@@ -155,6 +155,18 @@ run(function() -- silent aim hook
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
+playersService.LocalPlayer.CharacterAdded:Connect(function(character)
+    local antiJumpScript = character:WaitForChild("AntiJump", 1)  -- Just incase 
+    if antiJumpScript then
+        antiJumpScript:Destroy()
+    end
+end)
+-- also destroy it now if you're already alive
+if playersService.LocalPlayer.Character then
+    local s = playersService.LocalPlayer.Character:WaitForChild("AntiJump", 1)
+    if s then s:Destroy() end
+end
+
 run(function() -- Team Switcher
     local RequestTeamChange = remotes:WaitForChild("RequestTeamChange")
     local Shippingcontainers = workspaceService:WaitForChild("Shippingcontainers")
@@ -1064,4 +1076,4 @@ run(function() -- Auto Arrest
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
 
-print("Hello, V4.1")
+print("Hello, V4.2")
