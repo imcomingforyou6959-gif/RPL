@@ -187,7 +187,7 @@ run(function()
     local customColorsEnabled = false
     local showTracersEnabled = true
 
-    -- helper to create a tracer part with custom color
+    -- CC Helper
     local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
         local distance = (endPos - startPos).magnitude
         local midPoint = (startPos + endPos) / 2
@@ -203,7 +203,7 @@ run(function()
         part.CanCollide = false
         part.CanQuery = false
         part.CanTouch = false
-        part.Color = color          -- use custom colour
+        part.Color = color          -- use cc
         part.Parent = workspace.CurrentCamera
 
         if hasLight then
@@ -272,7 +272,7 @@ run(function()
         end
     })
 
-    -- colour sliders (always visible when module is on)
+    -- CS
     local TaserColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Taser Color",
         Function = function(hue, sat, val)
@@ -301,7 +301,7 @@ run(function()
         end
     })
 
-    -- hide them by default
+    -- HTBD
     TaserColorSlider.Object.Visible = false
     SniperColorSlider.Object.Visible = false
     BulletColorSlider.Object.Visible = false
@@ -1225,4 +1225,38 @@ run(function()
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
 
-print("Hello, V4.4.2")
+run(function()
+    local NameChanger = vape.Categories.Utility:CreateModule({
+        Name = "Name Changer",
+        Function = function(callback)
+            -- nothing needed on toggle
+        end
+    })
+
+    local displayNameBox = NameChanger:CreateTextBox({
+        Name = "Display Name",
+        Default = lplr.DisplayName or lplr.Name or "",
+        Placeholder = "New display name"
+    })
+    local userNameBox = NameChanger:CreateTextBox({
+        Name = "User Name",
+        Default = lplr.Name or "",
+        Placeholder = "New username"
+    })
+    NameChanger:CreateButton({
+        Name = "Set Names",
+        Function = function()
+            local newDisplay = displayNameBox.Value
+            local newUser = userNameBox.Value
+            if newDisplay and newDisplay ~= "" then
+                lplr.DisplayName = newDisplay
+            end
+            if newUser and newUser ~= "" then
+                lplr.Name = newUser
+            end
+            notif('Name Changer', 'Names have been updated!', 2, 'success')
+        end
+    })
+end)
+
+print("Hello, V4.5")
