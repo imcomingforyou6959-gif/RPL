@@ -25,7 +25,7 @@ local guiService = cloneref(game:GetService('GuiService'))
 local vimService = cloneref(game:GetService('VirtualInputManager'))
 local playerGui = cloneref(playersService.LocalPlayer:WaitForChild("PlayerGui"))
 
--- Global Search
+-- Pre‑fetch team aliases to avoid repeated global lookups
 local guardsTeam = teamService.Guards
 local criminalsTeam = teamService.Criminals
 local inmatesTeam = teamService.Inmates
@@ -172,6 +172,184 @@ if playersService.LocalPlayer.Character then
 end
 
 run(function()
+    -- start 1
+    local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
+    local originalCreateTaser = GunTracers.createTaser
+    local originalCreateSniper = GunTracers.createSniper
+    local originalCreateBullet = GunTracers.createBullet
+
+    -- Service
+    local debris = game:GetService("Debris")
+    local tweenService = game:GetService("TweenService")
+
+    -- meh
+    local taserColor = Color3.fromRGB(0, 234, 255)
+    local sniperColor = Color3.fromRGB(127, 127, 127)   -- medium stone grey
+    local bulletColor = Color3.fromRGB(255, 255, 0)     -- yellow
+
+    -- Module states
+    local customColorsEnabled = false
+    local showTracersEnabled = true
+
+    -- Helper function :(
+    local function createTracerPart(startPos, endPos, brickColor, sizeThickness, duration, lightColor)
+        local distance = (endPos - startPos).magnitude
+        local midPoint = (startPos + endPos) / 2
+
+        local part = Instance.new("Part")
+        part.Name = "RayPart"
+        part.Material = Enum.Material.Neon
+        part.Anchored = true
+        part.Transparency = 0.5
+        part.formFactor = Enum.FormFactor.Custom
+        part.Size = Vector3.new(sizeThickness, sizeThickness, distance)
+        part.CFrame = CFrame.new(midPoint, endPos)
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.BrickColor = brickColor and BrickColor.new(brickColor) or BrickColor.White()
+        part.Parent = workspace.CurrentCamera
+
+        -- :(
+        if lightColor then
+            local light = Instance.new("SurfaceLight", part)
+            light.Color = lightColor
+            light.Range = 7
+            light.Face = "Bottom"
+            light.Brightness = 5
+            light.Angle = 180
+            -- fade
+            tweenService:Create(light, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Brightness = 0}):Play()
+        end
+
+        -- Fade out the part
+        tweenService:Create(part, TweenInfo.new(duration or 1, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Transparency = 1}):Play()
+
+        -- Destroy part after its lifespan
+        debris:AddItem(part, duration or 2)
+    end
+
+    -- smh
+    local function customCreateTaser(startPos, endPos)
+        createTracerPart(startPos, endPos, "Cyan", 0.2, 2, taserColor)
+    end
+
+    local function customCreateSniper(startPos, endPos)
+        createTracerPart(startPos, endPos, "Medium stone grey", 0.17, 4, nil)
+    end
+
+    local function customCreateBullet(startPos, endPos)
+        createTracerPart(startPos, endPos, "Yellow", 0.1, 0.05, nil)
+    end
+
+    -- Empty functions to completely disable tracers
+    local function emptyTracer() end
+
+    -- men
+    local function updateTracerFunctions()
+        if not showTracersEnabled then
+            GunTracers.createTaser = emptyTracer
+            GunTracers.createSniper = emptyTracer
+            GunTracers.createBullet = emptyTracer
+        elseif customColorsEnabled then
+            GunTracers.createTaser = customCreateTaser
+            GunTracers.createSniper = customCreateSniper
+            GunTracers.createBullet = customCreateBullet
+        else
+            GunTracers.createTaser = originalCreateTaser
+            GunTracers.createSniper = originalCreateSniper
+            GunTracers.createBullet = originalCreateBullet
+        end
+    end
+
+    -- 67
+    local TracerVisuals = vape.Categories.Utility:CreateModule({
+        Name = "Tracer Visuals",
+        Function = function(callback)
+            if callback then
+                -- 6767
+                updateTracerFunctions()
+            else
+                -- 41 gold 
+                GunTracers.createTaser = originalCreateTaser
+                GunTracers.createSniper = originalCreateSniper
+                GunTracers.createBullet = originalCreateBullet
+            end
+        end
+    })
+
+    -- hi mister
+    TracerVisuals:CreateToggle({
+        Name = "Show Tracers",
+        Default = true,
+        Function = function(callback)
+            showTracersEnabled = callback
+            updateTracerFunctions()
+        end
+    })
+
+    -- ccc
+    TracerVisuals:CreateToggle({
+        Name = "Custom Colors",
+        Default = false,
+        Function = function(callback)
+            customColorsEnabled = callback
+            -- 34567
+            if TaserColorSlider then TaserColorSlider.Object.Visible = callback end
+            if SniperColorSlider then SniperColorSlider.Object.Visible = callback end
+            if BulletColorSlider then BulletColorSlider.Object.Visible = callback end
+            updateTracerFunctions()
+        end
+    })
+
+    -- 89
+    local TaserColorSlider = TracerVisuals:CreateColorSlider({
+        Name = "Taser Color",
+        Visible = false,
+        DefaultHue = 0.54,    -- cyan hue
+        DefaultSat = 1,
+        DefaultVal = 1,
+        Function = function(hue, sat, val)
+            taserColor = Color3.fromHSV(hue, sat, val)
+            if customColorsEnabled and showTracersEnabled then
+                updateTracerFunctions()
+            end
+        end
+    })
+
+    local SniperColorSlider = TracerVisuals:CreateColorSlider({
+        Name = "Sniper Color",
+        Visible = false,
+        DefaultHue = 0,       -- grey
+        DefaultSat = 0,
+        DefaultVal = 0.5,
+        Function = function(hue, sat, val)
+            sniperColor = Color3.fromHSV(hue, sat, val)
+            if customColorsEnabled and showTracersEnabled then
+                updateTracerFunctions()
+            end
+        end
+    })
+
+    local BulletColorSlider = TracerVisuals:CreateColorSlider({
+        Name = "Bullet Color",
+        Visible = false,
+        DefaultHue = 0.16,    -- yellow
+        DefaultSat = 1,
+        DefaultVal = 1,
+        Function = function(hue, sat, val)
+            bulletColor = Color3.fromHSV(hue, sat, val)
+            if customColorsEnabled and showTracersEnabled then
+                updateTracerFunctions()
+            end
+        end
+    end)
+
+    -- Initial state: show original tracers
+    updateTracerFunctions()
+end)
+
+run(function()
     local RequestTeamChange = remotes:WaitForChild("RequestTeamChange")
     local Shippingcontainers = workspaceService:WaitForChild("Shippingcontainers")
     local TeamSwitcher
@@ -181,7 +359,7 @@ run(function()
         Name = "TeamSwitcher",
         Function = function(callback)
             if callback == true then
-                notif('Rawr.xyz', 'Please expand this module to use it', 3, 'alert')
+                notif('Vape', 'Please expand this module to use it', 3, 'alert')
                 TeamSwitcher:Toggle()
             end
         end
@@ -202,7 +380,7 @@ run(function()
                 RequestTeamChange:InvokeServer(guardsTeam, 1)
                 task.delay(1, function()
                     if lplr.Team ~= guardsTeam then
-                        notif('Rawr.xyz', 'Failed to switch to guards team, please try again later', 3, 'alert')
+                        notif('Vape', 'Failed to switch to guards team, please try again later', 3, 'alert')
                     end
                 end)
             elseif Team.Value == "Criminals" then
@@ -213,7 +391,7 @@ run(function()
                     until lplr.Team == criminalsTeam
                     t.d.s = CFrame.new()
                 else
-                    notif('Rawr.xyz', 'Please switch to the inmates team and try again', 3, 'alert')
+                    notif('Vape', 'Please switch to the inmates team and try again', 3, 'alert')
                 end
             elseif Team.Value == "Inmates" then
                 RequestTeamChange:InvokeServer(neutralTeam, 1)
@@ -221,7 +399,7 @@ run(function()
                 RequestTeamChange:InvokeServer(inmatesTeam, 1)
                 task.delay(1, function()
                     if lplr.Team ~= inmatesTeam then
-                        notif('Rawr.xyz', 'Failed to switch to inmates team, please try again later', 3, 'alert')
+                        notif('Vape', 'Failed to switch to inmates team, please try again later', 3, 'alert')
                     end
                 end)
             end
@@ -333,7 +511,6 @@ run(function()
         backpackConn = lplr.Backpack.ChildAdded:Connect(function(child)
             itemAdded(child)
         end)
-        -- Numeric for loop 
         local children = char.Character:GetChildren()
         for i = 1, #children do itemAdded(children[i]) end
         children = lplr.Backpack:GetChildren()
@@ -385,6 +562,7 @@ run(function()
     local ShowTarget
     local rand = Random.new()
     local delayCheck = tick()
+    -- The GunTracers module has already been patched by Tracer Visuals
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
     local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
     local Method
@@ -492,7 +670,7 @@ run(function()
             if callback then
                 repeat
                     if entitylib.isAlive then
-                        local character = entitylib.character.Character  -- cached locally for this iteration
+                        local character = entitylib.character.Character
                         local head = entitylib.character.Head
                         if head and character then
                             local origin = head.CFrame
@@ -565,7 +743,7 @@ run(function()
                             end
                         end
                     end
-                    task.wait(0.03)  -- reduced because it caused preformance issues 
+                    task.wait(0.03)
                 until not SilentAim.Enabled
             end
         end,
@@ -842,7 +1020,6 @@ run(function()
                         Limit = Max.Value
                     })
 
-                    -- Numeric for loop
                     for i = 1, #plrs do
                         local v = plrs[i]
                         local delta = (v.RootPart.Position - selfpos)
@@ -895,7 +1072,7 @@ run(function()
                         end
                     end
 
-                    task.wait(0.03)  -- reduced CPU usage
+                    task.wait(0.03)
                 until not Killaura.Enabled
             else
                 for _, box in pairs(Boxes) do box.Visible = false; box.Adornee = nil end
@@ -1079,4 +1256,4 @@ run(function()
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
 
-print("Hello, V4.3")
+print("Hello, V4.4")
