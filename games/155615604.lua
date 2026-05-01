@@ -270,24 +270,8 @@ run(function()
         end
     })
 
-    TracerVisuals:CreateToggle({
-        Name = "Custom Colors",
-        Default = false,
-        Function = function(callback)
-            customColorsEnabled = callback
-            if TaserColorSlider then TaserColorSlider.Object.Visible = callback end
-            if SniperColorSlider then SniperColorSlider.Object.Visible = callback end
-            if BulletColorSlider then BulletColorSlider.Object.Visible = callback end
-            updateTracerFunctions()
-        end
-    })
-
     local TaserColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Taser Color",
-        Visible = false,
-        DefaultHue = 0.54,
-        DefaultSat = 1,
-        DefaultVal = 1,
         Function = function(hue, sat, val)
             taserColor = Color3.fromHSV(hue, sat, val)
             if customColorsEnabled and showTracersEnabled then
@@ -295,13 +279,8 @@ run(function()
             end
         end
     })
-
     local SniperColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Sniper Color",
-        Visible = false,
-        DefaultHue = 0,
-        DefaultSat = 0,
-        DefaultVal = 0.5,
         Function = function(hue, sat, val)
             sniperColor = Color3.fromHSV(hue, sat, val)
             if customColorsEnabled and showTracersEnabled then
@@ -309,13 +288,8 @@ run(function()
             end
         end
     })
-
     local BulletColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Bullet Color",
-        Visible = false,
-        DefaultHue = 0.16,
-        DefaultSat = 1,
-        DefaultVal = 1,
         Function = function(hue, sat, val)
             bulletColor = Color3.fromHSV(hue, sat, val)
             if customColorsEnabled and showTracersEnabled then
@@ -324,7 +298,21 @@ run(function()
         end
     })
 
-    updateTracerFunctions()
+    TaserColorSlider.Object.Visible = false
+    SniperColorSlider.Object.Visible = false
+    BulletColorSlider.Object.Visible = false
+
+    TracerVisuals:CreateToggle({
+        Name = "Custom Colors",
+        Default = false,
+        Function = function(callback)
+            customColorsEnabled = callback
+            TaserColorSlider.Object.Visible = callback
+            SniperColorSlider.Object.Visible = callback
+            BulletColorSlider.Object.Visible = callback
+            updateTracerFunctions()
+        end
+    })
 end)
 
 run(function()
@@ -1233,4 +1221,4 @@ run(function()
     ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
 end)
 
-print("Hello, V4.4")
+print("Hello, V4.4.1")
