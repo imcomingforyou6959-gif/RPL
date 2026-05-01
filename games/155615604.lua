@@ -179,7 +179,6 @@ run(function()
     local debris = game:GetService("Debris")
     local tweenService = game:GetService("TweenService")
 
-    -- default colours
     local taserColor = Color3.fromRGB(0, 234, 255)
     local sniperColor = Color3.fromRGB(255, 50, 50)
     local bulletColor = Color3.fromRGB(255, 255, 0)
@@ -950,9 +949,6 @@ run(function()
     end
 end)
 
--- ============================================================
--- NEW MODULE: Hitmarker & Hitsound
--- ============================================================
 run(function()
     local HitmarkerModule = vape.Categories.Utility:CreateModule({
         Name = "Hitmarker & Hitsound",
@@ -962,16 +958,90 @@ run(function()
     -- State toggles
     local visualEnabled = false
     local soundEnabled = false
-    local lastSoundPath = "newvape/assets/sounds/hit.mp3"
-    local soundCooldown = 0.1   -- avoid audio overlap
+    local lastSoundPath = "newvape/assets/sounds/Beep.mp3"
+    local soundCooldown = 0.1
     local lastSoundTime = 0
 
-    -- Hitmarker drawing (cross)
+    -- Complete sound database from GitHub repo
+    local soundFiles = {
+        -- MP3
+        {name = "1nn", ext = ".mp3"},
+        {name = "67", ext = ".mp3"},
+        {name = "BatHit", ext = ".mp3"},
+        {name = "Beep", ext = ".mp3"},
+        {name = "Bonk", ext = ".mp3"},
+        {name = "Bow", ext = ".mp3"},
+        {name = "Bubble", ext = ".mp3"},
+        {name = "Bubble2", ext = ".mp3"},
+        {name = "CSGO", ext = ".mp3"},
+        {name = "Cod", ext = ".mp3"},
+        {name = "Fairy1", ext = ".mp3"},
+        {name = "Fairy2", ext = ".mp3"},
+        {name = "Fatality", ext = ".mp3"},
+        {name = "Fatality2", ext = ".mp3"},
+        {name = "Hentai1", ext = ".mp3"},
+        {name = "Hentai2", ext = ".mp3"},
+        {name = "Hentai3", ext = ".mp3"},
+        {name = "Lazer", ext = ".mp3"},
+        {name = "MarioCoins", ext = ".mp3"},
+        {name = "MinecraftXP", ext = ".mp3"},
+        {name = "Neverlose", ext = ".mp3"},
+        {name = "OSU", ext = ".mp3"},
+        {name = "PubgPan", ext = ".mp3"},
+        {name = "Rifk7", ext = ".mp3"},
+        {name = "RustHeadshot", ext = ".mp3"},
+        {name = "Skeet", ext = ".mp3"},
+        {name = "SpanishMoan", ext = ".mp3"},
+        {name = "StaryKrow", ext = ".mp3"},
+        {name = "Steve", ext = ".mp3"},
+        {name = "TF2Crit", ext = ".mp3"},
+        {name = "TF2Default", ext = ".mp3"},
+        {name = "Windows", ext = ".mp3"},
+        {name = "lobby", ext = ".mp3"},
+        -- OGG
+        {name = "boolean", ext = ".ogg"},
+        {name = "disable", ext = ".ogg"},
+        {name = "enable", ext = ".ogg"},
+        {name = "keypress", ext = ".ogg"},
+        {name = "keyrelease", ext = ".ogg"},
+        {name = "moan1", ext = ".ogg"},
+        {name = "moan2", ext = ".ogg"},
+        {name = "moan3", ext = ".ogg"},
+        {name = "moan4", ext = ".ogg"},
+        {name = "orthodox", ext = ".ogg"},
+        {name = "pmsound", ext = ".ogg"},
+        {name = "rifk", ext = ".ogg"},
+        {name = "scroll", ext = ".ogg"},
+        {name = "skeet", ext = ".ogg"},
+        {name = "swipein", ext = ".ogg"},
+        {name = "swipeout", ext = ".ogg"},
+        {name = "uwu", ext = ".ogg"},
+        -- No extension
+        {name = "ex", ext = ""}
+    }
+
+    -- Build display list for dropdown
+    local soundNames = {}
+    local soundMap = {}
+    for _, s in ipairs(soundFiles) do
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.name .. s.ext
+    end
+
+    -- Assets
+    local GITHUB_SOUNDS_BASE = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/assets/sounds/"
+
+    -- Folders
+    if not isfolder("newvape/assets/sounds") then
+        makefolder("newvape/assets/sounds")
+    end
+
+    -- :(
     local hitmarkerLines = {}
     local function createHitmarker()
         for i = 1, 4 do
             local line = Drawing.new("Line")
-            line.Color = Color3.fromRGB(255, 0, 0)  -- red
+            line.Color = Color3.fromRGB(255, 0, 0)
             line.Thickness = 2
             line.Transparency = 1
             line.Visible = false
@@ -983,12 +1053,11 @@ run(function()
     local function showHitmarker()
         local center = vape.gui.AbsoluteSize / 2
         local size = 10
-        -- cross pattern: top, bottom, left, right
         local directions = {
-            {Vector2.new(0, -size), Vector2.new(0, -size/3)},   -- top
-            {Vector2.new(0, size), Vector2.new(0, size/3)},     -- bottom
-            {Vector2.new(-size, 0), Vector2.new(-size/3, 0)},   -- left
-            {Vector2.new(size, 0), Vector2.new(size/3, 0)}      -- right
+            {Vector2.new(0, -size), Vector2.new(0, -size/3)},
+            {Vector2.new(0, size), Vector2.new(0, size/3)},
+            {Vector2.new(-size, 0), Vector2.new(-size/3, 0)},
+            {Vector2.new(size, 0), Vector2.new(size/3, 0)}
         }
         for i, line in ipairs(hitmarkerLines) do
             if i <= #directions then
@@ -998,7 +1067,6 @@ run(function()
                 line.Visible = true
             end
         end
-        -- fade out
         task.delay(0.2, function()
             for _, line in ipairs(hitmarkerLines) do
                 line.Visible = false
@@ -1006,7 +1074,6 @@ run(function()
         end)
     end
 
-    -- Play hitsound using getcustomaudio
     local function playHitsound(path)
         if tick() - lastSoundTime < soundCooldown then return end
         lastSoundTime = tick()
@@ -1025,7 +1092,6 @@ run(function()
                 sound:Destroy()
             end)
         else
-            -- fallback: try syn.play_audio
             local synSuccess = pcall(function()
                 if syn and syn.play_audio then
                     syn.play_audio(path)
@@ -1037,12 +1103,10 @@ run(function()
         end
     end
 
-    -- Called from the shooting hook (we'll modify t.sa.hooks.PrisonLife slightly)
-    -- To keep it clean, we override the notification function to also trigger hitmarker/sound
+    -- Override notif to trigger hitmarker/sound on hit messages
     local originalNotif = notif
     notif = function(title, msg, duration, type)
-        -- Catch hit messages and trigger effects
-        if type == 'hit' or string.find(msg, "'s ") then
+        if type == 'hit' or (msg and string.find(msg, "'s ")) then
             if visualEnabled then showHitmarker() end
             if soundEnabled then playHitsound(lastSoundPath) end
         end
@@ -1062,19 +1126,29 @@ run(function()
         Function = function(callback) soundEnabled = callback end
     })
 
-    local soundPathBox = HitmarkerModule:CreateTextBox({
-        Name = "Hitsound File Path",
-        Default = lastSoundPath,
-        Placeholder = "newvape/assets/sounds/hit.mp3"
-    })
-
-    HitmarkerModule:CreateButton({
-        Name = "Set Path",
-        Function = function()
-            local newPath = soundPathBox.Value
-            if newPath and newPath ~= "" then
-                lastSoundPath = newPath
-                notif('Hitmarker', 'Sound path set to: '..newPath, 2, 'success')
+    -- Dropdown with all sounds from GitHub
+    HitmarkerModule:CreateDropdown({
+        Name = "Select Sound",
+        List = soundNames,
+        Function = function(val)
+            local fullName = soundMap[val]
+            if fullName then
+                lastSoundPath = "newvape/assets/sounds/" .. fullName
+                -- Auto-download if missing
+                if not isfile(lastSoundPath) then
+                    local rawUrl = GITHUB_SOUNDS_BASE .. fullName
+                    local suc, res = pcall(function()
+                        return game:HttpGet(rawUrl)
+                    end)
+                    if suc and res then
+                        writefile(lastSoundPath, res)
+                        notif('Hitmarker', 'Downloaded: '..fullName, 2, 'success')
+                    else
+                        notif('Hitmarker', 'Failed to download: '..fullName, 3, 'alert')
+                    end
+                else
+                    notif('Hitmarker', 'Selected: '..fullName, 2, 'success')
+                end
             end
         end
     })
@@ -1395,4 +1469,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.6")
+print("Hello, V4.7")
