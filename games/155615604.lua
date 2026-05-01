@@ -25,7 +25,6 @@ local guiService = cloneref(game:GetService('GuiService'))
 local vimService = cloneref(game:GetService('VirtualInputManager'))
 local playerGui = cloneref(playersService.LocalPlayer:WaitForChild("PlayerGui"))
 
--- Pre‑fetch team aliases to avoid repeated global lookups
 local guardsTeam = teamService.Guards
 local criminalsTeam = teamService.Criminals
 local inmatesTeam = teamService.Inmates
@@ -172,27 +171,22 @@ if playersService.LocalPlayer.Character then
 end
 
 run(function()
-    -- start 1
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
-    local originalCreateTaser = GunTracers.createTaser
-    local originalCreateSniper = GunTracers.createSniper
-    local originalCreateBullet = GunTracers.createBullet
+    local originalCreateTaser = GunTracers and GunTracers.createTaser or function() end
+    local originalCreateSniper = GunTracers and GunTracers.createSniper or function() end
+    local originalCreateBullet = GunTracers and GunTracers.createBullet or function() end
 
-    -- Service
     local debris = game:GetService("Debris")
     local tweenService = game:GetService("TweenService")
 
-    -- meh
     local taserColor = Color3.fromRGB(0, 234, 255)
-    local sniperColor = Color3.fromRGB(127, 127, 127)   -- medium stone grey
-    local bulletColor = Color3.fromRGB(255, 255, 0)     -- yellow
+    local sniperColor = Color3.fromRGB(127, 127, 127)
+    local bulletColor = Color3.fromRGB(255, 255, 0)
 
-    -- Module states
     local customColorsEnabled = false
     local showTracersEnabled = true
 
-    -- Helper function :(
-    local function createTracerPart(startPos, endPos, brickColor, sizeThickness, duration, lightColor)
+    local function createTracerPart(startPos, endPos, brickColorName, sizeThickness, duration, lightColor)
         local distance = (endPos - startPos).magnitude
         local midPoint = (startPos + endPos) / 2
 
@@ -207,10 +201,9 @@ run(function()
         part.CanCollide = false
         part.CanQuery = false
         part.CanTouch = false
-        part.BrickColor = brickColor and BrickColor.new(brickColor) or BrickColor.White()
+        part.BrickColor = BrickColor.new(brickColorName)
         part.Parent = workspace.CurrentCamera
 
-        -- :(
         if lightColor then
             local light = Instance.new("SurfaceLight", part)
             light.Color = lightColor
@@ -218,18 +211,13 @@ run(function()
             light.Face = "Bottom"
             light.Brightness = 5
             light.Angle = 180
-            -- fade
             tweenService:Create(light, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Brightness = 0}):Play()
         end
 
-        -- Fade out the part
         tweenService:Create(part, TweenInfo.new(duration or 1, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Transparency = 1}):Play()
-
-        -- Destroy part after its lifespan
         debris:AddItem(part, duration or 2)
     end
 
-    -- smh
     local function customCreateTaser(startPos, endPos)
         createTracerPart(startPos, endPos, "Cyan", 0.2, 2, taserColor)
     end
@@ -242,10 +230,8 @@ run(function()
         createTracerPart(startPos, endPos, "Yellow", 0.1, 0.05, nil)
     end
 
-    -- Empty functions to completely disable tracers
     local function emptyTracer() end
 
-    -- men
     local function updateTracerFunctions()
         if not showTracersEnabled then
             GunTracers.createTaser = emptyTracer
@@ -262,15 +248,12 @@ run(function()
         end
     end
 
-    -- 67
     local TracerVisuals = vape.Categories.Utility:CreateModule({
         Name = "Tracer Visuals",
         Function = function(callback)
             if callback then
-                -- 6767
                 updateTracerFunctions()
             else
-                -- 41 gold 
                 GunTracers.createTaser = originalCreateTaser
                 GunTracers.createSniper = originalCreateSniper
                 GunTracers.createBullet = originalCreateBullet
@@ -278,7 +261,6 @@ run(function()
         end
     })
 
-    -- hi mister
     TracerVisuals:CreateToggle({
         Name = "Show Tracers",
         Default = true,
@@ -288,13 +270,11 @@ run(function()
         end
     })
 
-    -- ccc
     TracerVisuals:CreateToggle({
         Name = "Custom Colors",
         Default = false,
         Function = function(callback)
             customColorsEnabled = callback
-            -- 34567
             if TaserColorSlider then TaserColorSlider.Object.Visible = callback end
             if SniperColorSlider then SniperColorSlider.Object.Visible = callback end
             if BulletColorSlider then BulletColorSlider.Object.Visible = callback end
@@ -302,11 +282,10 @@ run(function()
         end
     })
 
-    -- 89
     local TaserColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Taser Color",
         Visible = false,
-        DefaultHue = 0.54,    -- cyan hue
+        DefaultHue = 0.54,
         DefaultSat = 1,
         DefaultVal = 1,
         Function = function(hue, sat, val)
@@ -320,7 +299,7 @@ run(function()
     local SniperColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Sniper Color",
         Visible = false,
-        DefaultHue = 0,       -- grey
+        DefaultHue = 0,
         DefaultSat = 0,
         DefaultVal = 0.5,
         Function = function(hue, sat, val)
@@ -334,7 +313,7 @@ run(function()
     local BulletColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Bullet Color",
         Visible = false,
-        DefaultHue = 0.16,    -- yellow
+        DefaultHue = 0.16,
         DefaultSat = 1,
         DefaultVal = 1,
         Function = function(hue, sat, val)
@@ -343,9 +322,8 @@ run(function()
                 updateTracerFunctions()
             end
         end
-    end)
+    })
 
-    -- Initial state: show original tracers
     updateTracerFunctions()
 end)
 
@@ -562,7 +540,6 @@ run(function()
     local ShowTarget
     local rand = Random.new()
     local delayCheck = tick()
-    -- The GunTracers module has already been patched by Tracer Visuals
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
     local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
     local Method
