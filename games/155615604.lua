@@ -472,7 +472,6 @@ run(function()
 
         toolConns[v] = conn
 
-        -- Clean up when tool is removed
         v.Destroying:Connect(function()
             if toolConns[v] then
                 toolConns[v]:Disconnect()
@@ -542,9 +541,10 @@ run(function()
     local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
     local Method
     local mouseClicked = false
+    local renderStepConnection
 
     local function tryShoot(origin, targetPart, tool)
-        if not tool then return end
+        if not tool or not targetPart then return end
         local ammo = tool:GetAttribute("Local_CurrentAmmo")
         if not ammo or ammo <= 0 then return end
         local reloadSession = tool:GetAttribute("Local_ReloadSession")
@@ -613,7 +613,7 @@ run(function()
     t.sa.hooks.PrisonLife = function(args)
         if not entitylib.isAlive then return end
         local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
-        if not ent or typeof(args[1]) ~= "table" then return end
+        if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
 
         local originalHits = args[1]
         local count = math.clamp(#originalHits, 1, 20)
@@ -643,83 +643,88 @@ run(function()
         Function = function(callback)
             if CircleObject then CircleObject.Visible = callback and Mode.Value == 'Mouse' end
             if callback then
-                repeat
-                    if entitylib.isAlive then
-                        local character = entitylib.character.Character
-                        local head = entitylib.character.Head
-                        if head and character then
-                            local origin = head.CFrame
-                            local ent = entitylib['Entity' .. Mode.Value]({
-                                Range = Range.Value,
-                                Wallcheck = Target.Walls.Enabled or nil,
-                                Part = 'Head',
-                                Origin = origin.Position,
-                                Players = Target.Players.Enabled,
-                                NPCs = Target.NPCs.Enabled
-                            })
+                renderStepConnection = runService.RenderStepped:Connect(function()
+                    if not entitylib.isAlive then return end
+                    local character = entitylib.character.Character
+                    local head = entitylib.character.Head
+                    if not head or not character then return end
 
-                            if ShowTarget.Enabled and ent then
-                                targetinfo.Targets[ent] = tick() + 1
-                            end
+                    local origin = head.CFrame
+                    local ent = entitylib['Entity' .. Mode.Value]({
+                        Range = Range.Value,
+                        Wallcheck = Target.Walls.Enabled or nil,
+                        Part = 'Head',
+                        Origin = origin.Position,
+                        Players = Target.Players.Enabled,
+                        NPCs = Target.NPCs.Enabled
+                    })
 
-                            if CircleObject then
-                                CircleObject.Position = inputService:GetMouseLocation()
-                            end
+                    if ShowTarget.Enabled and ent then
+                        targetinfo.Targets[ent] = tick() + 1
+                    end
 
-                            if AutoFire.Enabled then
-                                local mouseDown = mouse1click()
-                                local windowActive = (isrbxactive or iswindowactive)()
-                                if mouseDown and windowActive then
-                                    if ent and canClick() then
-                                        if Method.Value == 'Click' then
-                                            if delayCheck < tick() then
-                                                if mouseClicked then
-                                                    mouse1release()
-                                                    mouseClicked = false
-                                                    delayCheck = tick() + AutoFireShootDelay.Value
-                                                else
-                                                    mouse1press()
-                                                    mouseClicked = true
-                                                    delayCheck = tick() + AutoFireShootDelay.Value
-                                                end
-                                            end
+                    if CircleObject then
+                        CircleObject.Position = inputService:GetMouseLocation()
+                    end
+
+                    if AutoFire.Enabled then
+                        local mouseDown = mouse1click()
+                        local windowActive = (isrbxactive or iswindowactive)()
+                        if mouseDown and windowActive then
+                            if ent and canClick() then
+                                if Method.Value == 'Click' then
+                                    if delayCheck < tick() then
+                                        if mouseClicked then
+                                            mouse1release()
+                                            mouseClicked = false
+                                            delayCheck = tick() + AutoFireShootDelay.Value
                                         else
-                                            if delayCheck < tick() then
-                                                delayCheck = tick() + AutoFireShootDelay.Value
-                                                local tool = character:FindFirstChildOfClass("Tool")
-                                                if tool then
-                                                    tryShoot(origin.Position, ent.Head, tool)
-                                                end
-                                            end
+                                            mouse1press()
+                                            mouseClicked = true
+                                            delayCheck = tick() + AutoFireShootDelay.Value
                                         end
                                     end
                                 else
-                                    if mouseClicked then
-                                        mouse1release()
-                                        mouseClicked = false
+                                    if delayCheck < tick() then
+                                        delayCheck = tick() + AutoFireShootDelay.Value
+                                        local tool = character:FindFirstChildOfClass("Tool")
+                                        if tool and ent.Head then
+                                            tryShoot(origin.Position, ent.Head, tool)
+                                        end
                                     end
                                 end
                             end
-
-                            if Face.Enabled and ent then
-                                local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
-                                if rootPart then
-                                    local vec = rootPart.Position * Vector3.new(1,0,1)
-                                    entitylib.character.RootPart.CFrame = CFrame.lookAt(
-                                        entitylib.character.RootPart.Position,
-                                        Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
-                                    )
-                                end
-                            end
-
-                            if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
-                                t.bt.m = true
-                                t.bt.p = ent.HumanoidRootPart.Position
+                        else
+                            if mouseClicked then
+                                mouse1release()
+                                mouseClicked = false
                             end
                         end
                     end
-                    task.wait(0.03)
-                until not SilentAim.Enabled
+
+                    if Face.Enabled and ent then
+                        local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
+                        if rootPart then
+                            local vec = rootPart.Position * Vector3.new(1,0,1)
+                            if entitylib.character and entitylib.character.RootPart then
+                                entitylib.character.RootPart.CFrame = CFrame.lookAt(
+                                    entitylib.character.RootPart.Position,
+                                    Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
+                                )
+                            end
+                        end
+                    end
+
+                    if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
+                        t.bt.m = true
+                        t.bt.p = ent.HumanoidRootPart.Position
+                    end
+                end)
+            else
+                if renderStepConnection then
+                    renderStepConnection:Disconnect()
+                    renderStepConnection = nil
+                end
             end
         end,
         Tooltip = 'Silently adjusts your aim towards the enemy'
@@ -976,12 +981,14 @@ run(function()
     local Face
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
+    local renderStepConnection
 
     Killaura = vape.Categories.Blatant:CreateModule({
         Name = 'KillAura',
         Function = function(callback)
             if callback then
-                repeat
+                renderStepConnection = runService.RenderStepped:Connect(function()
+                    if not entitylib.isAlive then return end
                     local attacked = {}
                     local selfpos = entitylib.character.RootPart.Position
                     local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
@@ -997,20 +1004,22 @@ run(function()
 
                     for i = 1, #plrs do
                         local v = plrs[i]
-                        local delta = (v.RootPart.Position - selfpos)
-                        local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
-                        if angle <= (math.rad(AngleSlider.Value) / 2) then
-                            table.insert(attacked, {
-                                Entity = v,
-                                Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
-                            })
-                            targetinfo.Targets[v] = tick() + 1
+                        if v.RootPart then
+                            local delta = (v.RootPart.Position - selfpos)
+                            local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
+                            if angle <= (math.rad(AngleSlider.Value) / 2) then
+                                table.insert(attacked, {
+                                    Entity = v,
+                                    Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
+                                })
+                                targetinfo.Targets[v] = tick() + 1
 
-                            if AttackDelay < tick() then
-                                AttackDelay = tick() + (1 / CPS.GetRandomValue())
-                                pcall(function()
-                                    meleeEvent:FireServer(v.Player, 1, 1)
-                                end)
+                                if AttackDelay < tick() then
+                                    AttackDelay = tick() + (1 / CPS.GetRandomValue())
+                                    pcall(function()
+                                        meleeEvent:FireServer(v.Player, 1, 1)
+                                    end)
+                                end
                             end
                         end
                     end
@@ -1038,7 +1047,7 @@ run(function()
 
                     if Face.Enabled and #attacked > 0 then
                         local root = attacked[1].Entity.RootPart
-                        if root then
+                        if root and entitylib.character and entitylib.character.RootPart then
                             local vec = root.Position * Vector3.new(1,0,1)
                             entitylib.character.RootPart.CFrame = CFrame.lookAt(
                                 entitylib.character.RootPart.Position,
@@ -1046,10 +1055,12 @@ run(function()
                             )
                         end
                     end
-
-                    task.wait(0.03)
-                until not Killaura.Enabled
+                end)
             else
+                if renderStepConnection then
+                    renderStepConnection:Disconnect()
+                    renderStepConnection = nil
+                end
                 for _, box in pairs(Boxes) do box.Visible = false; box.Adornee = nil end
                 for _, part in pairs(Particles) do part.Parent = nil end
             end
