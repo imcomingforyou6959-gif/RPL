@@ -70,7 +70,8 @@ local t = {
     d = {l = CFrame.new(), s = CFrame.new()},
     bt = {m = false, q = false, p = Vector3.new()},
     sa = {hooks = {}, toggle = nil},
-    hn = {e = false}
+    hn = {e = false},
+    hs = {play = nil}   -- hitsound callback
 }
 
 run(function()
@@ -626,6 +627,9 @@ run(function()
                 end
             end
         end
+
+        -- Trigger hitsound callback
+        if t.hs.play then t.hs.play() end
     end
 
     SilentAim = vape.Categories.Combat:CreateModule({
@@ -949,98 +953,81 @@ run(function()
     end
 end)
 
+-- ============================================================
+-- SIMPLE HITSOUND MODULE (no visuals, no API)
+-- ============================================================
 run(function()
-    local HitmarkerModule = vape.Categories.Utility:CreateModule({
-        Name = "Hitmarker & Hitsound",
-        Function = function(callback) end
-    })
-
-    local visualEnabled = false
-    local soundEnabled = false
-    local lastSoundPath = "newvape/assets/sounds/Beep.mp3"
-    local soundCooldown = 0.1
-    local lastSoundTime = 0
+    -- Hardcoded list of sounds from your GitHub (same names as before)
+    local soundList = {
+        {name = "1nn", ext = ".mp3"},
+        {name = "67", ext = ".mp3"},
+        {name = "BatHit", ext = ".mp3"},
+        {name = "Beep", ext = ".mp3"},
+        {name = "Bonk", ext = ".mp3"},
+        {name = "Bow", ext = ".mp3"},
+        {name = "Bubble", ext = ".mp3"},
+        {name = "Bubble2", ext = ".mp3"},
+        {name = "CSGO", ext = ".mp3"},
+        {name = "Cod", ext = ".mp3"},
+        {name = "Fairy1", ext = ".mp3"},
+        {name = "Fairy2", ext = ".mp3"},
+        {name = "Fatality", ext = ".mp3"},
+        {name = "Fatality2", ext = ".mp3"},
+        {name = "Hentai1", ext = ".mp3"},
+        {name = "Hentai2", ext = ".mp3"},
+        {name = "Hentai3", ext = ".mp3"},
+        {name = "Lazer", ext = ".mp3"},
+        {name = "MarioCoins", ext = ".mp3"},
+        {name = "MinecraftXP", ext = ".mp3"},
+        {name = "Neverlose", ext = ".mp3"},
+        {name = "OSU", ext = ".mp3"},
+        {name = "PubgPan", ext = ".mp3"},
+        {name = "Rifk7", ext = ".mp3"},
+        {name = "RustHeadshot", ext = ".mp3"},
+        {name = "Skeet", ext = ".mp3"},
+        {name = "SpanishMoan", ext = ".mp3"},
+        {name = "StaryKrow", ext = ".mp3"},
+        {name = "Steve", ext = ".mp3"},
+        {name = "TF2Crit", ext = ".mp3"},
+        {name = "TF2Default", ext = ".mp3"},
+        {name = "Windows", ext = ".mp3"},
+        {name = "lobby", ext = ".mp3"},
+        {name = "boolean", ext = ".ogg"},
+        {name = "disable", ext = ".ogg"},
+        {name = "enable", ext = ".ogg"},
+        {name = "keypress", ext = ".ogg"},
+        {name = "keyrelease", ext = ".ogg"},
+        {name = "moan1", ext = ".ogg"},
+        {name = "moan2", ext = ".ogg"},
+        {name = "moan3", ext = ".ogg"},
+        {name = "moan4", ext = ".ogg"},
+        {name = "orthodox", ext = ".ogg"},
+        {name = "pmsound", ext = ".ogg"},
+        {name = "rifk", ext = ".ogg"},
+        {name = "scroll", ext = ".ogg"},
+        {name = "skeet", ext = ".ogg"},
+        {name = "swipein", ext = ".ogg"},
+        {name = "swipeout", ext = ".ogg"},
+        {name = "uwu", ext = ".ogg"},
+        {name = "ex", ext = ""}
+    }
 
     local soundNames = {}
-    local soundMap = {}
-    local GITHUB_SOUNDS_BASE = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/assets/sounds/"
-    local GITHUB_API_URL = "https://api.github.com/repos/imcomingforyou6959-gif/RPL/contents/assets/sounds"
+    local soundMap = {}    -- name -> "name.ext"
+    for _, s in ipairs(soundList) do
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.name .. s.ext
+    end
 
+    local baseUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/assets/sounds/"
     if not isfolder("newvape/assets/sounds") then
         makefolder("newvape/assets/sounds")
     end
 
-    -- Fetch file list from GitHub
-    local function fetchSoundList()
-        soundNames = {}
-        soundMap = {}
-        local success, response = pcall(function()
-            return game:HttpGet(GITHUB_API_URL)
-        end)
-        if success and response then
-            local ok, files = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), response)
-            if ok and type(files) == "table" then
-                for _, file in ipairs(files) do
-                    if file.type == "file" then
-                        local fullName = file.name
-                        local base = string.match(fullName, "(.+)%.[^%.]+$") or fullName
-                        if base and soundMap[base] == nil then
-                            table.insert(soundNames, base)
-                        end
-                        soundMap[base] = fullName   -- FEXE
-                    end
-                end
-            end
-        end
-        -- Fallback
-        if #soundNames == 0 then
-            local fallback = {"Beep", "Cod", "TF2Default", "MinecraftXP"}
-            for _, name in ipairs(fallback) do
-                table.insert(soundNames, name)
-                soundMap[name] = name .. ".mp3"
-            end
-        end
-    end
-
-    fetchSoundList()
-
-    -- m
-    local hitmarkerLines = {}
-    local function createHitmarker()
-        for i = 1, 4 do
-            local line = Drawing.new("Line")
-            line.Color = Color3.fromRGB(255, 0, 0)
-            line.Thickness = 2
-            line.Transparency = 1
-            line.Visible = false
-            table.insert(hitmarkerLines, line)
-        end
-    end
-    createHitmarker()
-
-    local function showHitmarker()
-        local center = vape.gui.AbsoluteSize / 2
-        local size = 10
-        local directions = {
-            {Vector2.new(0, -size), Vector2.new(0, -size/3)},
-            {Vector2.new(0, size), Vector2.new(0, size/3)},
-            {Vector2.new(-size, 0), Vector2.new(-size/3, 0)},
-            {Vector2.new(size, 0), Vector2.new(size/3, 0)}
-        }
-        for i, line in ipairs(hitmarkerLines) do
-            if i <= #directions then
-                line.From = center + directions[i][1]
-                line.To = center + directions[i][2]
-                line.Transparency = 1
-                line.Visible = true
-            end
-        end
-        task.delay(0.2, function()
-            for _, line in ipairs(hitmarkerLines) do
-                line.Visible = false
-            end
-        end)
-    end
+    local hitsoundEnabled = false
+    local currentSoundPath = "newvape/assets/sounds/Beep.mp3"
+    local soundCooldown = 0.1
+    local lastSoundTime = 0
 
     local function playHitsound(path)
         if tick() - lastSoundTime < soundCooldown then return end
@@ -1068,64 +1055,62 @@ run(function()
         end
     end
 
-    local originalNotif = notif
-    notif = function(title, msg, duration, type)
-        if type == 'hit' or (msg and string.find(msg, "'s ")) then
-            if visualEnabled then showHitmarker() end
-            if soundEnabled then playHitsound(lastSoundPath) end
+    -- Set global hitsound callback that fires on every hit
+    t.hs.play = function()
+        if hitsoundEnabled then
+            playHitsound(currentSoundPath)
         end
-        originalNotif(title, msg, duration, type)
     end
 
-    -- GUI elements
-    HitmarkerModule:CreateToggle({
-        Name = "Hitmarker (Visual)",
-        Default = false,
-        Function = function(callback) visualEnabled = callback end
+    local HitsoundModule = vape.Categories.Utility:CreateModule({
+        Name = "Hitsound",
+        Function = function(callback) end
     })
 
-    HitmarkerModule:CreateToggle({
+    HitsoundModule:CreateToggle({
         Name = "Hitsound",
         Default = false,
-        Function = function(callback) soundEnabled = callback end
+        Function = function(callback) hitsoundEnabled = callback end
     })
 
-    HitmarkerModule:CreateDropdown({
+    HitsoundModule:CreateDropdown({
         Name = "Select Sound",
         List = soundNames,
         Function = function(val)
             local fullName = soundMap[val]
             if fullName then
-                lastSoundPath = "newvape/assets/sounds/" .. fullName
-                if not isfile(lastSoundPath) then
-                    local rawUrl = GITHUB_SOUNDS_BASE .. fullName
+                currentSoundPath = "newvape/assets/sounds/" .. fullName
+                -- Auto-download if missing
+                if not isfile(currentSoundPath) then
+                    local rawUrl = baseUrl .. fullName
                     local suc, res = pcall(function()
                         return game:HttpGet(rawUrl)
                     end)
                     if suc and res then
-                        writefile(lastSoundPath, res)
-                        notif('Hitmarker', 'Downloaded: '..fullName, 2, 'success')
+                        writefile(currentSoundPath, res)
+                        notif('Hitsound', 'Downloaded: '..fullName, 2, 'success')
                     else
-                        notif('Hitmarker', 'Download failed – check filename: '..fullName, 3, 'alert')
+                        notif('Hitsound', '404 – file missing on GitHub: '..fullName, 3, 'alert')
                     end
                 else
-                    notif('Hitmarker', 'Selected: '..fullName, 2, 'success')
+                    notif('Hitsound', 'Selected: '..fullName, 2, 'success')
                 end
             end
         end
     })
 
-    HitmarkerModule:CreateButton({
+    HitsoundModule:CreateButton({
         Name = "Preview Sound",
         Function = function()
-            if soundEnabled then
-                playHitsound(lastSoundPath)
+            if hitsoundEnabled then
+                playHitsound(currentSoundPath)
             else
-                notif('Hitmarker', 'Enable Hitsound first', 2, 'alert')
+                notif('Hitsound', 'Enable Hitsound first', 2, 'alert')
             end
         end
     })
 end)
+
 run(function()
     local meleeEvent = replicatedStorageService:WaitForChild("meleeEvent")
     local Killaura
@@ -1430,4 +1415,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.7")
+print("Hello, V4.8 - Test")
