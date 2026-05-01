@@ -339,11 +339,11 @@ run(function()
         Name = "Switch",
         Function = function()
             if Team.Value == "Neutral" then
-                RequestTeamChange:InvokeServer(neutralTeam, 1)
+                pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
             elseif Team.Value == "Guards" then
-                RequestTeamChange:InvokeServer(neutralTeam, 1)
+                pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
                 task.wait(1.5)
-                RequestTeamChange:InvokeServer(guardsTeam, 1)
+                pcall(function() RequestTeamChange:InvokeServer(guardsTeam, 1) end)
                 task.delay(1, function()
                     if lplr.Team ~= guardsTeam then
                         notif('Vape', 'Failed to switch to guards team, please try again later', 3, 'alert')
@@ -360,9 +360,9 @@ run(function()
                     notif('Vape', 'Please switch to the inmates team and try again', 3, 'alert')
                 end
             elseif Team.Value == "Inmates" then
-                RequestTeamChange:InvokeServer(neutralTeam, 1)
+                pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
                 task.wait(1.5)
-                RequestTeamChange:InvokeServer(inmatesTeam, 1)
+                pcall(function() RequestTeamChange:InvokeServer(inmatesTeam, 1) end)
                 task.delay(1, function()
                     if lplr.Team ~= inmatesTeam then
                         notif('Vape', 'Failed to switch to inmates team, please try again later', 3, 'alert')
@@ -450,7 +450,7 @@ run(function()
 
         if toolConns[v] then toolConns[v]:Disconnect() end
 
-        toolConns[v] = v:GetAttributeChangedSignal("Local_CurrentAmmo"):Connect(function()
+        local conn = v:GetAttributeChangedSignal("Local_CurrentAmmo"):Connect(function()
             if not entitylib.isAlive then return end
             local ammo = v:GetAttribute("Local_CurrentAmmo")
             if ammo and ammo <= 0 then
@@ -467,6 +467,16 @@ run(function()
                            entitylib.character.Character:FindFirstChildOfClass("Tool"):GetAttribute("Local_CurrentAmmo") > 0)
                            or attempts > 10
                 end
+            end
+        end)
+
+        toolConns[v] = conn
+
+        -- Clean up when tool is removed
+        v.Destroying:Connect(function()
+            if toolConns[v] then
+                toolConns[v]:Disconnect()
+                toolConns[v] = nil
             end
         end)
     end
@@ -1237,10 +1247,10 @@ run(function()
         Function = function()
             local newDisplay = displayNameBox.Value
             local newUser = userNameBox.Value
-            if newDisplay and newDisplay ~= "" then
+            if newDisplay and newDisplay ~= "" and #newDisplay <= 100 then
                 lplr.DisplayName = newDisplay
             end
-            if newUser and newUser ~= "" then
+            if newUser and newUser ~= "" and #newUser <= 100 then
                 lplr.Name = newUser
             end
             notif('Name Changer', 'Names have been updated!', 2, 'success')
