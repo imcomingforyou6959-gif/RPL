@@ -57,7 +57,8 @@ local function canClick()
             return false
         end
     end
-    local clickGuiVisible = vape.gui.ScaledGui and vape.gui.ScaledGui.ClickGui and vape.gui.ScaledGui.ClickGui.Visible
+    local scaledGui = vape.gui.ScaledGui
+    local clickGuiVisible = scaledGui and scaledGui.ClickGui and scaledGui.ClickGui.Visible
     return not clickGuiVisible and not inputService:GetFocusedTextBox()
 end
 
@@ -75,23 +76,29 @@ local t = {
 
 run(function()
     vape:Clean(runService.Heartbeat:Connect(function()
-        if lplr.Character and t.d.s ~= CFrame.new() then
+        if lplr and lplr.Character then
             local character = lplr.Character
             local root = character:FindFirstChild("HumanoidRootPart")
-            if root then
+            if root and t.d.s ~= CFrame.new() then
                 t.d.l = root.CFrame
                 root.CFrame = t.d.s
                 runService.RenderStepped:Wait()
-                root.CFrame = t.d.l
+                if root and character.Parent then
+                    root.CFrame = t.d.l
+                end
             end
         end
     end))
 
     local old
     old = hookmetamethod(game, "__index", newcclosure(function(self, key)
-        if t.d.s ~= CFrame.new() and not checkcaller() and key == "CFrame" and
-            lplr.Character and lplr.Character.HumanoidRootPart and self ==
-            lplr.Character.HumanoidRootPart then return t.d.l end
+        if t.d.s ~= CFrame.new() and not checkcaller() and key == "CFrame" then
+            local char = lplr and lplr.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp and self == hrp then
+                return t.d.l
+            end
+        end
         return old(self, key)
     end))
 
@@ -118,8 +125,10 @@ run(function()
             local mid = child.CFrame.Position
 
             local start = mid - lookVector * (length / 2)
-            local dist = (start - entitylib.character.RootPart.Position).Magnitude
-            if dist > 5 then return end
+            if entitylib and entitylib.character and entitylib.character.RootPart then
+                local dist = (start - entitylib.character.RootPart.Position).Magnitude
+                if dist > 5 then return end
+            end
 
             local newEnd = t.bt.p
             local newLength = (newEnd - start).Magnitude
@@ -151,7 +160,9 @@ run(function()
         if checkcaller() then return old(self, ...) end
 
         local args = {...}
-        if typeof(args[1]) == "table" then t.sa.hooks.PrisonLife(args) end
+        if typeof(args[1]) == "table" and t.sa.hooks.PrisonLife then
+            t.sa.hooks.PrisonLife(args)
+        end
 
         return old(self, unpack(args))
     end)
@@ -160,7 +171,7 @@ run(function()
 end)
 
 playersService.LocalPlayer.CharacterAdded:Connect(function(character)
-    local antiJumpScript = character:WaitForChild("AntiJump", 1)
+    local antiJumpScript = character and character:WaitForChild("AntiJump", 1)
     if antiJumpScript then
         antiJumpScript:Destroy()
     end
@@ -187,6 +198,7 @@ run(function()
     local showTracersEnabled = true
 
     local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
+        if not startPos or not endPos or not color then return end
         local distance = (endPos - startPos).magnitude
         local midPoint = (startPos + endPos) / 2
 
@@ -233,6 +245,7 @@ run(function()
     local function emptyTracer() end
 
     local function updateTracerFunctions()
+        if not GunTracers then return end
         if not showTracersEnabled then
             GunTracers.createTaser = emptyTracer
             GunTracers.createSniper = emptyTracer
@@ -254,9 +267,11 @@ run(function()
             if callback then
                 updateTracerFunctions()
             else
-                GunTracers.createTaser = originalCreateTaser
-                GunTracers.createSniper = originalCreateSniper
-                GunTracers.createBullet = originalCreateBullet
+                if GunTracers then
+                    GunTracers.createTaser = originalCreateTaser
+                    GunTracers.createSniper = originalCreateSniper
+                    GunTracers.createBullet = originalCreateBullet
+                end
             end
         end
     })
@@ -338,33 +353,35 @@ run(function()
     TeamSwitcher:CreateButton({
         Name = "Switch",
         Function = function()
-            if Team.Value == "Neutral" then
+            local team = Team.Value
+            if team == "Neutral" then
                 pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
-            elseif Team.Value == "Guards" then
+            elseif team == "Guards" then
                 pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
                 task.wait(1.5)
                 pcall(function() RequestTeamChange:InvokeServer(guardsTeam, 1) end)
                 task.delay(1, function()
-                    if lplr.Team ~= guardsTeam then
+                    if lplr and lplr.Team ~= guardsTeam then
                         notif('Vape', 'Failed to switch to guards team, please try again later', 3, 'alert')
                     end
                 end)
-            elseif Team.Value == "Criminals" then
-                if lplr.Team == inmatesTeam then
+            elseif team == "Criminals" then
+                if lplr and lplr.Team == inmatesTeam and Shippingcontainers then
+                    local startTime = tick()
                     repeat
                         t.d.s = Shippingcontainers.WorldPivot
                         task.wait(0.05)
-                    until lplr.Team == criminalsTeam
+                    until lplr.Team == criminalsTeam or tick()-startTime > 10 or not lplr.Parent
                     t.d.s = CFrame.new()
                 else
                     notif('Vape', 'Please switch to the inmates team and try again', 3, 'alert')
                 end
-            elseif Team.Value == "Inmates" then
+            elseif team == "Inmates" then
                 pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
                 task.wait(1.5)
                 pcall(function() RequestTeamChange:InvokeServer(inmatesTeam, 1) end)
                 task.delay(1, function()
-                    if lplr.Team ~= inmatesTeam then
+                    if lplr and lplr.Team ~= inmatesTeam then
                         notif('Vape', 'Failed to switch to inmates team, please try again later', 3, 'alert')
                     end
                 end)
@@ -394,6 +411,7 @@ run(function()
     end
 
     local function getAmmoOrReloading(v)
+        if not v then return end
         local reloading = v:GetAttribute("Local_ReloadSession")
         if reloading and reloading == 0 then return true end
         local ammo = v:GetAttribute("Local_CurrentAmmo")
@@ -406,7 +424,7 @@ run(function()
 
     local function getToolWithAmmo()
         if not entitylib.isAlive then return end
-        local backpack = lplr:FindFirstChildOfClass("Backpack")
+        local backpack = lplr and lplr:FindFirstChildOfClass("Backpack")
         local character = entitylib.character and entitylib.character.Character
         if not backpack or not character then return end
 
@@ -423,7 +441,7 @@ run(function()
         end
 
         for _, v in pairs(backpack:GetChildren()) do
-            if v:IsA("Tool") and v.Name ~= "Taser" and getAmmoOrReloading(v) then
+            if v and v:IsA("Tool") and v.Name ~= "Taser" and getAmmoOrReloading(v) then
                 character.Humanoid:UnequipTools()
                 character.Humanoid:EquipTool(v)
                 return
@@ -432,18 +450,21 @@ run(function()
     end
 
     local function clearToolConns()
-        for _, conn in pairs(toolConns) do
-            conn:Disconnect()
+        if toolConns then
+            for _, conn in pairs(toolConns) do
+                conn:Disconnect()
+            end
+            table.clear(toolConns)
         end
-        table.clear(toolConns)
     end
 
     local function itemAdded(v)
-        if not v:IsA("Tool") then return end
-        if v:GetAttribute("Behavior") == "Sniper" then
+        if not v or not v:IsA("Tool") then return end
+        local behavior = v:GetAttribute("Behavior")
+        if behavior == "Sniper" then
             OwnSniper = true
             Sniper = v
-        elseif v:GetAttribute("Behavior") == "Shotgun" then
+        elseif behavior == "Shotgun" then
             OwnShotgun = true
             Shotgun = v
         end
@@ -473,7 +494,7 @@ run(function()
         toolConns[v] = conn
 
         v.Destroying:Connect(function()
-            if toolConns[v] then
+            if toolConns and toolConns[v] then
                 toolConns[v]:Disconnect()
                 toolConns[v] = nil
             end
@@ -483,13 +504,21 @@ run(function()
     local function characterAdded(char)
         clearToolConns()
         if backpackConn then backpackConn:Disconnect() end
-        backpackConn = lplr.Backpack.ChildAdded:Connect(function(child)
-            itemAdded(child)
-        end)
-        local children = char.Character:GetChildren()
-        for i = 1, #children do itemAdded(children[i]) end
-        children = lplr.Backpack:GetChildren()
-        for i = 1, #children do itemAdded(children[i]) end
+        if lplr and lplr.Backpack then
+            backpackConn = lplr.Backpack.ChildAdded:Connect(function(child)
+                itemAdded(child)
+            end)
+        end
+        local character = char and char.Character
+        if character then
+            local children = character:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
+        end
+        local backpack = lplr and lplr.Backpack
+        if backpack then
+            local children = backpack:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
+        end
 
         OwnShotgun = false
         OwnSniper = false
@@ -504,7 +533,7 @@ run(function()
                 reloadConnection = entitylib.Events.LocalAdded:Connect(function(newChar)
                     characterAdded(newChar)
                 end)
-                if entitylib.isAlive then
+                if entitylib and entitylib.isAlive then
                     characterAdded(entitylib.character)
                 end
             else
@@ -544,7 +573,7 @@ run(function()
     local renderStepConnection
 
     local function tryShoot(origin, targetPart, tool)
-        if not tool or not targetPart then return end
+        if not tool or not targetPart or not targetPart.Position then return end
         local ammo = tool:GetAttribute("Local_CurrentAmmo")
         if not ammo or ammo <= 0 then return end
         local reloadSession = tool:GetAttribute("Local_ReloadSession")
@@ -553,15 +582,20 @@ run(function()
         tool:SetAttribute("Local_IsShooting", true)
         local projectileCount = tool:GetAttribute("ProjectileCount") or 1
         local hits = {}
+        local lastBehavior
         for _ = 1, projectileCount do
             local muzzle = (tool:FindFirstChild("muzzle") and tool.muzzle.Position) or origin
-            local behavior = tool:GetAttribute("Behavior")
-            if behavior == "Sniper" then
-                GunTracers.createSniper(muzzle, targetPart.Position)
-            elseif behavior == "Taser" then
-                GunTracers.createTaser(muzzle, targetPart.Position)
-            else
-                GunTracers.createBullet(muzzle, targetPart.Position)
+            lastBehavior = tool:GetAttribute("Behavior")
+            if GunTracers then
+                if lastBehavior == "Sniper" and GunTracers.createSniper then
+                    GunTracers.createSniper(muzzle, targetPart.Position)
+                elseif lastBehavior == "Taser" and GunTracers.createTaser then
+                    GunTracers.createTaser(muzzle, targetPart.Position)
+                else
+                    if GunTracers.createBullet then
+                        GunTracers.createBullet(muzzle, targetPart.Position)
+                    end
+                end
             end
             table.insert(hits, {origin, targetPart.Position, targetPart})
         end
@@ -580,7 +614,7 @@ run(function()
                 if gunFrame then
                     local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
                     if bulletsLabel then
-                        if behavior == "Sniper" then
+                        if lastBehavior == "Sniper" then
                             bulletsLabel.Text = newAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
                         else
                             bulletsLabel.Text = newAmmo .. "/" .. (tool:GetAttribute("MaxAmmo") or 0)
@@ -594,36 +628,38 @@ run(function()
     end
 
     local function getTarget(origin, obj)
-        if rand.NextNumber(rand, 0, 100) > (AutoFire and AutoFire.Enabled and 100 or HitChance.Value) then return end
-        local headshotChance = (AutoFire and AutoFire.Enabled and 100 or HeadshotChance.Value)
+        local enabled = (AutoFire and AutoFire.Enabled)
+        local chance = enabled and 100 or (HitChance and HitChance.Value or 0)
+        if not rand or rand.NextNumber(rand, 0, 100) > chance then return end
+        local headshotChance = enabled and 100 or (HeadshotChance and HeadshotChance.Value or 0)
         local targetPart = (rand.NextNumber(rand, 0, 100) < headshotChance) and 'Head' or 'RootPart'
-        local wallcheck = Target and Target.Walls.Enabled and (obj or true) or nil
-        local ent = entitylib['Entity' .. Mode.Value]({
-            Range = Range.Value,
+        local wallcheck = Target and Target.Walls and Target.Walls.Enabled and (obj or true) or nil
+        local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
+            Range = Range and Range.Value or 150,
             Wallcheck = wallcheck,
             Part = targetPart,
             Origin = origin,
-            Players = Target.Players.Enabled,
-            NPCs = Target.NPCs.Enabled
+            Players = Target and Target.Players and Target.Players.Enabled,
+            NPCs = Target and Target.NPCs and Target.NPCs.Enabled
         })
-        if ent then targetinfo.Targets[ent] = tick() + 1 end
+        if ent and targetinfo then targetinfo.Targets[ent] = tick() + 1 end
         return ent, ent and ent[targetPart], origin
     end
 
     t.sa.hooks.PrisonLife = function(args)
-        if not entitylib.isAlive then return end
+        if not entitylib or not entitylib.isAlive then return end
         local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
         if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
 
         local originalHits = args[1]
         local count = math.clamp(#originalHits, 1, 20)
-        if SilentAim.Enabled then
+        if SilentAim and SilentAim.Enabled then
             local newHits = table.create(count)
             for i = 1, count do
                 newHits[i] = {origin, targetPart.Position, targetPart}
             end
             args[1] = newHits
-            if t.hn.e then
+            if t.hn.e and targetPart.Parent then
                 notif('Vape', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
             end
         else
@@ -641,25 +677,25 @@ run(function()
     SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'SilentAim',
         Function = function(callback)
-            if CircleObject then CircleObject.Visible = callback and Mode.Value == 'Mouse' end
+            if CircleObject then CircleObject.Visible = callback and Mode and Mode.Value == 'Mouse' end
             if callback then
                 renderStepConnection = runService.RenderStepped:Connect(function()
-                    if not entitylib.isAlive then return end
-                    local character = entitylib.character.Character
-                    local head = entitylib.character.Head
+                    if not entitylib or not entitylib.isAlive then return end
+                    local character = entitylib.character and entitylib.character.Character
+                    local head = entitylib.character and entitylib.character.Head
                     if not head or not character then return end
 
                     local origin = head.CFrame
-                    local ent = entitylib['Entity' .. Mode.Value]({
-                        Range = Range.Value,
-                        Wallcheck = Target.Walls.Enabled or nil,
+                    local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
+                        Range = Range and Range.Value or 150,
+                        Wallcheck = Target and Target.Walls and Target.Walls.Enabled or nil,
                         Part = 'Head',
                         Origin = origin.Position,
-                        Players = Target.Players.Enabled,
-                        NPCs = Target.NPCs.Enabled
+                        Players = Target and Target.Players and Target.Players.Enabled,
+                        NPCs = Target and Target.NPCs and Target.NPCs.Enabled
                     })
 
-                    if ShowTarget.Enabled and ent then
+                    if ShowTarget and ShowTarget.Enabled and ent and targetinfo then
                         targetinfo.Targets[ent] = tick() + 1
                     end
 
@@ -667,26 +703,26 @@ run(function()
                         CircleObject.Position = inputService:GetMouseLocation()
                     end
 
-                    if AutoFire.Enabled then
+                    if AutoFire and AutoFire.Enabled then
                         local mouseDown = mouse1click()
                         local windowActive = (isrbxactive or iswindowactive)()
                         if mouseDown and windowActive then
                             if ent and canClick() then
-                                if Method.Value == 'Click' then
+                                if Method and Method.Value == 'Click' then
                                     if delayCheck < tick() then
                                         if mouseClicked then
                                             mouse1release()
                                             mouseClicked = false
-                                            delayCheck = tick() + AutoFireShootDelay.Value
+                                            delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
                                         else
                                             mouse1press()
                                             mouseClicked = true
-                                            delayCheck = tick() + AutoFireShootDelay.Value
+                                            delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
                                         end
                                     end
                                 else
                                     if delayCheck < tick() then
-                                        delayCheck = tick() + AutoFireShootDelay.Value
+                                        delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
                                         local tool = character:FindFirstChildOfClass("Tool")
                                         if tool and ent.Head then
                                             tryShoot(origin.Position, ent.Head, tool)
@@ -702,16 +738,14 @@ run(function()
                         end
                     end
 
-                    if Face.Enabled and ent then
+                    if Face and Face.Enabled and ent then
                         local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
-                        if rootPart then
+                        if rootPart and entitylib.character and entitylib.character.RootPart then
                             local vec = rootPart.Position * Vector3.new(1,0,1)
-                            if entitylib.character and entitylib.character.RootPart then
-                                entitylib.character.RootPart.CFrame = CFrame.lookAt(
-                                    entitylib.character.RootPart.Position,
-                                    Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
-                                )
-                            end
+                            entitylib.character.RootPart.CFrame = CFrame.lookAt(
+                                entitylib.character.RootPart.Position,
+                                Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
+                            )
                         end
                     end
 
@@ -749,8 +783,8 @@ run(function()
     AutoFire = SilentAim:CreateToggle({
         Name = 'AutoFire',
         Function = function(callback)
-            AutoFireShootDelay.Object.Visible = callback
-            Method.Object.Visible = callback
+            if AutoFireShootDelay then AutoFireShootDelay.Object.Visible = callback end
+            if Method then Method.Object.Visible = callback end
         end
     })
     AutoFireShootDelay = SilentAim:CreateSlider({
@@ -763,20 +797,20 @@ run(function()
         Function = function(callback)
             if callback then
                 CircleObject = Drawing.new('Circle')
-                CircleObject.Filled = CircleFilled.Enabled
-                CircleObject.Color = Color3.fromHSV(CircleColor.Hue, CircleColor.Sat, CircleColor.Value)
+                CircleObject.Filled = CircleFilled and CircleFilled.Enabled
+                CircleObject.Color = Color3.fromHSV((CircleColor and CircleColor.Hue or 0), (CircleColor and CircleColor.Sat or 1), (CircleColor and CircleColor.Value or 1))
                 CircleObject.Position = vape.gui.AbsoluteSize / 2
-                CircleObject.Radius = Range.Value
+                CircleObject.Radius = Range and Range.Value or 150
                 CircleObject.NumSides = 100
-                CircleObject.Transparency = 1 - CircleTransparency.Value
-                CircleObject.Visible = SilentAim.Enabled and Mode.Value == 'Mouse'
+                CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0)
+                CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
             else
                 pcall(function() CircleObject:Remove() end)
                 CircleObject = nil
             end
-            CircleColor.Object.Visible = callback
-            CircleTransparency.Object.Visible = callback
-            CircleFilled.Object.Visible = callback
+            if CircleColor then CircleColor.Object.Visible = callback end
+            if CircleTransparency then CircleTransparency.Object.Visible = callback end
+            if CircleFilled then CircleFilled.Object.Visible = callback end
         end
     })
     CircleColor = SilentAim:CreateColorSlider({
@@ -804,26 +838,31 @@ run(function()
         Name = 'Head Pitch Spinbot (Client)',
         Function = function(callback)
             if callback then
-                if entitylib.character and entitylib.character.Character and
-                   entitylib.character.Character:FindFirstChild("Torso") and
-                   entitylib.character.Character.Torso:FindFirstChild("Neck") then
-                    Original = entitylib.character.Character.Torso.Neck.C1
-                    Pitch:Clean(runService.PreSimulation:Connect(function()
-                        if entitylib.isAlive then
-                            local character = entitylib.character.Character
-                            local torso = character and character:FindFirstChild("Torso")
-                            if torso and torso:FindFirstChild("Neck") then
-                                torso.Neck.C1 = torso.Neck.C1 * CFrame.Angles(math.rad(145), 0, 0)
+                if entitylib and entitylib.character and entitylib.character.Character then
+                    local character = entitylib.character.Character
+                    local torso = character:FindFirstChild("Torso")
+                    local neck = torso and torso:FindFirstChild("Neck")
+                    if neck then
+                        Original = neck.C1
+                        Pitch:Clean(runService.PreSimulation:Connect(function()
+                            if entitylib and entitylib.isAlive then
+                                local char = entitylib.character.Character
+                                local t = char and char:FindFirstChild("Torso")
+                                local n = t and t:FindFirstChild("Neck")
+                                if n then
+                                    n.C1 = n.C1 * CFrame.Angles(math.rad(145), 0, 0)
+                                end
                             end
-                        end
-                    end))
+                        end))
+                    end
                 end
             else
-                if entitylib.isAlive then
+                if entitylib and entitylib.isAlive then
                     local character = entitylib.character.Character
                     local torso = character and character:FindFirstChild("Torso")
-                    if torso and torso:FindFirstChild("Neck") then
-                        torso.Neck.C1 = Original
+                    local neck = torso and torso:FindFirstChild("Neck")
+                    if neck then
+                        neck.C1 = Original
                     end
                 end
             end
@@ -846,27 +885,34 @@ run(function()
 
     local function itemAdded(v)
         if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
-            v:SetAttribute("Range", Range.Value)
-            v:SetAttribute("AccurateRange", Range.Value)
-            v:SetAttribute("SpreadRadius", SpreadRadius.Value)
-            v:SetAttribute("FireRate", FireRate.Value)
+            v:SetAttribute("Range", Range and Range.Value)
+            v:SetAttribute("AccurateRange", Range and Range.Value)
+            v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
+            v:SetAttribute("FireRate", FireRate and FireRate.Value)
         end
     end
 
     local function characterAdded(char)
-        GunMods:Clean(char.Character.ChildAdded:Connect(itemAdded))
-        GunMods:Clean(lplr.Backpack.ChildAdded:Connect(itemAdded))
-        local children = char.Character:GetChildren()
-        for i = 1, #children do itemAdded(children[i]) end
-        children = lplr.Backpack:GetChildren()
-        for i = 1, #children do itemAdded(children[i]) end
+        if not char then return end
+        local character = char.Character
+        if character then
+            GunMods:Clean(character.ChildAdded:Connect(itemAdded))
+            local children = character:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
+        end
+        local backpack = lplr and lplr.Backpack
+        if backpack then
+            GunMods:Clean(backpack.ChildAdded:Connect(itemAdded))
+            local children = backpack:GetChildren()
+            for i = 1, #children do itemAdded(children[i]) end
+        end
     end
 
     GunMods = vape.Categories.Combat:CreateModule({
         Name = "GunMods",
         Function = function(callback)
             if callback then
-                if entitylib.character then characterAdded(entitylib.character) end
+                if entitylib and entitylib.character then characterAdded(entitylib.character) end
                 GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
             end
         end
@@ -884,9 +930,9 @@ run(function()
     local GiverPressed = remotes:WaitForChild("GiverPressed")
 
     local function checkInv(v, name)
-        if not entitylib.isAlive then return false end
-        local backpack = lplr:FindFirstChildOfClass("Backpack")
-        local character = entitylib.character.Character
+        if not entitylib or not entitylib.isAlive then return false end
+        local backpack = lplr and lplr:FindFirstChildOfClass("Backpack")
+        local character = entitylib.character and entitylib.character.Character
         if not backpack or not character then return false end
         for _, tool in pairs(backpack:GetChildren()) do
             if tool:IsA("Tool") and tool.Name == (name or v.Name) then return true end
@@ -898,7 +944,7 @@ run(function()
     end
 
     local function pickUp(v, name)
-        if not entitylib.isAlive then return end
+        if not entitylib or not entitylib.isAlive then return end
         if checkInv(v, name) then return end
         local handle = v:FindFirstChildWhichIsA("MeshPart") or v:FindFirstChildWhichIsA("BasePart") or v.PrimaryPart
         if handle then
@@ -908,16 +954,18 @@ run(function()
                 t.d.s = new
                 pcall(function() GiverPressed:FireServer(v) end)
                 task.wait(0.5)
-            until checkInv(v, name) or not entitylib.isAlive
+            until not entitylib or not entitylib.isAlive or checkInv(v, name)
             t.d.s = CFrame.new()
         end
     end
 
     local function canPickup(v)
+        if not entitylib or not entitylib.character or not entitylib.character.Player then return false end
+        local team = entitylib.character.Player.Team
         if v and v.Parent and v.Parent.Name == "Model" then
-            return entitylib.character.Player.Team == criminalsTeam
+            return team == criminalsTeam
         end
-        return entitylib.character.Player.Team == inmatesTeam or entitylib.character.Player.Team == guardsTeam
+        return team == inmatesTeam or team == guardsTeam
     end
 
     AutoPickup = vape.Categories.Utility:CreateModule({
@@ -925,18 +973,18 @@ run(function()
         Function = function(callback)
             if callback then
                 AutoPickup:Clean(entitylib.Events.LocalAdded:Connect(function()
-                    if entitylib.isAlive then
+                    if entitylib and entitylib.isAlive then
                         for _, item in pairs(PrisonItems) do
-                            if item.Enabled and item.Object and canPickup(item.Object) then
+                            if item and item.Enabled and item.Object and canPickup(item.Object) then
                                 pickUp(item.Object, item.Gun)
                             end
                         end
                     end
                 end))
                 AutoPickup:Clean(workspaceService.ChildAdded:Connect(function(v)
-                    if v.Name == "Key card" and Keycard.Enabled and lplr.Team ~= guardsTeam then
+                    if v and v.Name == "Key card" and Keycard and Keycard.Enabled and lplr and lplr.Team ~= guardsTeam then
                         pickUp(v)
-                    elseif v.Name == "M9" and M9.Enabled and lplr.Team ~= guardsTeam then
+                    elseif v and v.Name == "M9" and M9 and M9.Enabled and lplr and lplr.Team ~= guardsTeam then
                         pickUp(v)
                     end
                 end))
@@ -951,11 +999,11 @@ run(function()
     for _, i in pairs(workspaceService:GetDescendants()) do
         if i.Name == "TouchGiver" then
             local tool = i:GetAttribute("ToolName")
-            if not PrisonItems[tool] and tool then
+            if tool and not PrisonItems[tool] then
                 PrisonItems[tool] = AutoPickup:CreateToggle({
                     Name = tool,
                     Tooltip = "Only works on respawn" ..
-                        (i and i.Parent and i.Parent.Name == "Model" and " and as a criminal" or " and as an inmate or guard")
+                        (i.Parent and i.Parent.Name == "Model" and " and as a criminal" or " and as an inmate or guard")
                 })
                 PrisonItems[tool].Object = i
                 PrisonItems[tool].Gun = tool
@@ -988,64 +1036,81 @@ run(function()
         Function = function(callback)
             if callback then
                 renderStepConnection = runService.RenderStepped:Connect(function()
-                    if not entitylib.isAlive then return end
+                    if not entitylib or not entitylib.isAlive then return end
+                    local rootPart = entitylib.character and entitylib.character.RootPart
+                    if not rootPart then return end
                     local attacked = {}
-                    local selfpos = entitylib.character.RootPart.Position
-                    local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
+                    local selfpos = rootPart.Position
+                    local localfacing = rootPart.CFrame.LookVector * Vector3.new(1,0,1)
 
                     local plrs = entitylib.AllPosition({
-                        Range = AttackRange.Value,
-                        Wallcheck = Targets.Walls.Enabled or nil,
+                        Range = AttackRange and AttackRange.Value or 13,
+                        Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
                         Part = 'RootPart',
-                        Players = Targets.Players.Enabled,
-                        NPCs = Targets.NPCs.Enabled,
-                        Limit = Max.Value
+                        Players = Targets and Targets.Players and Targets.Players.Enabled,
+                        NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
+                        Limit = Max and Max.Value or 10
                     })
 
                     for i = 1, #plrs do
                         local v = plrs[i]
-                        if v.RootPart then
+                        if v and v.RootPart and v.RootPart.Position then
                             local delta = (v.RootPart.Position - selfpos)
-                            local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
-                            if angle <= (math.rad(AngleSlider.Value) / 2) then
-                                table.insert(attacked, {
-                                    Entity = v,
-                                    Check = delta.Magnitude > AttackRange.Value and BoxSwingColor or BoxAttackColor
-                                })
-                                targetinfo.Targets[v] = tick() + 1
+                            local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
+                            local dot = localfacing:Dot(deltaUnit)
+                            if dot <= 1 and dot >= -1 then
+                                local angle = math.acos(dot)
+                                if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
+                                    local distMag = delta.Magnitude
+                                    table.insert(attacked, {
+                                        Entity = v,
+                                        Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
+                                    })
+                                    if targetinfo then targetinfo.Targets[v] = tick() + 1 end
 
-                                if AttackDelay < tick() then
-                                    AttackDelay = tick() + (1 / CPS.GetRandomValue())
-                                    pcall(function()
-                                        meleeEvent:FireServer(v.Player, 1, 1)
-                                    end)
+                                    if AttackDelay < tick() then
+                                        local aps = CPS and CPS.GetRandomValue() or 1
+                                        if aps > 0 then
+                                            AttackDelay = tick() + (1 / aps)
+                                        end
+                                        pcall(function()
+                                            meleeEvent:FireServer(v.Player, 1, 1)
+                                        end)
+                                    end
                                 end
                             end
                         end
                     end
 
-                    for i, box in ipairs(Boxes) do
-                        if attacked[i] then
-                            box.Adornee = attacked[i].Entity.RootPart
-                            box.Color3 = Color3.fromHSV(attacked[i].Check.Hue, attacked[i].Check.Sat, attacked[i].Check.Value)
-                            box.Transparency = 1 - attacked[i].Check.Opacity
-                            box.Visible = true
-                        else
-                            box.Adornee = nil
-                            box.Visible = false
+                    if Boxes then
+                        for i, box in ipairs(Boxes) do
+                            if attacked[i] and box then
+                                box.Adornee = attacked[i].Entity.RootPart
+                                local chk = attacked[i].Check
+                                if chk and chk.Hue then
+                                    box.Color3 = Color3.fromHSV(chk.Hue, chk.Sat, chk.Value)
+                                    box.Transparency = 1 - chk.Opacity
+                                end
+                                box.Visible = true
+                            elseif box then
+                                box.Adornee = nil
+                                box.Visible = false
+                            end
                         end
                     end
 
-                    for i, part in ipairs(Particles) do
-                        if attacked[i] then
-                            part.Position = attacked[i].Entity.RootPart.Position
-                            part.Parent = gameCamera
-                        else
-                            part.Parent = nil
+                    if Particles then
+                        for i, part in ipairs(Particles) do
+                            if attacked[i] and part then
+                                part.Position = attacked[i].Entity.RootPart.Position
+                                part.Parent = gameCamera
+                            elseif part then
+                                part.Parent = nil
+                            end
                         end
                     end
 
-                    if Face.Enabled and #attacked > 0 then
+                    if Face and Face.Enabled and #attacked > 0 then
                         local root = attacked[1].Entity.RootPart
                         if root and entitylib.character and entitylib.character.RootPart then
                             local vec = root.Position * Vector3.new(1,0,1)
@@ -1081,8 +1146,8 @@ run(function()
     Killaura:CreateToggle({
         Name = 'Show target',
         Function = function(callback)
-            BoxSwingColor.Object.Visible = callback
-            BoxAttackColor.Object.Visible = callback
+            if BoxSwingColor then BoxSwingColor.Object.Visible = callback end
+            if BoxAttackColor then BoxAttackColor.Object.Visible = callback end
             if callback then
                 for i = 1, 10 do
                     local box = Instance.new('BoxHandleAdornment')
@@ -1108,10 +1173,10 @@ run(function()
     Killaura:CreateToggle({
         Name = 'Target particles',
         Function = function(callback)
-            ParticleTexture.Object.Visible = callback
-            ParticleColor1.Object.Visible = callback
-            ParticleColor2.Object.Visible = callback
-            ParticleSize.Object.Visible = callback
+            if ParticleTexture then ParticleTexture.Object.Visible = callback end
+            if ParticleColor1 then ParticleColor1.Object.Visible = callback end
+            if ParticleColor2 then ParticleColor2.Object.Visible = callback end
+            if ParticleSize then ParticleSize.Object.Visible = callback end
             if callback then
                 for i = 1, 10 do
                     local part = Instance.new('Part')
@@ -1123,9 +1188,9 @@ run(function()
                     part.Parent = Killaura.Enabled and gameCamera or nil
                     local particles = Instance.new('ParticleEmitter')
                     particles.Brightness = 1.5
-                    particles.Size = NumberSequence.new(ParticleSize.Value)
+                    particles.Size = NumberSequence.new(ParticleSize and ParticleSize.Value or 0.2)
                     particles.Shape = Enum.ParticleEmitterShape.Sphere
-                    particles.Texture = ParticleTexture.Value
+                    particles.Texture = ParticleTexture and ParticleTexture.Value or 'rbxassetid://14736249347'
                     particles.Transparency = NumberSequence.new(0)
                     particles.Lifetime = NumberRange.new(0.4)
                     particles.Speed = NumberRange.new(16)
@@ -1133,8 +1198,8 @@ run(function()
                     particles.Drag = 16
                     particles.ShapePartial = 1
                     particles.Color = ColorSequence.new({
-                        ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)),
-                        ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value))
+                        ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1 and ParticleColor1.Hue or 0, ParticleColor1 and ParticleColor1.Sat or 1, ParticleColor1 and ParticleColor1.Value or 1)),
+                        ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2 and ParticleColor2.Hue or 0.6, ParticleColor2 and ParticleColor2.Sat or 1, ParticleColor2 and ParticleColor2.Value or 1))
                     })
                     particles.Parent = part
                     Particles[i] = part
@@ -1185,8 +1250,8 @@ run(function()
     end
 
     local function Auto(v)
-        if not AutoArrest.Enabled then return end
-        if not entitylib.isAlive then return end
+        if not AutoArrest or not AutoArrest.Enabled then return end
+        if not entitylib or not entitylib.isAlive then return end
 
         disconnectPlayerConnections(v)
         Players[v] = {}
@@ -1198,26 +1263,26 @@ run(function()
                     notif('Vape', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
                     return
                 end
-                if not entitylib.isAlive then return end
+                if not entitylib or not entitylib.isAlive then return end
                 local root = char:FindFirstChild("HumanoidRootPart")
                 if not root then return end
                 local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
-                if dist > ArrestRange.Value then return end
+                if dist > (ArrestRange and ArrestRange.Value or 100) then return end
 
-                if char:GetAttribute("Tased") == true and lplr.Team == guardsTeam then
-                    if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
-                        local Handcuffs = char:FindFirstChild("Handcuffs") or lplr.Backpack:FindFirstChild("Handcuffs")
+                if char:GetAttribute("Tased") == true and lplr and lplr.Team == guardsTeam then
+                    if v and v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
+                        local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
                         if Handcuffs then
                             Handcuffs.Parent = char
                             local start = tick()
                             repeat
-                                if not entitylib.isAlive then break end
+                                if not entitylib or not entitylib.isAlive then break end
                                 if not char or not char:FindFirstChild("HumanoidRootPart") then break end
                                 t.d.s = char.HumanoidRootPart.CFrame
                                 Arrest(v, char)
                                 task.wait(0.1)
-                            until (not char) or char:GetAttribute("Arrested") or (tick()-start > 5)
-                            Handcuffs.Parent = lplr.Backpack
+                            until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
+                            Handcuffs.Parent = lplr and lplr.Backpack
                             t.d.s = CFrame.new()
                         end
                     end
@@ -1230,7 +1295,7 @@ run(function()
             end)
         end
 
-        if v.Character then Listener(v.Character) end
+        if v and v.Character then Listener(v.Character) end
 
         Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
             if plr.Player == v then disconnectPlayerConnections(v) end
@@ -1248,7 +1313,7 @@ run(function()
                 for _, plr in pairs(entitylib.List) do setup(plr.Player) end
                 AutoArrest:Clean(entitylib.Events.EntityAdded:Connect(function(plr) setup(plr.Player) end))
             else
-                for _, conns in pairs(Players) do
+                for plr, conns in pairs(Players) do
                     for _, conn in pairs(conns) do
                         pcall(function() conn:Disconnect() end)
                     end
@@ -1268,26 +1333,37 @@ run(function()
 
     local displayNameBox = NameChanger:CreateTextBox({
         Name = "Display Name",
-        Default = lplr.DisplayName or lplr.Name or "",
+        Default = lplr and (lplr.DisplayName or lplr.Name) or "",
         Placeholder = "New display name"
     })
     local userNameBox = NameChanger:CreateTextBox({
         Name = "User Name",
-        Default = lplr.Name or "",
+        Default = lplr and lplr.Name or "",
         Placeholder = "New username"
     })
     NameChanger:CreateButton({
         Name = "Set Names",
         Function = function()
-            local newDisplay = displayNameBox.Value
-            local newUser = userNameBox.Value
+            local newDisplay = displayNameBox and displayNameBox.Value
+            local newUser = userNameBox and userNameBox.Value
+            local success = false
             if newDisplay and newDisplay ~= "" and #newDisplay <= 100 then
-                lplr.DisplayName = newDisplay
+                if lplr then
+                    lplr.DisplayName = newDisplay
+                    success = true
+                end
             end
             if newUser and newUser ~= "" and #newUser <= 100 then
-                lplr.Name = newUser
+                if lplr then
+                    lplr.Name = newUser
+                    success = true
+                end
             end
-            notif('Name Changer', 'Names have been updated!', 2, 'success')
+            if success then
+                notif('Name Changer', 'Names have been updated!', 2, 'success')
+            else
+                notif('Name Changer', 'Failed to update names.', 2, 'alert')
+            end
         end
     })
 end)
