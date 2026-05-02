@@ -152,7 +152,7 @@ local function serverHop(pointer, filter)
 		table.insert(visited, game.JobId)
 	end
 	if not pointer then
-		notif('Vape', 'Searching for an available server.', 2)
+		notif('Rawr.xyz', 'Searching for an available server.', 2)
 	end
 
 	local suc, httpdata = pcall(function()
@@ -165,7 +165,7 @@ local function serverHop(pointer, filter)
 				cacheExpire, cache = tick() + 60, httpdata
 				table.insert(attempted, v.id)
 
-				notif('Vape', 'Found! Teleporting.', 5)
+				notif('Rawr.xyz', 'Found! Teleporting.', 5)
 				teleportService:TeleportToPlaceInstance(game.PlaceId, v.id)
 				return
 			end
@@ -174,10 +174,10 @@ local function serverHop(pointer, filter)
 		if data.nextPageCursor then
 			serverHop(data.nextPageCursor, filter)
 		else
-			notif('Vape', 'Failed to find an available server.', 5, 'warning')
+			notif('Rawr.xyz', 'Failed to find an available server.', 5, 'warning')
 		end
 	else
-		notif('Vape', 'Failed to grab servers. ('..(data and data.errors[1].message or 'no data')..')', 5, 'warning')
+		notif('Rawr.xyz', 'Failed to grab servers. ('..(data and data.errors[1].message or 'no data')..')', 5, 'warning')
 	end
 end
 
@@ -421,7 +421,7 @@ run(function()
 			if self.localprio == 0 then
 				olduninject = vape.Uninject
 				vape.Uninject = function()
-					notif('Vape', 'No escaping the private members :)', 10)
+					notif('Rawr.xyz', 'No escaping the private members :)', 10)
 				end
 				if joined then
 					task.wait(10)
@@ -445,7 +445,7 @@ run(function()
 
 		if self.localprio > 0 and not self.said[plr.Name] and msg == 'helloimusinginhaler' and plr ~= lplr then
 			self.said[plr.Name] = true
-			notif('Vape', plr.Name..' is using vape!', 60)
+			notif('Rawr.xyz', plr.Name..' is using vape!', 60)
 			self.customtags[plr.Name] = {{
 				text = 'VAPE USER',
 				color = Color3.new(1, 1, 0)
