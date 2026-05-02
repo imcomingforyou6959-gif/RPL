@@ -262,7 +262,7 @@ run(function()
     end
 
     local TracerVisuals = vape.Categories.Utility:CreateModule({
-        Name = "Tracer Visuals",
+        Name = "Bullet Tracers",
         Function = function(callback)
             if callback then
                 updateTracerFunctions()
@@ -340,7 +340,7 @@ run(function()
         Name = "TeamSwitcher",
         Function = function(callback)
             if callback == true then
-                notif('Vape', 'Please expand this module to use it', 3, 'alert')
+                notif('Rawr.xyz', 'Please expand this module to use it', 3, 'alert')
                 TeamSwitcher:Toggle()
             end
         end
@@ -362,7 +362,7 @@ run(function()
                 pcall(function() RequestTeamChange:InvokeServer(guardsTeam, 1) end)
                 task.delay(1, function()
                     if lplr and lplr.Team ~= guardsTeam then
-                        notif('Vape', 'Failed to switch to guards team, please try again later', 3, 'alert')
+                        notif('Rawr.xyz', 'Failed to switch to guards team, please try again later', 3, 'alert')
                     end
                 end)
             elseif team == "Criminals" then
@@ -374,7 +374,7 @@ run(function()
                     until lplr.Team == criminalsTeam or tick()-startTime > 10 or not lplr.Parent
                     t.d.s = CFrame.new()
                 else
-                    notif('Vape', 'Please switch to the inmates team and try again', 3, 'alert')
+                    notif('Rawr.xyz', 'Please switch to the inmates team and try again', 3, 'alert')
                 end
             elseif team == "Inmates" then
                 pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
@@ -382,7 +382,7 @@ run(function()
                 pcall(function() RequestTeamChange:InvokeServer(inmatesTeam, 1) end)
                 task.delay(1, function()
                     if lplr and lplr.Team ~= inmatesTeam then
-                        notif('Vape', 'Failed to switch to inmates team, please try again later', 3, 'alert')
+                        notif('Rawr.xyz', 'Failed to switch to inmates team, please try again later', 3, 'alert')
                     end
                 end)
             end
@@ -660,14 +660,14 @@ run(function()
             end
             args[1] = newHits
             if t.hn.e and targetPart.Parent then
-                notif('Vape', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
+                notif('Rawr.xyz', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
             end
         else
             if t.hn.e then
                 for _, v in originalHits do
                     local part = v[3]
                     if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                        notif('Vape', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
+                        notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
                     end
                 end
             end
@@ -1260,7 +1260,7 @@ run(function()
             if not char then return end
             local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
                 if tick() < Cooldown then
-                    notif('Vape', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
+                    notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
                     return
                 end
                 if not entitylib or not entitylib.isAlive then return end
