@@ -1270,20 +1270,22 @@ run(function()
                 if dist > (ArrestRange and ArrestRange.Value or 100) then return end
 
                 if char:GetAttribute("Tased") == true and lplr and lplr.Team == guardsTeam then
-                    if v and v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
-                        local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
-                        if Handcuffs then
-                            Handcuffs.Parent = char
-                            local start = tick()
-                            repeat
-                                if not entitylib or not entitylib.isAlive then break end
-                                if not char or not char:FindFirstChild("HumanoidRootPart") then break end
-                                t.d.s = char.HumanoidRootPart.CFrame
-                                Arrest(v, char)
-                                task.wait(0.1)
-                            until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
-                            Handcuffs.Parent = lplr and lplr.Backpack
-                            t.d.s = CFrame.new()
+                    if v and v.Team then
+                        if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
+                            local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
+                            if Handcuffs then
+                                Handcuffs.Parent = char
+                                local start = tick()
+                                repeat
+                                    if not entitylib or not entitylib.isAlive then break end
+                                    if not char or not char:FindFirstChild("HumanoidRootPart") then break end
+                                    t.d.s = char.HumanoidRootPart.CFrame
+                                    Arrest(v, char)
+                                    task.wait(0.1)
+                                until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
+                                Handcuffs.Parent = lplr and lplr.Backpack
+                                t.d.s = CFrame.new()
+                            end
                         end
                     end
                 end
@@ -1368,4 +1370,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.8")
+print("Hello, V4.9")
