@@ -24,7 +24,7 @@ local function checkBlacklist()
     local userId = game.Players.LocalPlayer.UserId
     if data.BlacklistedUsers[tostring(userId)] or data.BlacklistedUsers[userId] then
         pcall(function()
-            game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted.")
+            game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted. All Appeals Must be Sent in https://discord.gg/RJj7vrNwBy")
         end)
         return true
     end
