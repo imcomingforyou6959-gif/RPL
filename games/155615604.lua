@@ -75,6 +75,14 @@ if identifyexecutor then
     end
 end
 
+-- Safe call wrapper (notifies on failure)
+local function safeCall(desc, func)
+    local ok, err = pcall(func)
+    if not ok then
+        notif('Rawr.xyz', desc .. ' failed: ' .. tostring(err), 3, 'alert')
+    end
+end
+
 local function canClick()
     local mousepos = (inputService:GetMouseLocation() - guiService:GetGuiInset())
     for _, v in lplr.PlayerGui:GetGuiObjectsAtPosition(mousepos.X, mousepos.Y) do
@@ -105,6 +113,25 @@ local t = {
     sa = {hooks = {}, toggle = nil},
     hn = {e = false}
 }
+
+-- AntiJump bypass (hook Humanoid __newindex)
+run(function()
+    local oldHumanoidNewindex
+    oldHumanoidNewindex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
+        if typeof(self) == "Instance" and self:IsA("Humanoid") then
+            if key == "Jump" and value == false then
+                local parent = self.Parent
+                if parent and parent:IsA("Model") and parent == lplr.Character then
+                    return  -- block the limiter
+                end
+            end
+        end
+        return oldHumanoidNewindex(self, key, value)
+    end))
+    vape:Clean(function()
+        hookmetamethod(game, "__newindex", oldHumanoidNewindex)
+    end)
+end)
 
 run(function()
     vape:Clean(runService.Heartbeat:Connect(function()
@@ -201,17 +228,6 @@ run(function()
 
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
-
-playersService.LocalPlayer.CharacterAdded:Connect(function(character)
-    local antiJumpScript = character and character:WaitForChild("AntiJump", 1)
-    if antiJumpScript then
-        antiJumpScript:Destroy()
-    end
-end)
-if playersService.LocalPlayer.Character then
-    local s = playersService.LocalPlayer.Character:WaitForChild("AntiJump", 1)
-    if s then s:Destroy() end
-end
 
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
@@ -387,11 +403,11 @@ run(function()
         Function = function()
             local team = Team.Value
             if team == "Neutral" then
-                pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
+                safeCall('Team switch (Neutral)', function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
             elseif team == "Guards" then
-                pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
+                safeCall('Team switch (Neutral->Guards)', function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
                 task.wait(1.5)
-                pcall(function() RequestTeamChange:InvokeServer(guardsTeam, 1) end)
+                safeCall('Team switch (Guards)', function() RequestTeamChange:InvokeServer(guardsTeam, 1) end)
                 task.delay(1, function()
                     if lplr and lplr.Team ~= guardsTeam then
                         notif('Rawr.xyz', 'Failed to switch to guards team, please try again later', 3, 'alert')
@@ -409,9 +425,9 @@ run(function()
                     notif('Rawr.xyz', 'Please switch to the inmates team and try again', 3, 'alert')
                 end
             elseif team == "Inmates" then
-                pcall(function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
+                safeCall('Team switch (Neutral)', function() RequestTeamChange:InvokeServer(neutralTeam, 1) end)
                 task.wait(1.5)
-                pcall(function() RequestTeamChange:InvokeServer(inmatesTeam, 1) end)
+                safeCall('Team switch (Inmates)', function() RequestTeamChange:InvokeServer(inmatesTeam, 1) end)
                 task.delay(1, function()
                     if lplr and lplr.Team ~= inmatesTeam then
                         notif('Rawr.xyz', 'Failed to switch to inmates team, please try again later', 3, 'alert')
@@ -632,7 +648,7 @@ run(function()
             table.insert(hits, {origin, targetPart.Position, targetPart})
         end
 
-        pcall(function()
+        safeCall('ShootEvent', function()
             ShootEvent:FireServer(hits)
         end)
 
@@ -837,7 +853,7 @@ run(function()
                 CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0)
                 CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
             else
-                pcall(function() CircleObject:Remove() end)
+                safeCall('Remove Circle', function() CircleObject:Remove() end)
                 CircleObject = nil
             end
             if CircleColor then CircleColor.Object.Visible = callback end
@@ -984,7 +1000,7 @@ run(function()
             local new = CFrame.new(position.X, position.Y - 5, position.Z)
             repeat
                 t.d.s = new
-                pcall(function() GiverPressed:FireServer(v) end)
+                safeCall('GiverPressed', function() GiverPressed:FireServer(v) end)
                 task.wait(0.5)
             until not entitylib or not entitylib.isAlive or checkInv(v, name)
             t.d.s = CFrame.new()
@@ -1105,7 +1121,7 @@ run(function()
                                         if aps > 0 then
                                             AttackDelay = tick() + (1 / aps)
                                         end
-                                        pcall(function()
+                                        safeCall('meleeEvent', function()
                                             meleeEvent:FireServer(v.Player, 1, 1)
                                         end)
                                     end
@@ -1270,7 +1286,7 @@ run(function()
 
     local function Arrest(player, char)
         if not player or not char then return end
-        pcall(function()
+        safeCall('Arrest', function()
             ArrestPlayer:InvokeServer(player, 1)
             InteractWithItem:InvokeServer(char.Head)
         end)
