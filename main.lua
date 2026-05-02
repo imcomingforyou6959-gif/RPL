@@ -28,6 +28,35 @@ local cloneref = cloneref or function(obj)
 end
 local playersService = cloneref(game:GetService('Players'))
 
+local function checkBlacklist()
+    local blacklistUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json"
+    local httpService = game:GetService("HttpService")
+    local success, result = pcall(function()
+        return game:HttpGet(blacklistUrl)
+    end)
+    if not success then
+        return false  -- Fetch failed, allow loading to continue
+    end
+    local ok, data = pcall(httpService.JSONDecode, httpService, result)
+    if not (ok and data and data.BlacklistedUsers) then
+        return false
+    end
+    local userId = tostring(playersService.LocalPlayer.UserId)
+    if data.BlacklistedUsers[userId] then
+        -- Kick the blacklisted user
+        pcall(function()
+            playersService.LocalPlayer:Kick("You are blacklisted from using this script.")
+        end)
+        return true
+    end
+    return false
+end
+
+if checkBlacklist() then
+    return  -- Stop script execution completely
+end
+-- =============================================
+
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
