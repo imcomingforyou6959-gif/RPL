@@ -66,6 +66,7 @@ local targetinfo = vape.Libraries.targetinfo
 
 local function notif(...) return vape:CreateNotification(...) end
 
+-- Executor compatibility warning
 if identifyexecutor then
     local execName = ({identifyexecutor()})[1]
     local allowed = {Madium = true, Velocity = true, Sirhurt = true, Volt = true, LX63 = true}
@@ -74,14 +75,12 @@ if identifyexecutor then
     end
 end
 
+-- Safe call wrapper (notifies on failure)
 local function safeCall(desc, func)
-    local ok, result = pcall(func)
+    local ok, err = pcall(func)
     if not ok then
-        local errMsg = (type(result) == "string") and result or "Unknown error"
-        notif('Rawr.xyz', desc .. ' failed: ' .. errMsg, 3, 'alert')
-        return false, result
+        notif('Rawr.xyz', desc .. ' failed: ' .. tostring(err), 3, 'alert')
     end
-    return true, result
 end
 
 local function canClick()
@@ -697,13 +696,7 @@ run(function()
 
     t.sa.hooks.PrisonLife = function(args)
         if not entitylib or not entitylib.isAlive then return end
-        local character = entitylib.character
-        if not character then return end
-        local head = character.Head
-        if not head or not head:IsA("BasePart") then return end
-        local origin = head.Position
-
-        local ent, targetPart = getTarget(origin, nil)
+        local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
         if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
 
         local originalHits = args[1]
@@ -754,9 +747,8 @@ run(function()
                         targetinfo.Targets[ent] = tick() + 1
                     end
 
-                    local circleObj = CircleObject
-                    if circleObj then
-                        circleObj.Position = inputService:GetMouseLocation()
+                    if CircleObject then
+                        CircleObject.Position = inputService:GetMouseLocation()
                     end
 
                     if AutoFire and AutoFire.Enabled then
