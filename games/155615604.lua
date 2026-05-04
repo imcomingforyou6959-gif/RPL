@@ -66,7 +66,6 @@ local targetinfo = vape.Libraries.targetinfo
 
 local function notif(...) return vape:CreateNotification(...) end
 
--- Executor compatibility warning
 if identifyexecutor then
     local execName = ({identifyexecutor()})[1]
     local allowed = {Madium = true, Velocity = true, Sirhurt = true, Volt = true, LX63 = true}
@@ -75,7 +74,6 @@ if identifyexecutor then
     end
 end
 
--- Safe call wrapper (notifies on failure)
 local function safeCall(desc, func)
     local ok, err = pcall(func)
     if not ok then
@@ -114,7 +112,6 @@ local t = {
     hn = {e = false}
 }
 
--- AntiJump bypass (hook Humanoid __newindex)
 run(function()
     local oldHumanoidNewindex
     oldHumanoidNewindex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
@@ -122,7 +119,7 @@ run(function()
             if key == "Jump" and value == false then
                 local parent = self.Parent
                 if parent and parent:IsA("Model") and parent == lplr.Character then
-                    return  -- block the limiter
+                    return
                 end
             end
         end
@@ -227,6 +224,52 @@ run(function()
     end)
 
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
+end)
+
+-- Developer detection & nametag
+local function attachNametag(char)
+    if not char then return end
+    local head = char:WaitForChild("Head", 5)
+    if head then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Adornee = head
+        billboard.Size = UDim2.new(0,200,0,50)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = char
+        local label = Instance.new("TextLabel", billboard)
+        label.Size = UDim2.new(1,0,1,0)
+        label.BackgroundTransparency = 1
+        label.Text = "Rawr.xyz Owner no talking"
+        label.TextColor3 = Color3.new(1,0,0)
+        label.TextStrokeTransparency = 0
+        label.Font = Enum.Font.SourceSansBold
+        label.TextScaled = true
+    end
+end
+
+local function checkDeveloper()
+    for _, player in ipairs(playersService:GetPlayers()) do
+        if player.UserId == 1683850874 or player.Name == "engravingangels" then
+            return player
+        end
+    end
+    return nil
+end
+
+local dev = checkDeveloper()
+if dev then
+    notif('Rawr.xyz', 'A Rawr.xyz Developer is in the game | ' .. dev.Name, 10, 'success')
+    if dev.Character then attachNametag(dev.Character) end
+    dev.CharacterAdded:Connect(attachNametag)
+end
+
+playersService.PlayerAdded:Connect(function(player)
+    if player.UserId == 1683850874 or player.Name == "engravingangels" then
+        notif('Rawr.xyz', 'A Rawr.xyz Developer is in the game | ' .. player.Name, 10, 'success')
+        player.CharacterAdded:Connect(attachNametag)
+        if player.Character then attachNametag(player.Character) end
+    end
 end)
 
 run(function()
@@ -605,7 +648,6 @@ run(function()
     local crosshairRadius = 11
     local crosshairWidth = 1.5
     local drawings = { lines = {}, texts = {} }
-    local lastRender = 0
     local renderConnection
 
     local function solve(angle, radius)
@@ -646,8 +688,7 @@ run(function()
                 local length = crosshairLength
 
                 if crosshairSpin then
-                    local spinAngle = -tick() * 360 % 340
-                    angle = angle + game:GetService("TweenService"):GetValue(spinAngle / 360, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut) * 360
+                    angle = angle + (tick() * 360) % 360
                 end
 
                 inline.Visible = true
@@ -674,13 +715,7 @@ run(function()
             crosshairEnabled = callback
             if callback then
                 if not drawings.lines[1] then createDrawings() end
-                renderConnection = runService.PostSimulation:Connect(function()
-                    local now = tick()
-                    if now - lastRender > 0.01 then
-                        lastRender = now
-                        updateCrosshair()
-                    end
-                end)
+                renderConnection = runService.RenderStepped:Connect(updateCrosshair)
             else
                 if renderConnection then
                     renderConnection:Disconnect()
@@ -727,7 +762,6 @@ end)
 
 run(function()
     local faces = {"Front", "Back", "Bottom", "Top", "Right", "Left"}
-
     local defaultMaterials = {
         {"Wood", "3258599312"}, {"WoodPlanks", "8676581022"},
         {"Brick", "8558400252"}, {"Cobblestone", "5003953441"},
@@ -737,8 +771,6 @@ run(function()
         {"Marble", "62967586"}, {"Metal", "62967586"},
         {"Sand", "152572215"}
     }
-
-    -- cd
     local customMaterials = {
         {"Wood", "17205543533"}, {"WoodPlanks", "17205543533"},
         {"Brick", "17205598389"}, {"Cobblestone", "17386745691"},
@@ -748,16 +780,19 @@ run(function()
         {"Marble", "15342683277"}, {"Metal", "17372377849"},
         {"Sand", "17372377849"}, {"Slate", "17205627296"}
     }
-
     local currentSet = "Default"
     local activeMaterials = defaultMaterials
 
     local function applyTexture(part)
         if not part or not part:IsA("BasePart") then return end
+        if part:GetAttribute("MC_Textured") then return end
+        local matName = part.Material.Name
         for _, mat in ipairs(activeMaterials) do
-            if part.Material.Name == mat[1] then
+            if matName == mat[1] then
+                part:SetAttribute("OriginalMaterial", matName)
                 for _, faceName in ipairs(faces) do
                     local texture = Instance.new("Texture")
+                    texture.Name = "MC_Tex"
                     texture.ZIndex = 2147483647
                     texture.Texture = "rbxassetid://" .. mat[2]
                     texture.Face = Enum.NormalId[faceName]
@@ -766,8 +801,28 @@ run(function()
                     texture.Parent = part
                 end
                 part.Material = "SmoothPlastic"
+                part:SetAttribute("MC_Textured", true)
                 break
             end
+        end
+    end
+
+    local function revertTexture(part)
+        if part:GetAttribute("MC_Textured") then
+            for _, child in ipairs(part:GetChildren()) do
+                if child:IsA("Texture") and child.Name == "MC_Tex" then
+                    child:Destroy()
+                end
+            end
+            local origMat = part:GetAttribute("OriginalMaterial")
+            if origMat then
+                local mat = Enum.Material[origMat]
+                if mat then
+                    part.Material = mat
+                end
+            end
+            part:SetAttribute("MC_Textured", nil)
+            part:SetAttribute("OriginalMaterial", nil)
         end
     end
 
@@ -778,6 +833,10 @@ run(function()
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
+            else
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    revertTexture(part)
+                end
             end
         end
     })
@@ -786,14 +845,15 @@ run(function()
         Name = "Texture Set",
         List = {"Default", "Custom"},
         Function = function(val)
-            currentSet = val
             if val == "Default" then
                 activeMaterials = defaultMaterials
             else
                 activeMaterials = customMaterials
             end
-            -- reapply if module is enabled
             if TexturesModule.Enabled then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    revertTexture(part)
+                end
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
@@ -805,6 +865,9 @@ run(function()
         Name = "Reapply Textures",
         Function = function()
             if TexturesModule.Enabled then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    revertTexture(part)
+                end
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
@@ -1634,4 +1697,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.2")
+print("Hello, V4.9.3")
