@@ -597,6 +597,206 @@ run(function()
     })
 end)
 
+-- =============================================
+-- CROSSHAIR MODULE (grey start, text fixed)
+-- =============================================
+run(function()
+    -- crosshair settings (local, not global)
+    local crosshairEnabled = false
+    local crosshairColor = Color3.fromRGB(128, 128, 128)  -- grey
+    local crosshairSpin = true
+    local crosshairLength = 10
+    local crosshairRadius = 11
+    local crosshairWidth = 1.5
+    local drawings = { lines = {}, texts = {} }
+    local lastRender = 0
+    local renderConnection
+
+    -- helper functions
+    local function solve(angle, radius)
+        return Vector2.new(math.sin(math.rad(angle)) * radius, math.cos(math.rad(angle)) * radius)
+    end
+
+    local function createDrawings()
+        -- 8 lines (4 outline + 4 inline)
+        for i = 1, 8 do
+            drawings.lines[i] = Drawing.new('Line')
+        end
+        -- fixed text (do not allow user to change)
+        drawings.texts[1] = Drawing.new('Text', {
+            Size = 13, Font = 2, Outline = true,
+            Text = 'Made with love |',
+            Color = Color3.new(1, 1, 1)
+        })
+        drawings.texts[2] = Drawing.new('Text', {
+            Size = 13, Font = 2, Outline = true,
+            Text = 'Rawr.xyz',
+            Color = crosshairColor
+        })
+    end
+
+    local function updateCrosshair()
+        local pos
+        if false then  -- always mouse mode (no other modes exposed)
+            pos = camera.ViewportSize / 2
+        else
+            pos = inputService:GetMouseLocation()
+        end
+        local text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X
+
+        drawings.texts[1].Visible = crosshairEnabled
+        drawings.texts[2].Visible = crosshairEnabled
+
+        if crosshairEnabled then
+            drawings.texts[1].Position = pos + Vector2.new(-text_x / 2, crosshairRadius + crosshairLength + 15)
+            drawings.texts[2].Position = drawings.texts[1].Position + Vector2.new(drawings.texts[1].TextBounds.X, 0)
+            drawings.texts[2].Color = crosshairColor
+
+            for idx = 1, 4 do
+                local outline = drawings.lines[idx]
+                local inline = drawings.lines[idx + 4]
+                local angle = (idx - 1) * 90
+                local length = crosshairLength
+
+                if crosshairSpin then
+                    local spinAngle = -tick() * 360 % 340
+                    angle = angle + game:GetService("TweenService"):GetValue(spinAngle / 360, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut) * 360
+                end
+
+                inline.Visible = true
+                inline.Color = crosshairColor
+                inline.From = pos + solve(angle, crosshairRadius)
+                inline.To = pos + solve(angle, crosshairRadius + length)
+                inline.Thickness = crosshairWidth
+
+                outline.Visible = true
+                outline.From = pos + solve(angle, crosshairRadius - 1)
+                outline.To = pos + solve(angle, crosshairRadius + length + 1)
+                outline.Thickness = crosshairWidth + 1.5
+            end
+        else
+            for i = 1, 8 do
+                drawings.lines[i].Visible = false
+            end
+        end
+    end
+
+    -- Module definition
+    local CrosshairModule = vape.Categories.Visuals:CreateModule({
+        Name = "Crosshair",
+        Function = function(callback)
+            crosshairEnabled = callback
+            if callback then
+                if not drawings.lines[1] then createDrawings() end
+                renderConnection = runService.PostSimulation:Connect(function()
+                    local now = tick()
+                    if now - lastRender > 0.01 then
+                        lastRender = now
+                        updateCrosshair()
+                    end
+                end)
+            else
+                if renderConnection then
+                    renderConnection:Disconnect()
+                    renderConnection = nil
+                end
+                for _, d in ipairs(drawings.lines) do if d then d.Visible = false end end
+                for _, d in ipairs(drawings.texts) do if d then d.Visible = false end end
+            end
+        end
+    })
+
+    CrosshairModule:CreateColorSlider({
+        Name = "Color",
+        Function = function(hue, sat, val)
+            crosshairColor = Color3.fromHSV(hue, sat, val)
+        end
+    })
+    CrosshairModule:CreateToggle({
+        Name = "Spin",
+        Default = true,
+        Function = function(val)
+            crosshairSpin = val
+        end
+    })
+    CrosshairModule:CreateSlider({
+        Name = "Length",
+        Min = 1, Max = 30, Default = 10,
+        Function = function(val) crosshairLength = val end,
+        Suffix = "px"
+    })
+    CrosshairModule:CreateSlider({
+        Name = "Radius",
+        Min = 0, Max = 30, Default = 11,
+        Function = function(val) crosshairRadius = val end,
+        Suffix = "px"
+    })
+    CrosshairModule:CreateSlider({
+        Name = "Width",
+        Min = 0.5, Max = 5, Default = 1.5, Decimal = 10,
+        Function = function(val) crosshairWidth = val end,
+        Suffix = "px"
+    })
+end)
+
+-- =============================================
+-- MINECRAFT TEXTURES MODULE
+-- =============================================
+run(function()
+    local faces = {"Front", "Back", "Bottom", "Top", "Right", "Left"}
+    local materials = {
+        {"Wood", "3258599312"}, {"WoodPlanks", "8676581022"},
+        {"Brick", "8558400252"}, {"Cobblestone", "5003953441"},
+        {"Concrete", "7341687607"}, {"DiamondPlate", "6849247561"},
+        {"Fabric", "118776397"}, {"Granite", "4722586771"},
+        {"Grass", "4722588177"}, {"Ice", "3823766459"},
+        {"Marble", "62967586"}, {"Metal", "62967586"},
+        {"Sand", "152572215"}
+    }
+
+    local function applyTexture(part)
+        if not part or not part:IsA("BasePart") then return end
+        for _, mat in ipairs(materials) do
+            if part.Material.Name == mat[1] then
+                for _, faceName in ipairs(faces) do
+                    local texture = Instance.new("Texture")
+                    texture.ZIndex = 2147483647
+                    texture.Texture = "rbxassetid://" .. mat[2]
+                    texture.Face = Enum.NormalId[faceName]
+                    texture.Color3 = part.Color
+                    texture.Transparency = part.Transparency
+                    texture.Parent = part
+                end
+                part.Material = "SmoothPlastic"
+                break
+            end
+        end
+    end
+
+    local MinecraftModule = vape.Categories.Visuals:CreateModule({
+        Name = "Minecraft Textures",
+        Function = function(callback)
+            if callback then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    applyTexture(part)
+                end
+            else
+                -- no undo; just stop future applications
+            end
+        end
+    })
+    MinecraftModule:CreateButton({
+        Name = "Reapply Textures",
+        Function = function()
+            if MinecraftModule.Enabled then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    applyTexture(part)
+                end
+            end
+        end
+    })
+end)
+
 run(function()
     local SilentAim
     local Target
@@ -1418,4 +1618,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9")
+print("Hello, V5.0")
