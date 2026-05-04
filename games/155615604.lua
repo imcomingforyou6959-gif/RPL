@@ -598,9 +598,8 @@ run(function()
 end)
 
 run(function()
-    -- crosshair
     local crosshairEnabled = false
-    local crosshairColor = Color3.fromRGB(128, 128, 128)  -- grey
+    local crosshairColor = Color3.fromRGB(128, 128, 128)
     local crosshairSpin = true
     local crosshairLength = 10
     local crosshairRadius = 11
@@ -614,11 +613,9 @@ run(function()
     end
 
     local function createDrawings()
-        -- c4
         for i = 1, 8 do
             drawings.lines[i] = Drawing.new('Line')
         end
-        -- 6
         drawings.texts[1] = Drawing.new('Text', {
             Size = 13, Font = 2, Outline = true,
             Text = 'Made with love |',
@@ -632,14 +629,8 @@ run(function()
     end
 
     local function updateCrosshair()
-        local pos
-        if false then
-            pos = camera.ViewportSize / 2
-        else
-            pos = inputService:GetMouseLocation()
-        end
+        local pos = inputService:GetMouseLocation()
         local text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X
-
         drawings.texts[1].Visible = crosshairEnabled
         drawings.texts[2].Visible = crosshairEnabled
 
@@ -677,8 +668,7 @@ run(function()
         end
     end
 
-    -- MD
-    local CrosshairModule = vape.Categories.Visuals:CreateModule({
+    local CrosshairModule = vape.Categories.Utility:CreateModule({
         Name = "Crosshair",
         Function = function(callback)
             crosshairEnabled = callback
@@ -737,7 +727,8 @@ end)
 
 run(function()
     local faces = {"Front", "Back", "Bottom", "Top", "Right", "Left"}
-    local materials = {
+
+    local defaultMaterials = {
         {"Wood", "3258599312"}, {"WoodPlanks", "8676581022"},
         {"Brick", "8558400252"}, {"Cobblestone", "5003953441"},
         {"Concrete", "7341687607"}, {"DiamondPlate", "6849247561"},
@@ -747,9 +738,23 @@ run(function()
         {"Sand", "152572215"}
     }
 
+    -- cd
+    local customMaterials = {
+        {"Wood", "17205543533"}, {"WoodPlanks", "17205543533"},
+        {"Brick", "17205598389"}, {"Cobblestone", "17386745691"},
+        {"Concrete", "17386745691"}, {"DiamondPlate", "17372377849"},
+        {"Fabric", "14003986744"}, {"Granite", "17205543533"},
+        {"Grass", "17372377849"}, {"Ice", "15342433592"},
+        {"Marble", "15342683277"}, {"Metal", "17372377849"},
+        {"Sand", "17372377849"}, {"Slate", "17205627296"}
+    }
+
+    local currentSet = "Default"
+    local activeMaterials = defaultMaterials
+
     local function applyTexture(part)
         if not part or not part:IsA("BasePart") then return end
-        for _, mat in ipairs(materials) do
+        for _, mat in ipairs(activeMaterials) do
             if part.Material.Name == mat[1] then
                 for _, faceName in ipairs(faces) do
                     local texture = Instance.new("Texture")
@@ -766,22 +771,40 @@ run(function()
         end
     end
 
-    local MinecraftModule = vape.Categories.Visuals:CreateModule({
-        Name = "Minecraft Textures",
+    local TexturesModule = vape.Categories.Utility:CreateModule({
+        Name = "World Textures",
         Function = function(callback)
             if callback then
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
-            else
-                -- no undo; just stop future applications
             end
         end
     })
-    MinecraftModule:CreateButton({
+
+    TexturesModule:CreateDropdown({
+        Name = "Texture Set",
+        List = {"Default", "Custom"},
+        Function = function(val)
+            currentSet = val
+            if val == "Default" then
+                activeMaterials = defaultMaterials
+            else
+                activeMaterials = customMaterials
+            end
+            -- reapply if module is enabled
+            if TexturesModule.Enabled then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    applyTexture(part)
+                end
+            end
+        end
+    })
+
+    TexturesModule:CreateButton({
         Name = "Reapply Textures",
         Function = function()
-            if MinecraftModule.Enabled then
+            if TexturesModule.Enabled then
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
@@ -1611,4 +1634,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.1")
+print("Hello, V4.9.2")
