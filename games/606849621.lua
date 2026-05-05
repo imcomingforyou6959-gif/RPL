@@ -19,6 +19,9 @@ end
 local run = function(func) func() end
 local cloneref = cloneref or function(obj) return obj end
 
+-- Wait for game to fully load before proceeding
+if not game:IsLoaded() then game.Loaded:Wait() end
+
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 local runService = cloneref(game:GetService('RunService'))
@@ -38,7 +41,15 @@ local whitelist = vape.Libraries.whitelist
 local prediction = vape.Libraries.prediction
 local targetinfo = vape.Libraries.targetinfo
 local sessioninfo = vape.Libraries.sessioninfo
-local vm = loadstring(downloadFile('newvape/libraries/vm.lua'), 'vm')()
+
+-- Load the virtual machine with error catching
+local ok, vm = pcall(function()
+	return loadstring(downloadFile('newvape/libraries/vm.lua'), 'vm')()
+end)
+if not ok then
+	vape:CreateNotification('Rawr.xyz', 'Failed to load VM: ' .. tostring(vm), 30, 'alert')
+	return
+end
 
 local jb = {}
 local InfNitro = {Enabled = false}
@@ -240,26 +251,51 @@ run(function()
 		return one .. (two:reverse():gsub('(%d%d%d)', '%1,'):reverse() .. three)..'$'
 	end
 
+	-- Safely require game modules, with error notification if missing
+	local function safeRequire(instance, path)
+		local ok, mod = pcall(require, instance:FindFirstChild(path) or error(path.." not found"))
+		if not ok then
+			notif('Rawr.xyz', 'Module load failed: '..path..' - '..tostring(mod), 10, 'alert')
+			return nil
+		end
+		return mod
+	end
+
 	jb = {
-		BulletEmitter = require(replicatedStorage.Game.ItemSystem.BulletEmitter),
-		CircleAction = require(replicatedStorage.Module.UI).CircleAction,
-		CargoController = require(replicatedStorage.Game.Robbery.RobberyPassengerTrain),
-		FallingController = require(replicatedStorage.Game.Falling),
-		GunController = require(replicatedStorage.Game.Item.Gun),
-		HotbarItemSystem = require(replicatedStorage.Hotbar.HotbarItemSystem),
-		InventoryItemSystem = require(replicatedStorage.Inventory.InventoryItemSystem),
-		ItemSystemController = require(replicatedStorage.Game.ItemSystem.ItemSystem),
-		PlayerUtils = require(replicatedStorage.Game.PlayerUtils),
-		RagdollController = require(replicatedStorage.Module.AlexRagdoll),
-		TaserController = require(replicatedStorage.Game.Item.Taser),
-		TeamChooseController = require(replicatedStorage.TeamSelect.TeamChooseUI),
-		VehicleController = require(replicatedStorage.Vehicle.VehicleUtils)
+		BulletEmitter = safeRequire(replicatedStorage, 'Game.ItemSystem.BulletEmitter'),
+		CircleAction = safeRequire(replicatedStorage, 'Module.UI'),
+		CargoController = safeRequire(replicatedStorage, 'Game.Robbery.RobberyPassengerTrain'),
+		FallingController = safeRequire(replicatedStorage, 'Game.Falling'),
+		GunController = safeRequire(replicatedStorage, 'Game.Item.Gun'),
+		HotbarItemSystem = safeRequire(replicatedStorage, 'Hotbar.HotbarItemSystem'),
+		InventoryItemSystem = safeRequire(replicatedStorage, 'Inventory.InventoryItemSystem'),
+		ItemSystemController = safeRequire(replicatedStorage, 'Game.ItemSystem.ItemSystem'),
+		PlayerUtils = safeRequire(replicatedStorage, 'Game.PlayerUtils'),
+		RagdollController = safeRequire(replicatedStorage, 'Module.AlexRagdoll'),
+		TaserController = safeRequire(replicatedStorage, 'Game.Item.Taser'),
+		TeamChooseController = safeRequire(replicatedStorage, 'TeamSelect.TeamChooseUI'),
+		VehicleController = safeRequire(replicatedStorage, 'Vehicle.VehicleUtils')
 	}
 
-	if not jb.VehicleController.toggleLocalLocked or not jb.VehicleController.NitroShopVisible then
-		repeat task.wait() until (jb.VehicleController.toggleLocalLocked and jb.VehicleController.NitroShopVisible) or vape.Loaded == nil
+	-- Verify all essential modules loaded
+	for k, v in pairs(jb) do
+		if v == nil then
+			error("Essential module "..k.." failed to load")
+		end
+	end
+
+	-- Wait for VehicleController properties with a 20-second timeout
+	local waited = 0
+	while not (jb.VehicleController.toggleLocalLocked and jb.VehicleController.NitroShopVisible) do
+		task.wait(0.1)
+		waited = waited + 0.1
+		if waited > 20 then
+			notif('Rawr.xyz', 'VehicleController not ready after 20s, aborting', 10, 'alert')
+			return
+		end
 		if vape.Loaded == nil then return end
 	end
+
 	local remotetable = debug.getupvalue(jb.VehicleController.toggleLocalLocked, 2)
 	local fireserver, hook = remotetable.FireServer
 
@@ -359,14 +395,13 @@ run(function()
 		table.clear(jb)
 		hookfunction(fireserver, hook)
 		hookfunction(cashfunc, cashhook)
-		--restorefunction(fireserver)
-		--restorefunction(cashfunc)
 	end)
 end)
 
 for _, v in {'Reach', 'TriggerBot', 'Disabler', 'AntiFall', 'HitBoxes', 'Killaura', 'MurderMystery'} do
 	vape:Remove(v)
 end
+
 run(function()
 	local SilentAim
 	local Target
@@ -382,7 +417,7 @@ run(function()
 	local Hooked
 	local ProjectileRaycast = RaycastParams.new()
 	ProjectileRaycast.RespectCanCollide = true
-	
+
 	SilentAim = vape.Categories.Combat:CreateModule({
 		Name = 'SilentAim',
 		Function = function(callback)
@@ -400,7 +435,7 @@ run(function()
 						Players = Target.Players.Enabled,
 						NPCs = Target.NPCs.Enabled
 					})
-	
+
 					if ent then
 						local item = jb.ItemSystemController:GetLocalEquipped()
 						if item and ((self.Tip.CFrame.Position - ent.RootPart.Position).Magnitude / (item.Config.BulletSpeed or 1000)) < item.BulletEmitter.LifeSpan then
@@ -413,15 +448,15 @@ run(function()
 							end
 						end
 					end
-	
+
 					return pos
 				end
-	
+
 				repeat
 					if CircleObject then 
 						CircleObject.Position = inputService:GetMouseLocation() 
 					end
-	
+
 					if Instant.Enabled then 
 						local item = jb.ItemSystemController:GetLocalEquipped()
 						if item and item.BulletEmitter then
@@ -520,10 +555,10 @@ run(function()
 	})
 	Instant = SilentAim:CreateToggle({Name = 'Hitscan Bullets'})
 end)
-	
+
 run(function()
 	local Wallbang = {Enabled = false}
-	
+
 	Wallbang = vape.Categories.Combat:CreateModule({
 		Name = 'Wallbang',
 		Function = function(callback)
@@ -535,7 +570,7 @@ run(function()
 					shotData.isHeadshot = true
 					return hook(...)
 				end)
-	
+
 				repeat
 					local item = jb.ItemSystemController:GetLocalEquipped()
 					if item and item.BulletEmitter then
@@ -550,10 +585,10 @@ run(function()
 		Tooltip = 'Modifies bullets to always do headshot damage & shooting through most walls.'
 	})
 end)
-	
+
 run(function()
 	local AutoArrest = {Enabled = false}
-	
+
 	AutoArrest = vape.Categories.Blatant:CreateModule({
 		Name = 'AutoArrest',
 		Function = function(callback)
@@ -567,7 +602,7 @@ run(function()
 							Part = 'RootPart',
 							Range = 50
 						})
-	
+
 						for _, ent in plrs do
 							if not AutoArrest.Enabled then break end
 							if ent.Player and isIllegal(ent) then
@@ -588,16 +623,16 @@ run(function()
 		Tooltip = 'Automatically uses handcuffs on nearby entities'
 	})
 end)
-	
+
 run(function()
 	local AutoPop
 	local Range
 	local HandCheck
 	local TeamCheck
-	
+
 	local function getEntitiesInVehicle(car)
 		local entities = {}
-	
+
 		for _, seat in car:GetChildren() do
 			if (seat.Name == 'Seat' or seat.Name == 'Passenger') then
 				seat = seat:FindFirstChild('PlayerName')
@@ -610,13 +645,13 @@ run(function()
 				end
 			end
 		end
-	
+
 		return entities
 	end
-	
+
 	local function getVehiclesNear()
 		local allowed = {}
-	
+
 		if entitylib.isAlive then
 			local localPosition = entitylib.character.HumanoidRootPart.Position
 			for _, car in collectionService:GetTagged('Vehicle') do
@@ -631,17 +666,17 @@ run(function()
 							end
 						end
 					end
-					
+
 					if check then 
 						table.insert(allowed, car) 
 					end
 				end
 			end
 		end
-	
+
 		return allowed
 	end
-	
+
 	AutoPop = vape.Categories.Blatant:CreateModule({
 		Name = 'AutoPop',
 		Function = function(callback)
@@ -672,10 +707,10 @@ run(function()
 	HandCheck = AutoPop:CreateToggle({Name = 'Hand Check'})
 	TeamCheck = AutoPop:CreateToggle({Name = 'Team Check'})
 end)
-	
+
 run(function()
 	local Punch = {Enabled = false}
-	
+
 	Punch = vape.Categories.Blatant:CreateModule({
 		Name = 'AutoPunch',
 		Function = function(callback)
@@ -691,11 +726,11 @@ run(function()
 		Tooltip = 'Always punches people infront of you'
 	})
 end)
-	
+
 run(function()
 	local AutoTaze = {Enabled = false}
 	local AutoTazeHandCheck = {Enabled = false}
-	
+
 	AutoTaze = vape.Categories.Blatant:CreateModule({
 		Name = 'AutoTaze',
 		Function = function(callback)
@@ -709,7 +744,7 @@ run(function()
 							Part = 'RootPart',
 							Range = 50
 						})
-	
+
 						if ent and isIllegal(ent) and not isArrested(ent.Player.Name) then
 							if item then 
 								jb:FireServer('TaseReplicate', ent.Head.Position) 
@@ -726,11 +761,11 @@ run(function()
 	})
 	AutoTazeHandCheck = AutoTaze:CreateToggle({Name = 'Hand Check'})
 end)
-	
+
 run(function()
 	LazerGodmode = vape.Categories.Blatant:CreateModule({Name = 'LazerGodmode'})
 end)
-	
+
 run(function()
 	vape.Categories.Blatant:CreateModule({
 		Name = 'NoFall',
@@ -740,11 +775,11 @@ run(function()
 		Tooltip = 'Disables ragdoll handling & fall damage'
 	})
 end)
-	
+
 run(function()
 	local nitrotable = debug.getupvalue(jb.VehicleController.NitroShopVisible, 1)
 	local oldnitro
-	
+
 	InfNitro = vape.Categories.Utility:CreateModule({
 		Name = 'InfiniteNitro',
 		Function = function(callback)
@@ -763,7 +798,7 @@ run(function()
 		Tooltip = 'Infinite boost for the local car'
 	})
 end)
-	
+
 run(function()
 	vape.Categories.Utility:CreateModule({
 		Name = 'InstantAction',
@@ -773,7 +808,7 @@ run(function()
 		Tooltip = 'Allows you to instantly complete ProximityPrompt actions'
 	})
 end)
-	
+
 run(function()
 	vape.Categories.Utility:CreateModule({
 		Name = 'KeySpoofer',
