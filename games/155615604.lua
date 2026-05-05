@@ -67,7 +67,13 @@ local targetinfo = vape.Libraries.targetinfo
 local function notif(...) return vape:CreateNotification(...) end
 
 if identifyexecutor then
-    local execName = ({identifyexecutor()})[1]
+    local execInfo = {identifyexecutor()}
+    local execName = execInfo[1] or "Unknown"
+    local execVersion = execInfo[2] or "Unknown"
+
+    print("Executor: " .. execName .. " | Version: " .. execVersion)
+    notif('Rawr.xyz', 'Executor: ' .. execName .. ' | v' .. execVersion, 5, 'info')
+
     local allowed = {
         Madium = true, Velocity = true, Sirhurt = true, Volt = true, LX63 = true,
         ["Synapse Z"] = true, Seliware = true, Potassium = true, Cosmic = true,
@@ -890,7 +896,7 @@ run(function()
         end
     end
 
-    local TexturesModule = vape.Categories.Utility:CreateModule({
+   local TexturesModule = vape.Categories.Utility:CreateModule({
     Name = "World Textures",
     Function = function(callback)
         if callback then
@@ -910,7 +916,6 @@ run(function()
         end
     end
 })
-
     TexturesModule:CreateDropdown({
         Name = "Texture Set",
         List = {"Default", "Custom"},
@@ -1833,10 +1838,3 @@ run(function()
 end)
 
 print("Hello, V4.9.5.2")
-if identifyexecutor then
-    local execInfo = {identifyexecutor()}
-    local execName = execInfo[1] or "Unknown"
-    local execVersion = execInfo[2] or "Unknown"
-    print("Executor: " .. execName .. " | Version: " .. execVersion)
-    notif('Rawr.xyz', 'Executor: ' .. execName .. ' | v' .. execVersion, 5, 'info')
-end
