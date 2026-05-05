@@ -893,8 +893,7 @@ run(function()
             for _, part in ipairs(workspace:GetDescendants()) do
                 applyTexture(part)
             end
-            local conn; conn = workspace.DescendantAdded:Connect(applyTexture)
-            -- Store connection so we can clean it later
+            local conn = workspace.DescendantAdded:Connect(applyTexture)
             TexturesModule.Conn = conn
         else
             if TexturesModule.Conn then
