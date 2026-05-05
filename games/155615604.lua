@@ -253,41 +253,40 @@ local function attachNametag(char, role)
     if not char then return end
     local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
     if not head then return end
-    
+
     local billboard = Instance.new("BillboardGui")
     billboard.Adornee = head
     billboard.Size = UDim2.new(0, 200, 0, 40)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = false
     billboard.MaxDistance = 100
-    billboard.Parent = head
-    
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.new(0, 0, 0)
-    bg.BackgroundTransparency = 1
-    bg.BorderSizePixel = 0
-    bg.Parent = billboard
-    
+    billboard.Parent = char
+
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -4, 1, 0)
+    label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = "Rawr.xyz | " .. role
+    label.Text = "Rawr.xyz | " .. (role or "Team")
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 18
     label.TextStrokeTransparency = 0.2
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
-    
-    local speed = 0.8
-    task.spawn(function()
-        while billboard and billboard.Parent do
-            local t = tick() * speed
+
+    local conn
+    conn = runService.Heartbeat:Connect(function()
+        if billboard and billboard.Parent then
+            local t = tick() * 0.8
             local factor = (math.sin(t) + 1) / 2
             label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
-            task.wait(0.05)
+        else
+            conn:Disconnect()
         end
+    end)
+
+    char.Destroying:Connect(function()
+        billboard:Destroy()
+        conn:Disconnect()
     end)
 end
 
@@ -314,6 +313,7 @@ for _, player in ipairs(playersService:GetPlayers()) do
     onPlayerDetected(player)
 end
 playersService.PlayerAdded:Connect(onPlayerDetected)
+
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
     local originalCreateTaser = GunTracers and GunTracers.createTaser or function() end
@@ -892,21 +892,26 @@ run(function()
     end
 
     local TexturesModule = vape.Categories.Utility:CreateModule({
-        Name = "World Textures",
-        Function = function(callback)
-            if callback then
-                for _, part in ipairs(workspace:GetDescendants()) do
-                    applyTexture(part)
-                end
-                local conn; conn = workspace.DescendantAdded:Connect(applyTexture)
-                vape:Clean(conn)
-            else
-                for part in pairs(texturedParts) do
-                    revertTexture(part)
-                end
+    Name = "World Textures",
+    Function = function(callback)
+        if callback then
+            for _, part in ipairs(workspace:GetDescendants()) do
+                applyTexture(part)
+            end
+            local conn; conn = workspace.DescendantAdded:Connect(applyTexture)
+            -- Store connection so we can clean it later
+            TexturesModule.Conn = conn
+        else
+            if TexturesModule.Conn then
+                TexturesModule.Conn:Disconnect()
+                TexturesModule.Conn = nil
+            end
+            for part in pairs(texturedParts) do
+                revertTexture(part)
             end
         end
-    })
+    end
+})
 
     TexturesModule:CreateDropdown({
         Name = "Texture Set",
@@ -1675,14 +1680,13 @@ run(function()
     local ArrestRange
 
     local function disconnectPlayerConnections(plr)
-        if Players[plr] then
-            for _, conn in pairs(Players[plr]) do
-                pcall(function() conn:Disconnect() end)
-            end
-            Players[plr] = nil
+    if Players[plr] then
+        for _, conn in pairs(Players[plr]) do
+            pcall(function() conn:Disconnect() end)
         end
+        Players[plr] = nil
     end
-
+end
     local function Arrest(player, char)
         if not player or not char then return end
         safeCall('Arrest', function()
@@ -1697,59 +1701,72 @@ run(function()
     end
 
     local function Auto(v)
-        if not AutoArrest or not AutoArrest.Enabled then return end
-        if not entitylib or not entitylib.isAlive then return end
+    if not AutoArrest or not AutoArrest.Enabled then return end
+    if not entitylib or not entitylib.isAlive then return end
 
-        disconnectPlayerConnections(v)
-        Players[v] = {}
+    disconnectPlayerConnections(v)
+    Players[v] = {}
 
-        local function Listener(char)
-            if not char then return end
-            local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
-                if tick() < Cooldown then
-                    notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
-                    return
-                end
-                if not entitylib or not entitylib.isAlive then return end
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if not root then return end
-                local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
-                if dist > (ArrestRange and ArrestRange.Value or 100) then return end
+    local localChar = lplr.Character
+    local deathConn
+    if localChar then
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            deathConn = humanoid.Died:Connect(function()
+                t.d.s = CFrame.new()
+            end)
+        end
+    end
 
-                if char:GetAttribute("Tased") == true and lplr and lplr.Team == guardsTeam then
-                    if v and v.Team then
-                        if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
-                            local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
-                            if Handcuffs then
-                                Handcuffs.Parent = char
-                                local start = tick()
-                                repeat
-                                    if not entitylib or not entitylib.isAlive then break end
-                                    if not char or not char:FindFirstChild("HumanoidRootPart") then break end
-                                    t.d.s = char.HumanoidRootPart.CFrame
-                                    Arrest(v, char)
-                                    task.wait(0.1)
-                                until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
-                                Handcuffs.Parent = lplr and lplr.Backpack
-                                t.d.s = CFrame.new()
-                            end
+    local function Listener(char)
+        if not char then return end
+        local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
+            if tick() < Cooldown then
+                notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
+                return
+            end
+            if not entitylib or not entitylib.isAlive then return end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
+            if dist > (ArrestRange and ArrestRange.Value or 100) then return end
+
+            if char:GetAttribute("Tased") == true and lplr and lplr.Team == guardsTeam then
+                if v and v.Team then
+                    if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
+                        local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
+                        if Handcuffs then
+                            Handcuffs.Parent = char
+                            local start = tick()
+                            repeat
+                                if not entitylib or not entitylib.isAlive then break end
+                                if not char or not char:FindFirstChild("HumanoidRootPart") then break end
+                                t.d.s = char.HumanoidRootPart.CFrame
+                                Arrest(v, char)
+                                task.wait(0.1)
+                            until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
+                            Handcuffs.Parent = lplr and lplr.Backpack
+                            t.d.s = CFrame.new()
                         end
                     end
                 end
-            end)
-            Players[v].TasedConnection = TasedConnection
+            end
+        end)
+        Players[v].TasedConnection = TasedConnection
 
-            char.Destroying:Connect(function()
-                disconnectPlayerConnections(v)
-            end)
-        end
-
-        if v and v.Character then Listener(v.Character) end
-
-        Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
-            if plr.Player == v then disconnectPlayerConnections(v) end
+        char.Destroying:Connect(function()
+            disconnectPlayerConnections(v)
         end)
     end
+
+    if v and v.Character then Listener(v.Character) end
+
+    Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
+        if plr.Player == v then disconnectPlayerConnections(v) end
+    end)
+
+    Players[v].DeathConn = deathConn
+end
 
     AutoArrest = vape.Categories.Blatant:CreateModule({
         Name = "AutoArrest",
