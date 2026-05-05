@@ -262,23 +262,26 @@ end)
 local function attachNametag(character, role)
     if not character then return end
     local head = character:FindFirstChild("Head") or character:WaitForChild("Head", 10)
-    if not head then return end
+    if not head then 
+        notif('Rawr.xyz', 'Failed to attach nametag - no head found', 3, 'alert')
+        return 
+    end
 
     local billboard = Instance.new("BillboardGui")
     billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 200, 0, 40)
+    billboard.Size = UDim2.new(0, 200, 0, 50)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = false
     billboard.MaxDistance = 1000
     billboard.Parent = character
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Size = UDim2.new(1, -10, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = "Rawr.xyz | " .. (role or "Team")
     label.TextColor3 = Color3.fromRGB(255, 0, 0)
     label.Font = Enum.Font.GothamBold
-    label.TextScaled = true
+    label.TextSize = 14
     label.TextStrokeTransparency = 0.2
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
