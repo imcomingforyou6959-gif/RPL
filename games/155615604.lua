@@ -248,7 +248,7 @@ local function loadTeamMembers()
     end
 end
 
-loadTeamMembers()
+task.spawn(loadTeamMembers)
 
 local function attachNametag(char, role)
     if not char then return end
@@ -273,13 +273,25 @@ local function attachNametag(char, role)
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
 
-    task.spawn(function()
+    local animThread
+    animThread = task.spawn(function()
         while billboard and billboard.Parent do
             local t = tick() * 2
             local factor = (math.sin(t) + 1) / 2
             label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
             task.wait(0.05)
         end
+        animThread = nil
+    end)
+
+    local conn
+    conn = char.Destroying:Connect(function()
+        billboard:Destroy()
+        if animThread then
+            task.cancel(animThread)
+            animThread = nil
+        end
+        conn:Disconnect()
     end)
 end
 
@@ -685,9 +697,20 @@ run(function()
     local crosshairWidth = 1.5
     local drawings = { lines = {}, texts = {} }
     local renderConnection
+    local text_x = 0
+    local cachedSinCos = {}
+    local lastSpinAngle = 0
 
     local function solve(angle, radius)
-        return Vector2.new(math.sin(math.rad(angle)) * radius, math.cos(math.rad(angle)) * radius)
+        local key = angle
+        if not cachedSinCos[key] then
+            cachedSinCos[key] = {
+                sin = math.sin(math.rad(angle)),
+                cos = math.cos(math.rad(angle))
+            }
+        end
+        local sc = cachedSinCos[key]
+        return Vector2.new(sc.sin * radius, sc.cos * radius)
     end
 
     local function createDrawings()
@@ -704,38 +727,46 @@ run(function()
             Text = 'Rawr.xyz',
             Color = crosshairColor
         })
+        text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X
     end
 
     local function updateCrosshair()
         local pos = inputService:GetMouseLocation()
-        local text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X
         drawings.texts[1].Visible = crosshairEnabled
         drawings.texts[2].Visible = crosshairEnabled
 
         if crosshairEnabled then
+            if text_x == 0 then
+                text_x = drawings.texts[1].TextBounds.X + drawings.texts[2].TextBounds.X
+            end
             drawings.texts[1].Position = pos + Vector2.new(-text_x / 2, crosshairRadius + crosshairLength + 15)
             drawings.texts[2].Position = drawings.texts[1].Position + Vector2.new(drawings.texts[1].TextBounds.X, 0)
             drawings.texts[2].Color = crosshairColor
 
+            if crosshairSpin then
+                lastSpinAngle = (tick() * 360) % 360
+            end
+
             for idx = 1, 4 do
                 local outline = drawings.lines[idx]
                 local inline = drawings.lines[idx + 4]
-                local angle = (idx - 1) * 90
-                local length = crosshairLength
+                local angle = (idx - 1) * 90 + lastSpinAngle
 
-                if crosshairSpin then
-                    angle = angle + (tick() * 360) % 360
-                end
+                local dir = solve(angle, 1)
+                local fromPos = pos + dir * crosshairRadius
+                local toPos = pos + dir * (crosshairRadius + crosshairLength)
+                local outlineFrom = pos + dir * (crosshairRadius - 1)
+                local outlineTo = pos + dir * (crosshairRadius + crosshairLength + 1)
 
                 inline.Visible = true
                 inline.Color = crosshairColor
-                inline.From = pos + solve(angle, crosshairRadius)
-                inline.To = pos + solve(angle, crosshairRadius + length)
+                inline.From = fromPos
+                inline.To = toPos
                 inline.Thickness = crosshairWidth
 
                 outline.Visible = true
-                outline.From = pos + solve(angle, crosshairRadius - 1)
-                outline.To = pos + solve(angle, crosshairRadius + length + 1)
+                outline.From = outlineFrom
+                outline.To = outlineTo
                 outline.Thickness = crosshairWidth + 1.5
             end
         else
@@ -751,6 +782,7 @@ run(function()
             crosshairEnabled = callback
             if callback then
                 if not drawings.lines[1] then createDrawings() end
+                cachedSinCos = {}
                 renderConnection = runService.RenderStepped:Connect(updateCrosshair)
             else
                 if renderConnection then
@@ -818,10 +850,11 @@ run(function()
     }
     local currentSet = "Default"
     local activeMaterials = defaultMaterials
+    local texturedParts = {}
 
     local function applyTexture(part)
         if not part or not part:IsA("BasePart") then return end
-        if part:GetAttribute("MC_Textured") then return end
+        if texturedParts[part] then return end
         local matName = part.Material.Name
         for _, mat in ipairs(activeMaterials) do
             if matName == mat[1] then
@@ -838,13 +871,14 @@ run(function()
                 end
                 part.Material = "SmoothPlastic"
                 part:SetAttribute("MC_Textured", true)
+                texturedParts[part] = true
                 break
             end
         end
     end
 
     local function revertTexture(part)
-        if part:GetAttribute("MC_Textured") then
+        if texturedParts[part] then
             for _, child in ipairs(part:GetChildren()) do
                 if child:IsA("Texture") and child.Name == "MC_Tex" then
                     child:Destroy()
@@ -859,6 +893,7 @@ run(function()
             end
             part:SetAttribute("MC_Textured", nil)
             part:SetAttribute("OriginalMaterial", nil)
+            texturedParts[part] = nil
         end
     end
 
@@ -869,8 +904,10 @@ run(function()
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
+                local conn; conn = workspace.DescendantAdded:Connect(applyTexture)
+                vape:Clean(conn)
             else
-                for _, part in ipairs(workspace:GetDescendants()) do
+                for part in pairs(texturedParts) do
                     revertTexture(part)
                 end
             end
@@ -887,7 +924,7 @@ run(function()
                 activeMaterials = customMaterials
             end
             if TexturesModule.Enabled then
-                for _, part in ipairs(workspace:GetDescendants()) do
+                for part in pairs(texturedParts) do
                     revertTexture(part)
                 end
                 for _, part in ipairs(workspace:GetDescendants()) do
@@ -901,7 +938,7 @@ run(function()
         Name = "Reapply Textures",
         Function = function()
             if TexturesModule.Enabled then
-                for _, part in ipairs(workspace:GetDescendants()) do
+                for part in pairs(texturedParts) do
                     revertTexture(part)
                 end
                 for _, part in ipairs(workspace:GetDescendants()) do
@@ -1021,7 +1058,12 @@ run(function()
 
     t.sa.hooks.PrisonLife = function(args)
         if not entitylib or not entitylib.isAlive then return end
-        local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
+        local character = entitylib.character
+        if not character then return end
+        local head = character.Head
+        if not head or not head:IsA("BasePart") then return end
+        local origin = head.Position
+        local ent, targetPart = getTarget(origin, nil)
         if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
 
         local originalHits = args[1]
@@ -1456,29 +1498,30 @@ run(function()
                         local v = plrs[i]
                         if v and v.RootPart and v.RootPart.Position then
                             if v.Player and not passesTeamCheckKA(v.Player) then
-                                continue
-                            end
-                            local delta = (v.RootPart.Position - selfpos)
-                            local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
-                            local dot = localfacing:Dot(deltaUnit)
-                            if dot <= 1 and dot >= -1 then
-                                local angle = math.acos(dot)
-                                if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
-                                    local distMag = delta.Magnitude
-                                    table.insert(attacked, {
-                                        Entity = v,
-                                        Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
-                                    })
-                                    if targetinfo then targetinfo.Targets[v] = tick() + 1 end
+                                -- skip
+                            else
+                                local delta = (v.RootPart.Position - selfpos)
+                                local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
+                                local dot = localfacing:Dot(deltaUnit)
+                                if dot <= 1 and dot >= -1 then
+                                    local angle = math.acos(dot)
+                                    if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
+                                        local distMag = delta.Magnitude
+                                        table.insert(attacked, {
+                                            Entity = v,
+                                            Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
+                                        })
+                                        if targetinfo then targetinfo.Targets[v] = tick() + 1 end
 
-                                    if AttackDelay < tick() then
-                                        local aps = CPS and CPS.GetRandomValue() or 1
-                                        if aps > 0 then
-                                            AttackDelay = tick() + (1 / aps)
+                                        if AttackDelay < tick() then
+                                            local aps = CPS and CPS.GetRandomValue() or 1
+                                            if aps > 0 then
+                                                AttackDelay = tick() + (1 / aps)
+                                            end
+                                            safeCall('meleeEvent', function()
+                                                meleeEvent:FireServer(v.Player, 1, 1)
+                                            end)
                                         end
-                                        safeCall('meleeEvent', function()
-                                            meleeEvent:FireServer(v.Player, 1, 1)
-                                        end)
                                     end
                                 end
                             end
@@ -1785,4 +1828,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.4")
+print("Hello, V4.9.5")
