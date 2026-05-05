@@ -265,7 +265,7 @@ local function attachNametag(char, role)
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 1, 0)
     bg.BackgroundColor3 = Color3.new(0, 0, 0)
-    bg.BackgroundTransparency = 0.8
+    bg.BackgroundTransparency = 1
     bg.BorderSizePixel = 0
     bg.Parent = billboard
     
@@ -275,7 +275,7 @@ local function attachNametag(char, role)
     label.Text = "Rawr.xyz | " .. role
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
+    label.TextSize = 18
     label.TextStrokeTransparency = 0.2
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
