@@ -910,46 +910,53 @@ run(function()
                 TexturesModule.Conn:Disconnect()
                 TexturesModule.Conn = nil
             end
-            for part in pairs(texturedParts) do
-                revertTexture(part)
+            -- Revert shit
+            for _, part in ipairs(workspace:GetDescendants()) do
+                if part:GetAttribute("MC_Textured") then
+                    revertTexture(part)
+                end
             end
         end
     end
 })
-    TexturesModule:CreateDropdown({
-        Name = "Texture Set",
-        List = {"Default", "Custom"},
-        Function = function(val)
-            if val == "Default" then
-                activeMaterials = defaultMaterials
-            else
-                activeMaterials = customMaterials
-            end
-            if TexturesModule.Enabled then
-                for part in pairs(texturedParts) do
-                    revertTexture(part)
-                end
-                for _, part in ipairs(workspace:GetDescendants()) do
-                    applyTexture(part)
-                end
-            end
-        end
-    })
 
-    TexturesModule:CreateButton({
-        Name = "Reapply Textures",
-        Function = function()
-            if TexturesModule.Enabled then
-                for part in pairs(texturedParts) do
+TexturesModule:CreateDropdown({
+    Name = "Texture Set",
+    List = {"Default", "Custom"},
+    Function = function(val)
+        if val == "Default" then
+            activeMaterials = defaultMaterials
+        else
+            activeMaterials = customMaterials
+        end
+        if TexturesModule.Enabled then
+            for _, part in ipairs(workspace:GetDescendants()) do
+                if part:GetAttribute("MC_Textured") then
                     revertTexture(part)
                 end
-                for _, part in ipairs(workspace:GetDescendants()) do
-                    applyTexture(part)
-                end
+            end
+            for _, part in ipairs(workspace:GetDescendants()) do
+                applyTexture(part)
             end
         end
-    })
-end)
+    end
+})
+
+TexturesModule:CreateButton({
+    Name = "Reapply Textures",
+    Function = function()
+        if TexturesModule.Enabled then
+            for _, part in ipairs(workspace:GetDescendants()) do
+                if part:GetAttribute("MC_Textured") then
+                    revertTexture(part)
+                end
+            end
+            for _, part in ipairs(workspace:GetDescendants()) do
+                applyTexture(part)
+            end
+        end
+    end
+})
 
 run(function()
     local SilentAim
