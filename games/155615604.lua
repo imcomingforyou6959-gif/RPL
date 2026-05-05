@@ -1826,12 +1826,11 @@ run(function()
     })
 end)
 
+print("Hello, V4.9.5.2")
 if identifyexecutor then
     local execInfo = {identifyexecutor()}
     local execName = execInfo[1] or "Unknown"
     local execVersion = execInfo[2] or "Unknown"
-    print("[Rawr.xyz] Executor: " .. execName .. " | Version: " .. execVersion)
+    print("Executor: " .. execName .. " | Version: " .. execVersion)
     notif('Rawr.xyz', 'Executor: ' .. execName .. ' | v' .. execVersion, 5, 'info')
 end
-                                                                                                                                                                        
-print("Hello, V4.9.5.2")
