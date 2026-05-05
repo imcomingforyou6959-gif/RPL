@@ -84,7 +84,8 @@ if identifyexecutor then
     end
 end
 
-local CURRENT_VERSION = "4.9.5.6"
+local SCRIPT_VERSION = "4.9.5.3"
+
 local VERSION_URL = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/version.txt?t=" .. tick()
 
 local function checkForUpdate()
@@ -93,8 +94,8 @@ local function checkForUpdate()
     latest = latest:match("^%s*(.-)%s*$")
     if latest == "" then return end
 
-    if latest ~= CURRENT_VERSION then
-        notif('Rawr.xyz', 'A new version is available: ' .. latest .. '\nYou are on ' .. CURRENT_VERSION .. '. Please re‑execute.', 15, 'alert')
+    if latest ~= SCRIPT_VERSION then
+        notif('Rawr.xyz', 'A new version is available: ' .. latest .. '\nYou are on ' .. SCRIPT_VERSION .. '. Please re‑inject.', 15, 'alert')
     end
 end
 
@@ -2015,4 +2016,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.5.6")
+print("Hello, V" .. SCRIPT_VERSION)
