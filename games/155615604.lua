@@ -273,20 +273,23 @@ local function attachNametag(char, role)
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
 
-    local conn
-    conn = runService.Heartbeat:Connect(function()
+    local conn = runService.Heartbeat:Connect(function()
         if billboard and billboard.Parent then
             local t = tick() * 0.8
             local factor = (math.sin(t) + 1) / 2
             label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
-        else
+        elseif conn then
             conn:Disconnect()
         end
     end)
 
     char.Destroying:Connect(function()
-        billboard:Destroy()
-        conn:Disconnect()
+        if billboard then
+            billboard:Destroy()
+        end
+        if conn then
+            conn:Disconnect()
+        end
     end)
 end
 
