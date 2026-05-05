@@ -226,17 +226,7 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
--- Ensure required services are available
-local playersService = game:GetService("Players")
-local notif = function(title, text, duration, icon)
-    if lib and lib.Notification then
-        lib:Notification(title, text, text)
-    else
-        print(string.format("[%s] %s", title, text))
-    end
-end
-
-local function attachDeveloperNametag(char)
+local function attachNametag(char)
     if not char then return end
     local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
     if not head then return end
@@ -281,8 +271,8 @@ end
 local function onDeveloperAdded(player)
     if not isRawrDeveloper(player) then return end
     notif('Rawr.xyz', 'A Rawr.xyz Developer is in the game | ' .. player.Name, 5, 'success')
-    if player.Character then attachDeveloperNametag(player.Character) end
-    player.CharacterAdded:Connect(attachDeveloperNametag)
+    if player.Character then attachNametag(player.Character) end
+    player.CharacterAdded:Connect(attachNametag)
 end
 
 for _, player in ipairs(playersService:GetPlayers()) do
