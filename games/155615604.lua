@@ -1897,4 +1897,54 @@ run(function()
     })
 end)
 
+run(function()
+    local Lighting = game:GetService("Lighting")
+    local originalBrightness = Lighting.Brightness
+    local originalClockTime = Lighting.ClockTime
+    local originalFogEnd = Lighting.FogEnd
+    local originalFogStart = Lighting.FogStart
+    local originalGlobalShadows = Lighting.GlobalShadows
+    local originalOutdoorAmbient = Lighting.OutdoorAmbient
+
+    vape.Categories.World:CreateModule({
+        Name = "Fullbright",
+        Function = function(callback)
+            if callback then
+                Lighting.Brightness = 3
+                Lighting.ClockTime = 12
+                Lighting.FogEnd = 100000
+                Lighting.FogStart = 100000
+                Lighting.GlobalShadows = false
+                Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+            else
+                Lighting.Brightness = originalBrightness
+                Lighting.ClockTime = originalClockTime
+                Lighting.FogEnd = originalFogEnd
+                Lighting.FogStart = originalFogStart
+                Lighting.GlobalShadows = originalGlobalShadows
+                Lighting.OutdoorAmbient = originalOutdoorAmbient
+            end
+        end
+    })
+end)
+
+run(function()
+    local Lighting = game:GetService("Lighting")
+    local originalFogEnd = Lighting.FogEnd
+    local originalFogStart = Lighting.FogStart
+
+    vape.Categories.World:CreateModule({
+        Name = "Anti-Fog",
+        Function = function(callback)
+            if callback then
+                Lighting.FogEnd = 100000
+                Lighting.FogStart = 100000
+            else
+                Lighting.FogEnd = originalFogEnd
+                Lighting.FogStart = originalFogStart
+            end
+        end
+    })
+end)
+
 print("Hello, V4.9.5.3")
