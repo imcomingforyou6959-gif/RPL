@@ -1,3 +1,4 @@
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
 
 -- FB
 if not mouse1click then mouse1click = function() return false end end
@@ -111,6 +112,7 @@ local t = {
     hn = {e = false}
 }
 
+-- AntiJump bypass (hook Humanoid __newindex)
 run(function()
     local oldHumanoidNewindex
     oldHumanoidNewindex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
@@ -225,6 +227,7 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
+-- Team member detection & nametag (improved)
 local teamLookup = {}
 local nameLookup = {}
 
@@ -280,13 +283,12 @@ local function attachNametag(char, role)
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
     label.Parent = billboard
 
-    -- PA
     local speed = 0.8
     task.spawn(function()
         while billboard and billboard.Parent do
             local t = (tick() * speed) % (2 * math.pi)
             local factor = (math.sin(t) + 1) / 2
-            local r = 1 - factor * 0.2   -- cvb
+            local r = 1 - factor * 0.2
             local g = 1 - factor * 0.2
             local b = 1 - factor * 0.2
             label.TextColor3 = Color3.new(r, g, b)
@@ -444,7 +446,7 @@ run(function()
     })
     local BulletColorSlider = TracerVisuals:CreateColorSlider({
         Name = "Bullet Color",
-        Function = function(hue, sat, val)
+        Function = function(hide, sat, val)
             bulletColor = Color3.fromHSV(hue, sat, val)
             if customColorsEnabled and showTracersEnabled then
                 updateTracerFunctions()
@@ -939,6 +941,7 @@ run(function()
     local CircleObject
     local Face
     local ShowTarget
+    local TeamFilterSA  -- team filter for SilentAim
     local rand = Random.new()
     local delayCheck = tick()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
@@ -1002,6 +1005,13 @@ run(function()
         tool:SetAttribute("Local_IsShooting", false)
     end
 
+    local function passesTeamCheck(player)
+        if not TeamFilterSA or TeamFilterSA.Value == "All" then return true end
+        if not player then return false end
+        local teamName = tostring(player.Team)
+        return teamName == TeamFilterSA.Value
+    end
+
     local function getTarget(origin, obj)
         local enabled = (AutoFire and AutoFire.Enabled)
         local chance = enabled and 100 or (HitChance and HitChance.Value or 0)
@@ -1018,6 +1028,9 @@ run(function()
             NPCs = Target and Target.NPCs and Target.NPCs.Enabled
         })
         if ent and targetinfo then targetinfo.Targets[ent] = tick() + 1 end
+        if ent and ent.Player and not passesTeamCheck(ent.Player) then
+            return nil
+        end
         return ent, ent and ent[targetPart], origin
     end
 
@@ -1069,6 +1082,10 @@ run(function()
                         Players = Target and Target.Players and Target.Players.Enabled,
                         NPCs = Target and Target.NPCs and Target.NPCs.Enabled
                     })
+
+                    if ent and ent.Player and not passesTeamCheck(ent.Player) then
+                        ent = nil
+                    end
 
                     if ShowTarget and ShowTarget.Enabled and ent and targetinfo then
                         targetinfo.Targets[ent] = tick() + 1
@@ -1134,6 +1151,10 @@ run(function()
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
                 end
+                if mouseClicked then
+                    mouse1release()
+                    mouseClicked = false
+                end
             end
         end,
         Tooltip = 'Silently adjusts your aim towards the enemy'
@@ -1167,6 +1188,11 @@ run(function()
         Suffix = function(val) return val == 1 and 'second' or 'seconds' end
     })
     Method = SilentAim:CreateDropdown({ Name = 'Shoot Method', List = {'Simulation', 'Click'} })
+    TeamFilterSA = SilentAim:CreateDropdown({
+        Name = 'Team Filter',
+        List = {'All', 'Criminals', 'Inmates', 'Guards', 'Neutral'},
+        Tooltip = 'Only target players on the selected team'
+    })
     SilentAim:CreateToggle({
         Name = 'Range Circle',
         Function = function(callback)
@@ -1402,9 +1428,17 @@ run(function()
     local ParticleColor2
     local ParticleSize
     local Face
+    local TeamFilterKA  -- team filter for KillAura
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
     local renderStepConnection
+
+    local function passesTeamCheckKA(player)
+        if not TeamFilterKA or TeamFilterKA.Value == "All" then return true end
+        if not player then return false end
+        local teamName = tostring(player.Team)
+        return teamName == TeamFilterKA.Value
+    end
 
     Killaura = vape.Categories.Blatant:CreateModule({
         Name = 'KillAura',
@@ -1430,6 +1464,9 @@ run(function()
                     for i = 1, #plrs do
                         local v = plrs[i]
                         if v and v.RootPart and v.RootPart.Position then
+                            if v.Player and not passesTeamCheckKA(v.Player) then
+                                continue
+                            end
                             local delta = (v.RootPart.Position - selfpos)
                             local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
                             local dot = localfacing:Dot(deltaUnit)
@@ -1518,6 +1555,11 @@ run(function()
     AttackRange = Killaura:CreateSlider({ Name='Attack range', Min=1, Max=30, Default=13, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
     AngleSlider = Killaura:CreateSlider({ Name='Max angle', Min=1, Max=360, Default=90 })
     Max = Killaura:CreateSlider({ Name='Max targets', Min=1, Max=10, Default=10 })
+    TeamFilterKA = Killaura:CreateDropdown({
+        Name = 'Team Filter',
+        List = {'All', 'Criminals', 'Inmates', 'Guards', 'Neutral'},
+        Tooltip = 'Only attack players on the selected team'
+    })
     Killaura:CreateToggle({
         Name = 'Show target',
         Function = function(callback)
@@ -1745,4 +1787,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.3")
+print("Hello, V4.9.4")
