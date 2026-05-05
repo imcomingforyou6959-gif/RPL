@@ -790,3 +790,10 @@ run(function()
 	})
 end)
 	
+if identifyexecutor then
+    local execInfo = {identifyexecutor()}
+    local execName = execInfo[1] or "Unknown"
+    local execVersion = execInfo[2] or "Unknown"
+    print("Executor: " .. execName .. " | Version: " .. execVersion)
+    notif('Rawr.xyz', 'Executor: ' .. execName .. ' | v' .. execVersion, 5, 'info')
+end
