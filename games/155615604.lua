@@ -226,7 +226,31 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
-local function attachNametag(char)
+local teamLookup = {}
+local nameLookup = {}
+
+local function loadTeamMembers()
+    local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
+    local suc, res = pcall(function() return game:HttpGet(url) end)
+    if not suc then return end
+    local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
+    if not ok or not data or type(data.TeamMembers) ~= "table" then return end
+
+    teamLookup = {}
+    nameLookup = {}
+    for _, mem in ipairs(data.TeamMembers) do
+        if mem.userId then
+            teamLookup[mem.userId] = mem
+        end
+        if mem.username then
+            nameLookup[mem.username:lower()] = mem
+        end
+    end
+end
+
+loadTeamMembers()   -- fetchin the json
+
+local function attachNametag(char, role)
     if not char then return end
     local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
     if not head then return end
@@ -241,7 +265,7 @@ local function attachNametag(char)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = "Rawr.xyz | Developer"
+    label.Text = "Rawr.xyz | " .. role
     label.TextColor3 = Color3.fromRGB(255, 0, 0)
     label.TextStrokeTransparency = 0.5
     label.Font = Enum.Font.GothamBold
@@ -264,22 +288,31 @@ local function attachNametag(char)
     end)
 end
 
-local function isRawrDeveloper(player)
-    return player.UserId == 1683850874 or player.Name == "engravingangels"
+local function isTeamMember(player)
+    -- startin check
+    if teamLookup[player.UserId] then
+        return teamLookup[player.UserId]
+    end
+    local name = player.Name:lower()
+    if nameLookup[name] then
+        return nameLookup[name]
+    end
+    return nil
 end
 
-local function onDeveloperAdded(player)
-    if not isRawrDeveloper(player) then return end
-    notif('Rawr.xyz', 'A Rawr.xyz Developer is in the game | ' .. player.Name, 5, 'success')
-    if player.Character then attachNametag(player.Character) end
-    player.CharacterAdded:Connect(attachNametag)
+local function onPlayerDetected(player)
+    local info = isTeamMember(player)
+    if not info then return end
+    notif('Rawr.xyz', 'A Rawr.xyz ' .. info.role .. ' is in the game | ' .. player.Name, 5, 'success')
+    if player.Character then attachNametag(player.Character, info.role) end
+    player.CharacterAdded:Connect(function(char) attachNametag(char, info.role) end)
 end
 
 for _, player in ipairs(playersService:GetPlayers()) do
-    onDeveloperAdded(player)
+    onPlayerDetected(player)
 end
 
-playersService.PlayerAdded:Connect(onDeveloperAdded)
+playersService.PlayerAdded:Connect(onPlayerDetected)
 
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
