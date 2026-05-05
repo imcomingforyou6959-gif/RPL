@@ -2008,4 +2008,80 @@ run(function()
     })
 end)
 
+run(function()
+    local localDoors = replicatedStorageService:FindFirstChild("Scripts"):FindFirstChild("LocalDoors")
+    if localDoors then
+        localDoors:Destroy()
+    end
+
+    local CollectionService = game:GetService("CollectionService")
+    local RunService = game:GetService("RunService")
+    local OPEN_DISTANCE = 15
+
+    local doors = {}
+    local playerRoot = nil
+    local heartbeatConn = nil
+
+    for _, door in ipairs(CollectionService:GetTagged("Door")) do
+        local block = door:FindFirstChild("block")
+        if block then
+            doors[door] = block
+        end
+    end
+
+    CollectionService:GetInstanceAddedSignal("Door"):Connect(function(door)
+        local block = door:WaitForChild("block", 5)
+        if block then
+            doors[door] = block
+        end
+    end)
+
+    CollectionService:GetInstanceRemovedSignal("Door"):Connect(function(door)
+        doors[door] = nil
+    end)
+
+    local function updatePlayerRoot()
+        local char = lplr.Character
+        playerRoot = char and char:FindFirstChild("HumanoidRootPart")
+    end
+    lplr.CharacterAdded:Connect(updatePlayerRoot)
+    updatePlayerRoot()
+
+    vape.Categories.Utility:CreateModule({
+        Name = "Anti Door",
+        Function = function(callback)
+            if callback then
+                heartbeatConn = RunService.Heartbeat:Connect(function()
+                    if not playerRoot then updatePlayerRoot() end
+                    if not playerRoot then return end
+
+                    local playerPos = playerRoot.Position
+                    for door, block in pairs(doors) do
+                        if door and door.Parent and block and block.Parent then
+                            local doorPos = door:GetModelCFrame().Position
+                            local dist = (playerPos - doorPos).Magnitude
+                            if dist <= OPEN_DISTANCE then
+                                block.Parent = nil
+                            else
+                                block.Parent = door
+                            end
+                        end
+                    end
+                end)
+            else
+                if heartbeatConn then
+                    heartbeatConn:Disconnect()
+                    heartbeatConn = nil
+                end
+                -- RST
+                for door, block in pairs(doors) do
+                    if block then
+                        block.Parent = door
+                    end
+                end
+            end
+        end
+    })
+end)
+
 print("Hello, V4.9.5.3")
