@@ -226,7 +226,6 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
--- Developer detection & nametag
 local function attachNametag(char)
     if not char then return end
     local head = char:WaitForChild("Head", 5)
@@ -240,7 +239,7 @@ local function attachNametag(char)
         local label = Instance.new("TextLabel", billboard)
         label.Size = UDim2.new(1,0,1,0)
         label.BackgroundTransparency = 1
-        label.Text = "Rawr.xyz Owner no talking"
+        label.Text = "Rawr.xyz | Developer"
         label.TextColor3 = Color3.new(1,0,0)
         label.TextStrokeTransparency = 0
         label.Font = Enum.Font.SourceSansBold
