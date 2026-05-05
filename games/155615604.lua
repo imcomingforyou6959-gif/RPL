@@ -896,7 +896,7 @@ run(function()
         end
     end
 
-   local TexturesModule = vape.Categories.Utility:CreateModule({
+    local TexturesModule = vape.Categories.Utility:CreateModule({
     Name = "World Textures",
     Function = function(callback)
         if callback then
