@@ -226,50 +226,70 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
-local function attachNametag(char)
+-- Ensure required services are available
+local playersService = game:GetService("Players")
+local notif = function(title, text, duration, icon)
+    if lib and lib.Notification then
+        lib:Notification(title, text, text)
+    else
+        print(string.format("[%s] %s", title, text))
+    end
+end
+
+local function attachDeveloperNametag(char)
     if not char then return end
-    local head = char:WaitForChild("Head", 5)
-    if head then
-        local billboard = Instance.new("BillboardGui")
-        billboard.Adornee = head
-        billboard.Size = UDim2.new(0,200,0,50)
-        billboard.StudsOffset = Vector3.new(0, 3, 0)
-        billboard.AlwaysOnTop = true
-        billboard.Parent = char
-        local label = Instance.new("TextLabel", billboard)
-        label.Size = UDim2.new(1,0,1,0)
-        label.BackgroundTransparency = 1
-        label.Text = "Rawr.xyz | Developer"
-        label.TextColor3 = Color3.new(1,0,0)
-        label.TextStrokeTransparency = 0
-        label.Font = Enum.Font.SourceSansBold
-        label.TextScaled = true
-    end
-end
+    local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
+    if not head then return end
 
-local function checkDeveloper()
-    for _, player in ipairs(playersService:GetPlayers()) do
-        if player.UserId == 1683850874 or player.Name == "engravingangels" then
-            return player
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 250, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = char
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "Rawr.xyz | Developer"
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.TextStrokeTransparency = 0.5
+    label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
+    label.Parent = billboard
+
+    local startColor = Color3.fromRGB(255, 0, 0)
+    local endColor = Color3.fromRGB(255, 255, 255)
+    local speed = 0.8
+    task.spawn(function()
+        while billboard and billboard.Parent do
+            local t = (tick() * speed) % (2 * math.pi)
+            local factor = (math.sin(t) + 1) / 2
+            local r = startColor.R + (endColor.R - startColor.R) * factor
+            local g = startColor.G + (endColor.G - startColor.G) * factor
+            local b = startColor.B + (endColor.B - startColor.B) * factor
+            label.TextColor3 = Color3.new(r, g, b)
+            task.wait(0.05)
         end
-    end
-    return nil
+    end)
 end
 
-local dev = checkDeveloper()
-if dev then
-    notif('Rawr.xyz', 'A Rawr.xyz Developer is in the game | ' .. dev.Name, 10, 'success')
-    if dev.Character then attachNametag(dev.Character) end
-    dev.CharacterAdded:Connect(attachNametag)
+local function isRawrDeveloper(player)
+    return player.UserId == 1683850874 or player.Name == "engravingangels"
 end
 
-playersService.PlayerAdded:Connect(function(player)
-    if player.UserId == 1683850874 or player.Name == "engravingangels" then
-        notif('Rawr.xyz', 'A Rawr.xyz Developer is in the game | ' .. player.Name, 10, 'success')
-        player.CharacterAdded:Connect(attachNametag)
-        if player.Character then attachNametag(player.Character) end
-    end
-end)
+local function onDeveloperAdded(player)
+    if not isRawrDeveloper(player) then return end
+    notif('Rawr.xyz', 'A Rawr.xyz Developer is in the game | ' .. player.Name, 5, 'success')
+    if player.Character then attachDeveloperNametag(player.Character) end
+    player.CharacterAdded:Connect(attachDeveloperNametag)
+end
+
+for _, player in ipairs(playersService:GetPlayers()) do
+    onDeveloperAdded(player)
+end
+
+playersService.PlayerAdded:Connect(onDeveloperAdded)
 
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
