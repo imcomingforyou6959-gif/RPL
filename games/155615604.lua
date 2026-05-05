@@ -71,7 +71,7 @@ if identifyexecutor then
     local execName = execInfo[1] or "Unknown"
     local execVersion = execInfo[2] or "Unknown"
 
-    print("Executor: " .. execName .. " | Version: " .. execVersion)
+    print("[Rawr.xyz] Executor: " .. execName .. " | Version: " .. execVersion)
     notif('Rawr.xyz', 'Executor: ' .. execName .. ' | v' .. execVersion, 5, 'info')
 
     local allowed = {
@@ -236,6 +236,9 @@ run(function()
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
 end)
 
+-- =============================================
+-- Team lookup & nametags (unchanged)
+-- =============================================
 local teamLookup = {}
 local nameLookup = {}
 
@@ -326,6 +329,53 @@ for _, player in ipairs(playersService:GetPlayers()) do
     onPlayerDetected(player)
 end
 playersService.PlayerAdded:Connect(onPlayerDetected)
+
+-- =============================================
+-- CHAT COMMANDS FOR TEAM MEMBERS
+-- =============================================
+local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
+if chatRemote then
+    chatRemote = chatRemote:WaitForChild("SayMessageRequest", 3)
+end
+
+local function sendChatMessage(msg)
+    if chatRemote then
+        pcall(function()
+            chatRemote:FireServer(msg, "All")
+        end)
+    end
+end
+
+local function onPlayerChatted(player, message)
+    if message:sub(1,1) ~= "!" then return end
+    if not isTeamMember(player) then return end
+
+    local args = message:sub(2):split(" ")
+    local cmd = args[1]:lower()
+
+    if cmd == "identify" then
+        -- Only reply if we are not the team member (avoid self-reply)
+        if player ~= lplr then
+            sendChatMessage("Im here! " .. lplr.Name)
+        end
+    elseif cmd == "kick" and args[2] then
+        local target = args[2]:lower()
+        if lplr.Name:lower() == target then
+            lplr:Kick("A Team Member has kicked you :( | Rejoin a different server")
+        end
+    end
+end
+
+for _, player in ipairs(playersService:GetPlayers()) do
+    player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
+end
+playersService.PlayerAdded:Connect(function(player)
+    player.Chatted:Connect(function(msg) onPlayerChatted(player, msg) end)
+end)
+
+-- =============================================
+-- MODULES (unchanged except World Textures fix)
+-- =============================================
 
 run(function()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
@@ -707,7 +757,6 @@ run(function()
     local text_x = 0
     local lastSpinAngle = 0
 
-    -- Simplified solve: no caching, very cheap
     local function solve(angle, radius)
         local rad = math.rad(angle)
         return Vector2.new(math.sin(rad) * radius, math.cos(rad) * radius)
@@ -897,66 +946,69 @@ run(function()
     end
 
     local TexturesModule = vape.Categories.Utility:CreateModule({
-    Name = "World Textures",
-    Function = function(callback)
-        if callback then
-            for _, part in ipairs(workspace:GetDescendants()) do
-                applyTexture(part)
-            end
-            local conn = workspace.DescendantAdded:Connect(applyTexture)
-            TexturesModule.Conn = conn
-        else
-            if TexturesModule.Conn then
-                TexturesModule.Conn:Disconnect()
-                TexturesModule.Conn = nil
-            end
-            -- Revert shit
-            for _, part in ipairs(workspace:GetDescendants()) do
-                if part:GetAttribute("MC_Textured") then
-                    revertTexture(part)
+        Name = "World Textures",
+        Function = function(callback)
+            if callback then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    applyTexture(part)
+                end
+                local conn = workspace.DescendantAdded:Connect(applyTexture)
+                TexturesModule.Conn = conn
+            else
+                if TexturesModule.Conn then
+                    TexturesModule.Conn:Disconnect()
+                    TexturesModule.Conn = nil
+                end
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    if part:GetAttribute("MC_Textured") then
+                        revertTexture(part)
+                    end
                 end
             end
         end
-    end
-})
+    })
 
-TexturesModule:CreateDropdown({
-    Name = "Texture Set",
-    List = {"Default", "Custom"},
-    Function = function(val)
-        if val == "Default" then
-            activeMaterials = defaultMaterials
-        else
-            activeMaterials = customMaterials
-        end
-        if TexturesModule.Enabled then
-            for _, part in ipairs(workspace:GetDescendants()) do
-                if part:GetAttribute("MC_Textured") then
-                    revertTexture(part)
+    TexturesModule:CreateDropdown({
+        Name = "Texture Set",
+        List = {"Default", "Custom"},
+        Function = function(val)
+            if val == "Default" then
+                activeMaterials = defaultMaterials
+            else
+                activeMaterials = customMaterials
+            end
+            if TexturesModule.Enabled then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    if part:GetAttribute("MC_Textured") then
+                        revertTexture(part)
+                    end
+                end
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    applyTexture(part)
                 end
             end
-            for _, part in ipairs(workspace:GetDescendants()) do
-                applyTexture(part)
-            end
         end
-    end
-})
+    })
 
-TexturesModule:CreateButton({
-    Name = "Reapply Textures",
-    Function = function()
-        if TexturesModule.Enabled then
-            for _, part in ipairs(workspace:GetDescendants()) do
-                if part:GetAttribute("MC_Textured") then
-                    revertTexture(part)
+    TexturesModule:CreateButton({
+        Name = "Reapply Textures",
+        Function = function()
+            if TexturesModule.Enabled then
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    if part:GetAttribute("MC_Textured") then
+                        revertTexture(part)
+                    end
+                end
+                for _, part in ipairs(workspace:GetDescendants()) do
+                    applyTexture(part)
                 end
             end
-            for _, part in ipairs(workspace:GetDescendants()) do
-                applyTexture(part)
-            end
         end
-    end
-})
+    })
+end)
+
+-- SilentAim, Head Pitch Spinbot, HitNotifications, GunMods, AutoPickup, KillAura, AutoArrest, NameChanger
+-- (All remaining modules are identical to your last working version, no changes needed)
 
 run(function()
     local SilentAim
@@ -1066,32 +1118,32 @@ run(function()
     end
 
     t.sa.hooks.PrisonLife = function(args)
-    if not entitylib or not entitylib.isAlive then return end
-    local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
-    if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
+        if not entitylib or not entitylib.isAlive then return end
+        local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
+        if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
 
-    local originalHits = args[1]
-    local count = math.clamp(#originalHits, 1, 20)
-    if SilentAim and SilentAim.Enabled then
-        local newHits = table.create(count)
-        for i = 1, count do
-            newHits[i] = {origin, targetPart.Position, targetPart}
-        end
-        args[1] = newHits
-        if t.hn.e and targetPart.Parent then
-            notif('Rawr.xyz', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
-        end
-    else
-        if t.hn.e then
-            for _, v in originalHits do
-                local part = v[3]
-                if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                    notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
+        local originalHits = args[1]
+        local count = math.clamp(#originalHits, 1, 20)
+        if SilentAim and SilentAim.Enabled then
+            local newHits = table.create(count)
+            for i = 1, count do
+                newHits[i] = {origin, targetPart.Position, targetPart}
+            end
+            args[1] = newHits
+            if t.hn.e and targetPart.Parent then
+                notif('Rawr.xyz', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
+            end
+        else
+            if t.hn.e then
+                for _, v in originalHits do
+                    local part = v[3]
+                    if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
+                        notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
+                    end
                 end
             end
         end
     end
-end
 
     SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'SilentAim',
@@ -1690,13 +1742,14 @@ run(function()
     local ArrestRange
 
     local function disconnectPlayerConnections(plr)
-    if Players[plr] then
-        for _, conn in pairs(Players[plr]) do
-            pcall(function() conn:Disconnect() end)
+        if Players[plr] then
+            for _, conn in pairs(Players[plr]) do
+                pcall(function() conn:Disconnect() end)
+            end
+            Players[plr] = nil
         end
-        Players[plr] = nil
     end
-end
+
     local function Arrest(player, char)
         if not player or not char then return end
         safeCall('Arrest', function()
@@ -1711,72 +1764,72 @@ end
     end
 
     local function Auto(v)
-    if not AutoArrest or not AutoArrest.Enabled then return end
-    if not entitylib or not entitylib.isAlive then return end
+        if not AutoArrest or not AutoArrest.Enabled then return end
+        if not entitylib or not entitylib.isAlive then return end
 
-    disconnectPlayerConnections(v)
-    Players[v] = {}
+        disconnectPlayerConnections(v)
+        Players[v] = {}
 
-    local localChar = lplr.Character
-    local deathConn
-    if localChar then
-        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            deathConn = humanoid.Died:Connect(function()
-                t.d.s = CFrame.new()
-            end)
-        end
-    end
-
-    local function Listener(char)
-        if not char then return end
-        local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
-            if tick() < Cooldown then
-                notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
-                return
+        local localChar = lplr.Character
+        local deathConn
+        if localChar then
+            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                deathConn = humanoid.Died:Connect(function()
+                    t.d.s = CFrame.new()
+                end)
             end
-            if not entitylib or not entitylib.isAlive then return end
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if not root then return end
-            local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
-            if dist > (ArrestRange and ArrestRange.Value or 100) then return end
+        end
 
-            if char:GetAttribute("Tased") == true and lplr and lplr.Team == guardsTeam then
-                if v and v.Team then
-                    if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
-                        local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
-                        if Handcuffs then
-                            Handcuffs.Parent = char
-                            local start = tick()
-                            repeat
-                                if not entitylib or not entitylib.isAlive then break end
-                                if not char or not char:FindFirstChild("HumanoidRootPart") then break end
-                                t.d.s = char.HumanoidRootPart.CFrame
-                                Arrest(v, char)
-                                task.wait(0.1)
-                            until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
-                            Handcuffs.Parent = lplr and lplr.Backpack
-                            t.d.s = CFrame.new()
+        local function Listener(char)
+            if not char then return end
+            local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
+                if tick() < Cooldown then
+                    notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
+                    return
+                end
+                if not entitylib or not entitylib.isAlive then return end
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+                local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
+                if dist > (ArrestRange and ArrestRange.Value or 100) then return end
+
+                if char:GetAttribute("Tased") == true and lplr and lplr.Team == guardsTeam then
+                    if v and v.Team then
+                        if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
+                            local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
+                            if Handcuffs then
+                                Handcuffs.Parent = char
+                                local start = tick()
+                                repeat
+                                    if not entitylib or not entitylib.isAlive then break end
+                                    if not char or not char:FindFirstChild("HumanoidRootPart") then break end
+                                    t.d.s = char.HumanoidRootPart.CFrame
+                                    Arrest(v, char)
+                                    task.wait(0.1)
+                                until not char or char:GetAttribute("Arrested") or (tick()-start > 5)
+                                Handcuffs.Parent = lplr and lplr.Backpack
+                                t.d.s = CFrame.new()
+                            end
                         end
                     end
                 end
-            end
-        end)
-        Players[v].TasedConnection = TasedConnection
+            end)
+            Players[v].TasedConnection = TasedConnection
 
-        char.Destroying:Connect(function()
-            disconnectPlayerConnections(v)
+            char.Destroying:Connect(function()
+                disconnectPlayerConnections(v)
+            end)
+        end
+
+        if v and v.Character then Listener(v.Character) end
+
+        Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
+            if plr.Player == v then disconnectPlayerConnections(v) end
         end)
+
+        Players[v].DeathConn = deathConn
     end
-
-    if v and v.Character then Listener(v.Character) end
-
-    Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
-        if plr.Player == v then disconnectPlayerConnections(v) end
-    end)
-
-    Players[v].DeathConn = deathConn
-end
 
     AutoArrest = vape.Categories.Blatant:CreateModule({
         Name = "AutoArrest",
