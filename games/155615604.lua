@@ -1,4 +1,3 @@
---This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
 
 -- FB
 if not mouse1click then mouse1click = function() return false end end
