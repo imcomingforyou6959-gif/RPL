@@ -1235,6 +1235,7 @@ run(function()
                     mouse1release()
                     mouseClicked = false
                 end
+                t.sa = nil
             end
         end,
         Tooltip = 'Silently adjusts your aim towards the enemy'
@@ -1522,7 +1523,9 @@ run(function()
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
     local renderStepConnection
-    local attackMode = "Punch"   -- two things
+    local attackMode = "Punch"   -- 2
+
+    local lastShotTime = 0
 
     local function passesTeamCheckKA(player)
         if not filterTeamKA then return true end
@@ -1620,9 +1623,29 @@ run(function()
         end
     end
 
-    -- shoot function redirect
-    local function shootRedirect(args)
+    local function shootStep()
         if not entitylib or not entitylib.isAlive then return end
+        local character = entitylib.character.Character
+        local backpack = lplr and lplr:FindFirstChildOfClass("Backpack")
+        local tool = nil
+        if character then
+            tool = character:FindFirstChildOfClass("Tool")
+        end
+        if not tool and backpack then
+            tool = backpack:FindFirstChildOfClass("Tool")
+        end
+        if not tool or not tool:IsA("Tool") then return end
+        local behavior = tool:GetAttribute("Behavior")
+        if not behavior then return end
+
+        local ammo = tool:GetAttribute("Local_CurrentAmmo")
+        if not ammo or ammo <= 0 then return end
+        local reloadSession = tool:GetAttribute("Local_ReloadSession")
+        if reloadSession and reloadSession > 0 then return end
+
+        local fireRate = tool:GetAttribute("FireRate") or 0.1
+        if tick() - lastShotTime < fireRate then return end
+
         local selfpos = entitylib.character.RootPart.Position
         local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
 
@@ -1658,18 +1681,57 @@ run(function()
 
         local targetPart = bestTarget.Head or bestTarget.RootPart
         if not targetPart then return end
-        local origin = entitylib.character.Head.Position
 
-        local originalHits = args[1]
-        local count = math.clamp(#originalHits, 1, 20)
-        local newHits = table.create(count)
-        for i = 1, count do
-            newHits[i] = {origin, targetPart.Position, targetPart}
+        -- Shoot!
+        lastShotTime = tick()
+        tool:SetAttribute("Local_IsShooting", true)
+
+        local muzzle = (tool:FindFirstChild("muzzle") and tool.muzzle.Position) or entitylib.character.Head.Position
+        local projectileCount = tool:GetAttribute("ProjectileCount") or 1
+        local hits = {}
+        local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
+        for _ = 1, projectileCount do
+            if behavior == "Sniper" and GunTracers.createSniper then
+                GunTracers.createSniper(muzzle, targetPart.Position)
+            elseif behavior == "Taser" and GunTracers.createTaser then
+                GunTracers.createTaser(muzzle, targetPart.Position)
+            else
+                if GunTracers.createBullet then
+                    GunTracers.createBullet(muzzle, targetPart.Position)
+                end
+            end
+            table.insert(hits, {muzzle, targetPart.Position, targetPart})
         end
-        args[1] = newHits
 
-        if t.hn.e then
-            notif('Rawr.xyz', 'we hit ' .. bestTarget.Player.Name .. "'s " .. targetPart.Name, 3)
+        safeCall('ShootEvent (KA)', function()
+            ShootEvent:FireServer(hits)
+        end)
+
+        local newAmmo = ammo - 1
+        tool:SetAttribute("Local_CurrentAmmo", newAmmo)
+
+        local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
+        if hud then
+            local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
+            if BottomRightFrame then
+                local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
+                if gunFrame then
+                    local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
+                    if bulletsLabel then
+                        if behavior == "Sniper" then
+                            bulletsLabel.Text = newAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
+                        else
+                            bulletsLabel.Text = newAmmo .. "/" .. (tool:GetAttribute("MaxAmmo") or 0)
+                        end
+                    end
+                end
+            end
+        end
+
+        tool:SetAttribute("Local_IsShooting", false)
+
+        if t.hn.e and targetPart.Parent then
+            notif('Rawr.xyz', 'KillAura hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
         end
     end
 
@@ -1678,8 +1740,7 @@ run(function()
         Function = function(callback)
             if callback then
                 if attackMode == "Shoot" then
-                    t.ka = t.ka or {}
-                    t.ka.redirect = shootRedirect
+                    renderStepConnection = runService.RenderStepped:Connect(shootStep)
                 else
                     renderStepConnection = runService.RenderStepped:Connect(meleeStep)
                 end
@@ -1688,7 +1749,6 @@ run(function()
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
                 end
-                t.ka = nil
                 if Boxes then
                     for _, v in pairs(Boxes) do v:Destroy() end
                     table.clear(Boxes)
@@ -1697,6 +1757,7 @@ run(function()
                     for _, v in pairs(Particles) do v:Destroy() end
                     table.clear(Particles)
                 end
+                lastShotTime = 0
             end
         end,
         Tooltip = 'Attack players around you without aiming at them.'
@@ -1707,21 +1768,20 @@ run(function()
         List = {'Punch', 'Shoot'},
         Function = function(val)
             attackMode = val
-            -- reapply
+            -- If module is on replace
             if Killaura.Enabled then
                 if renderStepConnection then
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
                 end
-                t.ka = nil
                 if val == "Shoot" then
-                    t.ka = {redirect = shootRedirect}
+                    renderStepConnection = runService.RenderStepped:Connect(shootStep)
                 else
                     renderStepConnection = runService.RenderStepped:Connect(meleeStep)
                 end
             end
         end,
-        Tooltip = 'punches/shoots people around u'
+        Tooltip = 'Punch = melee aura, Shoot = automatic gun aura'
     })
 
     Targets = Killaura:CreateTargets({Players = true})
@@ -1816,7 +1876,7 @@ run(function()
     ParticleSize = Killaura:CreateSlider({ Name='Size', Min=0, Max=1, Default=0.2, Decimal=100, Function=function(val) for _,v in pairs(Particles) do v.ParticleEmitter.Size = NumberSequence.new(val) end end, Darker=true, Visible=false })
     Face = Killaura:CreateToggle({ Name='Face target' })
 end)
-
+                                                                                                                                                                
 run(function()
     local ArrestPlayer = remotes:WaitForChild("ArrestPlayer")
     local InteractWithItem = remotes:WaitForChild("InteractWithItem")
