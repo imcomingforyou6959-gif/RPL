@@ -84,23 +84,6 @@ if identifyexecutor then
     end
 end
 
-local SCRIPT_VERSION = "4.9.5.8"
-
-local VERSION_URL = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/version.txt?t=" .. tick()
-
-local function checkForUpdate()
-    local suc, latest = pcall(game.HttpGet, game, VERSION_URL)
-    if not suc or not latest then return end
-    latest = latest:match("^%s*(.-)%s*$")
-    if latest == "" then return end
-
-    if latest ~= SCRIPT_VERSION then
-        notif('Rawr.xyz', 'A new version is available: ' .. latest .. '\nYou are on ' .. SCRIPT_VERSION .. '. Please re‑inject.', 15, 'alert')
-    end
-end
-
-checkForUpdate()
-
 local function safeCall(desc, func)
     local ok, err = pcall(func)
     if not ok then
