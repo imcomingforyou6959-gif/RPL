@@ -339,7 +339,6 @@ for _, player in ipairs(playersService:GetPlayers()) do
 end
 playersService.PlayerAdded:Connect(onPlayerDetected)
 
-
 local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
 if chatRemote then
     chatRemote = chatRemote:WaitForChild("SayMessageRequest", 3)
@@ -361,7 +360,6 @@ local function onPlayerChatted(player, message)
     local cmd = args[1]:lower()
 
     if cmd == "identify" then
-        -- 6
         if player ~= lplr then
             sendChatMessage("Im here! " .. lplr.Name)
         end
@@ -952,19 +950,15 @@ run(function()
         Name = "World Textures",
         Function = function(callback)
             if callback then
-                -- Apply
                 for _, part in ipairs(workspace:GetDescendants()) do
                     applyTexture(part)
                 end
-                -- Listen
                 descConn = workspace.DescendantAdded:Connect(applyTexture)
             else
-                -- Stop
                 if descConn then
                     descConn:Disconnect()
                     descConn = nil
                 end
-                -- Revert
                 for _, part in ipairs(workspace:GetDescendants()) do
                     if part:GetAttribute("MC_Textured") then
                         revertTexture(part)
@@ -1550,7 +1544,6 @@ run(function()
             local v = plrs[i]
             if v and v.RootPart and v.RootPart.Position then
                 if v.Player and not passesTeamCheckKA(v.Player) then
-                    -- skip
                 else
                     local delta = (v.RootPart.Position - selfpos)
                     local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
@@ -1624,25 +1617,51 @@ run(function()
         if not entitylib or not entitylib.isAlive then return end
         local character = entitylib.character.Character
         local backpack = lplr and lplr:FindFirstChildOfClass("Backpack")
-        local tool = nil
-        if character then
-            tool = character:FindFirstChildOfClass("Tool")
+
+        -- Try to equip a weapon if none is held
+        local tool = character and character:FindFirstChildOfClass("Tool")
+        if not tool or not tool:GetAttribute("Behavior") then
+            if backpack then
+                -- Prefer guns over taser
+                local best = nil
+                for _, v in pairs(backpack:GetChildren()) do
+                    if v:IsA("Tool") then
+                        local beh = v:GetAttribute("Behavior")
+                        if beh == "Sniper" then
+                            best = v
+                            break
+                        elseif beh == "Shotgun" and not best then
+                            best = v
+                        elseif beh and beh ~= "Taser" and not best then
+                            best = v
+                        elseif beh == "Taser" and not best then
+                            best = v
+                        end
+                    end
+                end
+                if best then
+                    character.Humanoid:UnequipTools()
+                    character.Humanoid:EquipTool(best)
+                    tool = best
+                end
+            end
         end
-        if not tool and backpack then
-            tool = backpack:FindFirstChildOfClass("Tool")
-        end
+
         if not tool or not tool:IsA("Tool") then return end
         local behavior = tool:GetAttribute("Behavior")
         if not behavior then return end
 
+        -- Ammo and reload check
         local ammo = tool:GetAttribute("Local_CurrentAmmo")
         if not ammo or ammo <= 0 then return end
         local reloadSession = tool:GetAttribute("Local_ReloadSession")
         if reloadSession and reloadSession > 0 then return end
 
+        -- Check fire rate
         local fireRate = tool:GetAttribute("FireRate") or 0.1
         if tick() - lastShotTime < fireRate then return end
 
+        -- Find target
         local selfpos = entitylib.character.RootPart.Position
         local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
 
@@ -1660,7 +1679,6 @@ run(function()
             local v = plrs[i]
             if v and v.Head then
                 if v.Player and not passesTeamCheckKA(v.Player) then
-                    -- skip
                 else
                     local delta = (v.Head.Position - selfpos)
                     local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
@@ -2148,4 +2166,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.7")
+print("Hello, V4.9.6")
