@@ -1614,141 +1614,142 @@ run(function()
     end
 
     local function shootStep()
-        if not entitylib or not entitylib.isAlive then return end
-        local character = entitylib.character.Character
-        local backpack = lplr and lplr:FindFirstChildOfClass("Backpack")
+    if not entitylib or not entitylib.isAlive then return end
+    local character = entitylib.character.Character
+    local backpack = lplr and lplr:FindFirstChildOfClass("Backpack")
+    if not character or not backpack then return end
 
-        -- Try to equip a weapon if none is held
-        local tool = character and character:FindFirstChildOfClass("Tool")
-        if not tool or not tool:GetAttribute("Behavior") then
-            if backpack then
-                -- Prefer guns over taser
-                local best = nil
-                for _, v in pairs(backpack:GetChildren()) do
-                    if v:IsA("Tool") then
-                        local beh = v:GetAttribute("Behavior")
-                        if beh == "Sniper" then
-                            best = v
-                            break
-                        elseif beh == "Shotgun" and not best then
-                            best = v
-                        elseif beh and beh ~= "Taser" and not best then
-                            best = v
-                        elseif beh == "Taser" and not best then
-                            best = v
-                        end
-                    end
-                end
-                if best then
-                    character.Humanoid:UnequipTools()
-                    character.Humanoid:EquipTool(best)
-                    tool = best
-                end
-            end
-        end
+    -- Find target first
+    local selfpos = entitylib.character.RootPart.Position
+    local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
 
-        if not tool or not tool:IsA("Tool") then return end
-        local behavior = tool:GetAttribute("Behavior")
-        if not behavior then return end
+    local plrs = entitylib.AllPosition({
+        Range = AttackRange and AttackRange.Value or 13,
+        Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
+        Part = 'Head',
+        Players = Targets and Targets.Players and Targets.Players.Enabled,
+        NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
+        Limit = 1
+    })
 
-        -- Ammo and reload check
-        local ammo = tool:GetAttribute("Local_CurrentAmmo")
-        if not ammo or ammo <= 0 then return end
-        local reloadSession = tool:GetAttribute("Local_ReloadSession")
-        if reloadSession and reloadSession > 0 then return end
-
-        -- Check fire rate
-        local fireRate = tool:GetAttribute("FireRate") or 0.1
-        if tick() - lastShotTime < fireRate then return end
-
-        -- Find target
-        local selfpos = entitylib.character.RootPart.Position
-        local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
-
-        local plrs = entitylib.AllPosition({
-            Range = AttackRange and AttackRange.Value or 13,
-            Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
-            Part = 'Head',
-            Players = Targets and Targets.Players and Targets.Players.Enabled,
-            NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
-            Limit = 1
-        })
-
-        local bestTarget = nil
-        for i = 1, #plrs do
-            local v = plrs[i]
-            if v and v.Head then
-                if v.Player and not passesTeamCheckKA(v.Player) then
-                else
-                    local delta = (v.Head.Position - selfpos)
-                    local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
-                    if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
-                        if delta.Magnitude <= (AttackRange and AttackRange.Value or 13) then
-                            bestTarget = v
-                            break
-                        end
-                    end
-                end
-            end
-        end
-
-        if not bestTarget then return end
-
-        local targetPart = bestTarget.Head or bestTarget.RootPart
-        if not targetPart then return end
-
-        -- Shoot!
-        lastShotTime = tick()
-        tool:SetAttribute("Local_IsShooting", true)
-
-        local muzzle = (tool:FindFirstChild("muzzle") and tool.muzzle.Position) or entitylib.character.Head.Position
-        local projectileCount = tool:GetAttribute("ProjectileCount") or 1
-        local hits = {}
-        local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
-        for _ = 1, projectileCount do
-            if behavior == "Sniper" and GunTracers.createSniper then
-                GunTracers.createSniper(muzzle, targetPart.Position)
-            elseif behavior == "Taser" and GunTracers.createTaser then
-                GunTracers.createTaser(muzzle, targetPart.Position)
+    local bestTarget = nil
+    for i = 1, #plrs do
+        local v = plrs[i]
+        if v and v.Head then
+            if v.Player and not passesTeamCheckKA(v.Player) then
             else
-                if GunTracers.createBullet then
-                    GunTracers.createBullet(muzzle, targetPart.Position)
-                end
-            end
-            table.insert(hits, {muzzle, targetPart.Position, targetPart})
-        end
-
-        safeCall('ShootEvent (KA)', function()
-            ShootEvent:FireServer(hits)
-        end)
-
-        local newAmmo = ammo - 1
-        tool:SetAttribute("Local_CurrentAmmo", newAmmo)
-
-        local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
-        if hud then
-            local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
-            if BottomRightFrame then
-                local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
-                if gunFrame then
-                    local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
-                    if bulletsLabel then
-                        if behavior == "Sniper" then
-                            bulletsLabel.Text = newAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
-                        else
-                            bulletsLabel.Text = newAmmo .. "/" .. (tool:GetAttribute("MaxAmmo") or 0)
-                        end
+                local delta = (v.Head.Position - selfpos)
+                local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
+                if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
+                    if delta.Magnitude <= (AttackRange and AttackRange.Value or 13) then
+                        bestTarget = v
+                        break
                     end
                 end
             end
-        end
-
-        tool:SetAttribute("Local_IsShooting", false)
-
-        if t.hn.e and targetPart.Parent then
-            notif('Rawr.xyz', 'KillAura hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
         end
     end
+
+    if not bestTarget then return end   -- No target, don't equip anything
+
+    -- Target exists, now ensure we have a weapon
+    local tool = character:FindFirstChildOfClass("Tool")
+    if not tool or not tool:GetAttribute("Behavior") then
+        -- Prefer guns over taser
+        local best = nil
+        for _, v in pairs(backpack:GetChildren()) do
+            if v:IsA("Tool") then
+                local beh = v:GetAttribute("Behavior")
+                if beh == "Sniper" then
+                    best = v
+                    break
+                elseif beh == "Shotgun" and not best then
+                    best = v
+                elseif beh and beh ~= "Taser" and not best then
+                    best = v
+                elseif beh == "Taser" and not best then
+                    best = v
+                end
+            end
+        end
+        if best then
+            character.Humanoid:UnequipTools()
+            character.Humanoid:EquipTool(best)
+            tool = best
+        else
+            return   -- No weapon at all, can't shoot
+        end
+    end
+
+    if not tool or not tool:IsA("Tool") then return end
+    local behavior = tool:GetAttribute("Behavior")
+    if not behavior then return end
+
+    -- Ammo and reload check
+    local ammo = tool:GetAttribute("Local_CurrentAmmo")
+    if not ammo or ammo <= 0 then return end
+    local reloadSession = tool:GetAttribute("Local_ReloadSession")
+    if reloadSession and reloadSession > 0 then return end
+
+    -- Check fire rate
+    local fireRate = tool:GetAttribute("FireRate") or 0.1
+    if tick() - lastShotTime < fireRate then return end
+
+    local targetPart = bestTarget.Head or bestTarget.RootPart
+    if not targetPart then return end
+
+    -- Shoot!
+    lastShotTime = tick()
+    tool:SetAttribute("Local_IsShooting", true)
+
+    local muzzle = (tool:FindFirstChild("muzzle") and tool.muzzle.Position) or entitylib.character.Head.Position
+    local projectileCount = tool:GetAttribute("ProjectileCount") or 1
+    local hits = {}
+    local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
+    for _ = 1, projectileCount do
+        if behavior == "Sniper" and GunTracers.createSniper then
+            GunTracers.createSniper(muzzle, targetPart.Position)
+        elseif behavior == "Taser" and GunTracers.createTaser then
+            GunTracers.createTaser(muzzle, targetPart.Position)
+        else
+            if GunTracers.createBullet then
+                GunTracers.createBullet(muzzle, targetPart.Position)
+            end
+        end
+        table.insert(hits, {muzzle, targetPart.Position, targetPart})
+    end
+
+    safeCall('ShootEvent (KA)', function()
+        ShootEvent:FireServer(hits)
+    end)
+
+    local newAmmo = ammo - 1
+    tool:SetAttribute("Local_CurrentAmmo", newAmmo)
+
+    local hud = playerGui:FindFirstChild("Home") and playerGui.Home:FindFirstChild("Hud")
+    if hud then
+        local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
+        if BottomRightFrame then
+            local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
+            if gunFrame then
+                local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
+                if bulletsLabel then
+                    if behavior == "Sniper" then
+                        bulletsLabel.Text = newAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
+                    else
+                        bulletsLabel.Text = newAmmo .. "/" .. (tool:GetAttribute("MaxAmmo") or 0)
+                    end
+                end
+            end
+        end
+    end
+
+    tool:SetAttribute("Local_IsShooting", false)
+
+    if t.hn.e and targetPart.Parent then
+        notif('Rawr.xyz', 'KillAura hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
+    end
+end
 
     Killaura = vape.Categories.Blatant:CreateModule({
         Name = 'KillAura',
