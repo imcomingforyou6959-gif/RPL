@@ -230,8 +230,6 @@ run(function()
         if typeof(args[1]) == "table" then
             if t.sa and t.sa.redirect then
                 t.sa.redirect(args)
-            elseif t.ka and t.ka.redirect then
-                t.ka.redirect(args)
             else
                 if t.hn.e then
                     for _, v in ipairs(args[1]) do
@@ -1516,7 +1514,6 @@ run(function()
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
     local renderStepConnection
-    local attackMode = "Punch"
 
     local function passesTeamCheckKA(player)
         if not filterTeamKA then return true end
@@ -1544,6 +1541,7 @@ run(function()
             local v = plrs[i]
             if v and v.RootPart and v.RootPart.Position then
                 if v.Player and not passesTeamCheckKA(v.Player) then
+                    -- skip
                 else
                     local delta = (v.RootPart.Position - selfpos)
                     local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
@@ -1613,74 +1611,16 @@ run(function()
         end
     end
 
-    -- Shoot redirect function (used when attackMode == "Shoot")
-    local function shootRedirect(args)
-        if not entitylib or not entitylib.isAlive then return end
-        local selfpos = entitylib.character.RootPart.Position
-        local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
-
-        local plrs = entitylib.AllPosition({
-            Range = AttackRange and AttackRange.Value or 13,
-            Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
-            Part = 'Head',
-            Players = Targets and Targets.Players and Targets.Players.Enabled,
-            NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
-            Limit = 1
-        })
-
-        local bestTarget = nil
-        for i = 1, #plrs do
-            local v = plrs[i]
-            if v and v.Head then
-                if v.Player and not passesTeamCheckKA(v.Player) then
-                else
-                    local delta = (v.Head.Position - selfpos)
-                    local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
-                    if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
-                        if delta.Magnitude <= (AttackRange and AttackRange.Value or 13) then
-                            bestTarget = v
-                            break
-                        end
-                    end
-                end
-            end
-        end
-
-        if not bestTarget then return end
-
-        local targetPart = bestTarget.Head or bestTarget.RootPart
-        if not targetPart then return end
-        local origin = entitylib.character.Head.Position
-
-        local originalHits = args[1]
-        local count = math.clamp(#originalHits, 1, 20)
-        local newHits = table.create(count)
-        for i = 1, count do
-            newHits[i] = {origin, targetPart.Position, targetPart}
-        end
-        args[1] = newHits
-
-        if t.hn.e then
-            notif('Rawr.xyz', 'KillAura shot ' .. bestTarget.Player.Name .. "'s " .. targetPart.Name, 3)
-        end
-    end
-
     Killaura = vape.Categories.Blatant:CreateModule({
         Name = 'KillAura',
         Function = function(callback)
             if callback then
-                if attackMode == "Shoot" then
-                    t.ka = t.ka or {}
-                    t.ka.redirect = shootRedirect
-                else
-                    renderStepConnection = runService.RenderStepped:Connect(meleeStep)
-                end
+                renderStepConnection = runService.RenderStepped:Connect(meleeStep)
             else
                 if renderStepConnection then
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
                 end
-                t.ka = nil
                 if Boxes then
                     for _, v in pairs(Boxes) do v:Destroy() end
                     table.clear(Boxes)
@@ -1692,27 +1632,6 @@ run(function()
             end
         end,
         Tooltip = 'Attack players around you without aiming at them.'
-    })
-
-    Killaura:CreateDropdown({
-        Name = 'Attack Type',
-        List = {'Punch', 'Shoot'},
-        Function = function(val)
-            attackMode = val
-            if Killaura.Enabled then
-                if renderStepConnection then
-                    renderStepConnection:Disconnect()
-                    renderStepConnection = nil
-                end
-                t.ka = nil
-                if val == "Shoot" then
-                    t.ka = {redirect = shootRedirect}
-                else
-                    renderStepConnection = runService.RenderStepped:Connect(meleeStep)
-                end
-            end
-        end,
-        Tooltip = 'Punch = melee aura, Shoot = bullet redirection'
     })
 
     Targets = Killaura:CreateTargets({Players = true})
