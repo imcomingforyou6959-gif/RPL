@@ -119,7 +119,8 @@ local t = {
     d = {l = CFrame.new(), s = CFrame.new()},
     bt = {m = false, q = false, p = Vector3.new()},
     sa = {hooks = {}, toggle = nil},
-    hn = {e = false}
+    hn = {e = false},
+    ka = {}   -- KillAura storage
 }
 
 run(function()
@@ -226,8 +227,22 @@ run(function()
         if checkcaller() then return old(self, ...) end
 
         local args = {...}
-        if typeof(args[1]) == "table" and t.sa.hooks.PrisonLife then
-            t.sa.hooks.PrisonLife(args)
+        if typeof(args[1]) == "table" then
+            if t.sa and t.sa.redirect then
+                t.sa.redirect(args)
+            elseif t.ka and t.ka.redirect then
+                t.ka.redirect(args)
+            else
+                -- default hit notifications
+                if t.hn.e then
+                    for _, v in ipairs(args[1]) do
+                        local part = v[3]
+                        if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
+                            notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
+                        end
+                    end
+                end
+            end
         end
 
         return old(self, unpack(args))
@@ -1108,7 +1123,7 @@ run(function()
         return ent, ent and ent[targetPart], origin
     end
 
-    t.sa.hooks.PrisonLife = function(args)
+    local function silentAimRedirect(args)
         if not entitylib or not entitylib.isAlive then return end
         local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
         if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
@@ -1123,15 +1138,6 @@ run(function()
             args[1] = newHits
             if t.hn.e and targetPart.Parent then
                 notif('Rawr.xyz', 'attempted to hit ' .. targetPart.Parent.Name .. "'s " .. targetPart.Name, 3)
-            end
-        else
-            if t.hn.e then
-                for _, v in originalHits do
-                    local part = v[3]
-                    if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                        notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
-                    end
-                end
             end
         end
     end
@@ -1233,6 +1239,8 @@ run(function()
         end,
         Tooltip = 'Silently adjusts your aim towards the enemy'
     })
+
+    t.sa.redirect = silentAimRedirect   -- assign redirect for central hook
 
     Target = SilentAim:CreateTargets({Players = true})
     Mode = SilentAim:CreateDropdown({
@@ -1514,111 +1522,173 @@ run(function()
     local Particles, Boxes = {}, {}
     local AttackDelay = tick()
     local renderStepConnection
+    local attackMode = "Punch"   -- two things
 
     local function passesTeamCheckKA(player)
         if not filterTeamKA then return true end
         return player and player.Team == filterTeamKA
     end
 
+    local function meleeStep()
+        if not entitylib or not entitylib.isAlive then return end
+        local rootPart = entitylib.character and entitylib.character.RootPart
+        if not rootPart then return end
+        local attacked = {}
+        local selfpos = rootPart.Position
+        local localfacing = rootPart.CFrame.LookVector * Vector3.new(1,0,1)
+
+        local plrs = entitylib.AllPosition({
+            Range = AttackRange and AttackRange.Value or 13,
+            Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
+            Part = 'RootPart',
+            Players = Targets and Targets.Players and Targets.Players.Enabled,
+            NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
+            Limit = Max and Max.Value or 10
+        })
+
+        for i = 1, #plrs do
+            local v = plrs[i]
+            if v and v.RootPart and v.RootPart.Position then
+                if v.Player and not passesTeamCheckKA(v.Player) then
+                    -- skip
+                else
+                    local delta = (v.RootPart.Position - selfpos)
+                    local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
+                    local dot = localfacing:Dot(deltaUnit)
+                    if dot <= 1 and dot >= -1 then
+                        local angle = math.acos(dot)
+                        if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
+                            local distMag = delta.Magnitude
+                            table.insert(attacked, {
+                                Entity = v,
+                                Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
+                            })
+                            if targetinfo then targetinfo.Targets[v] = tick() + 1 end
+
+                            if AttackDelay < tick() then
+                                local aps = CPS and CPS.GetRandomValue() or 1
+                                if aps > 0 then
+                                    AttackDelay = tick() + (1 / aps)
+                                end
+                                safeCall('meleeEvent', function()
+                                    meleeEvent:FireServer(v.Player, 1, 1)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if Boxes then
+            for i, box in ipairs(Boxes) do
+                if attacked[i] and box then
+                    box.Adornee = attacked[i].Entity.RootPart
+                    local chk = attacked[i].Check
+                    if chk and chk.Hue then
+                        box.Color3 = Color3.fromHSV(chk.Hue, chk.Sat, chk.Value)
+                        box.Transparency = 1 - chk.Opacity
+                    end
+                    box.Visible = true
+                elseif box then
+                    box.Adornee = nil
+                    box.Visible = false
+                end
+            end
+        end
+
+        if Particles then
+            for i, part in ipairs(Particles) do
+                if attacked[i] and part then
+                    part.Position = attacked[i].Entity.RootPart.Position
+                    part.Parent = gameCamera
+                elseif part then
+                    part.Parent = nil
+                end
+            end
+        end
+
+        if Face and Face.Enabled and #attacked > 0 then
+            local root = attacked[1].Entity.RootPart
+            if root and entitylib.character and entitylib.character.RootPart then
+                local vec = root.Position * Vector3.new(1,0,1)
+                entitylib.character.RootPart.CFrame = CFrame.lookAt(
+                    entitylib.character.RootPart.Position,
+                    Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
+                )
+            end
+        end
+    end
+
+    -- shoot function redirect
+    local function shootRedirect(args)
+        if not entitylib or not entitylib.isAlive then return end
+        local selfpos = entitylib.character.RootPart.Position
+        local localfacing = entitylib.character.RootPart.CFrame.LookVector * Vector3.new(1,0,1)
+
+        local plrs = entitylib.AllPosition({
+            Range = AttackRange and AttackRange.Value or 13,
+            Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
+            Part = 'Head',
+            Players = Targets and Targets.Players and Targets.Players.Enabled,
+            NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
+            Limit = 1
+        })
+
+        local bestTarget = nil
+        for i = 1, #plrs do
+            local v = plrs[i]
+            if v and v.Head then
+                if v.Player and not passesTeamCheckKA(v.Player) then
+                    -- skip
+                else
+                    local delta = (v.Head.Position - selfpos)
+                    local angle = math.acos( localfacing:Dot((delta * Vector3.new(1,0,1)).Unit) )
+                    if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
+                        if delta.Magnitude <= (AttackRange and AttackRange.Value or 13) then
+                            bestTarget = v
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+        if not bestTarget then return end
+
+        local targetPart = bestTarget.Head or bestTarget.RootPart
+        if not targetPart then return end
+        local origin = entitylib.character.Head.Position
+
+        local originalHits = args[1]
+        local count = math.clamp(#originalHits, 1, 20)
+        local newHits = table.create(count)
+        for i = 1, count do
+            newHits[i] = {origin, targetPart.Position, targetPart}
+        end
+        args[1] = newHits
+
+        if t.hn.e then
+            notif('Rawr.xyz', 'we hit ' .. bestTarget.Player.Name .. "'s " .. targetPart.Name, 3)
+        end
+    end
+
     Killaura = vape.Categories.Blatant:CreateModule({
         Name = 'KillAura',
         Function = function(callback)
             if callback then
-                renderStepConnection = runService.RenderStepped:Connect(function()
-                    if not entitylib or not entitylib.isAlive then return end
-                    local rootPart = entitylib.character and entitylib.character.RootPart
-                    if not rootPart then return end
-                    local attacked = {}
-                    local selfpos = rootPart.Position
-                    local localfacing = rootPart.CFrame.LookVector * Vector3.new(1,0,1)
-
-                    local plrs = entitylib.AllPosition({
-                        Range = AttackRange and AttackRange.Value or 13,
-                        Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
-                        Part = 'RootPart',
-                        Players = Targets and Targets.Players and Targets.Players.Enabled,
-                        NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
-                        Limit = Max and Max.Value or 10
-                    })
-
-                    for i = 1, #plrs do
-                        local v = plrs[i]
-                        if v and v.RootPart and v.RootPart.Position then
-                            if v.Player and not passesTeamCheckKA(v.Player) then
-                                -- skip
-                            else
-                                local delta = (v.RootPart.Position - selfpos)
-                                local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
-                                local dot = localfacing:Dot(deltaUnit)
-                                if dot <= 1 and dot >= -1 then
-                                    local angle = math.acos(dot)
-                                    if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
-                                        local distMag = delta.Magnitude
-                                        table.insert(attacked, {
-                                            Entity = v,
-                                            Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
-                                        })
-                                        if targetinfo then targetinfo.Targets[v] = tick() + 1 end
-
-                                        if AttackDelay < tick() then
-                                            local aps = CPS and CPS.GetRandomValue() or 1
-                                            if aps > 0 then
-                                                AttackDelay = tick() + (1 / aps)
-                                            end
-                                            safeCall('meleeEvent', function()
-                                                meleeEvent:FireServer(v.Player, 1, 1)
-                                            end)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-
-                    if Boxes then
-                        for i, box in ipairs(Boxes) do
-                            if attacked[i] and box then
-                                box.Adornee = attacked[i].Entity.RootPart
-                                local chk = attacked[i].Check
-                                if chk and chk.Hue then
-                                    box.Color3 = Color3.fromHSV(chk.Hue, chk.Sat, chk.Value)
-                                    box.Transparency = 1 - chk.Opacity
-                                end
-                                box.Visible = true
-                            elseif box then
-                                box.Adornee = nil
-                                box.Visible = false
-                            end
-                        end
-                    end
-
-                    if Particles then
-                        for i, part in ipairs(Particles) do
-                            if attacked[i] and part then
-                                part.Position = attacked[i].Entity.RootPart.Position
-                                part.Parent = gameCamera
-                            elseif part then
-                                part.Parent = nil
-                            end
-                        end
-                    end
-
-                    if Face and Face.Enabled and #attacked > 0 then
-                        local root = attacked[1].Entity.RootPart
-                        if root and entitylib.character and entitylib.character.RootPart then
-                            local vec = root.Position * Vector3.new(1,0,1)
-                            entitylib.character.RootPart.CFrame = CFrame.lookAt(
-                                entitylib.character.RootPart.Position,
-                                Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
-                            )
-                        end
-                    end
-                end)
+                if attackMode == "Shoot" then
+                    t.ka = t.ka or {}
+                    t.ka.redirect = shootRedirect
+                else
+                    renderStepConnection = runService.RenderStepped:Connect(meleeStep)
+                end
             else
                 if renderStepConnection then
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
                 end
+                t.ka = nil
                 if Boxes then
                     for _, v in pairs(Boxes) do v:Destroy() end
                     table.clear(Boxes)
@@ -1631,6 +1701,29 @@ run(function()
         end,
         Tooltip = 'Attack players around you without aiming at them.'
     })
+
+    Killaura:CreateDropdown({
+        Name = 'Attack Type',
+        List = {'Punch', 'Shoot'},
+        Function = function(val)
+            attackMode = val
+            -- reapply
+            if Killaura.Enabled then
+                if renderStepConnection then
+                    renderStepConnection:Disconnect()
+                    renderStepConnection = nil
+                end
+                t.ka = nil
+                if val == "Shoot" then
+                    t.ka = {redirect = shootRedirect}
+                else
+                    renderStepConnection = runService.RenderStepped:Connect(meleeStep)
+                end
+            end
+        end,
+        Tooltip = 'punches/shoots people around u'
+    })
+
     Targets = Killaura:CreateTargets({Players = true})
     CPS = Killaura:CreateTwoSlider({ Name='Attacks per Second', Min=1, Max=15, DefaultMin=8, DefaultMax=12 })
     AttackRange = Killaura:CreateSlider({ Name='Attack range', Min=1, Max=30, Default=13, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
