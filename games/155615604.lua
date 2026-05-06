@@ -84,7 +84,7 @@ if identifyexecutor then
     end
 end
 
-local SCRIPT_VERSION = "4.9.5.6"
+local SCRIPT_VERSION = "4.9.5.8"
 
 local VERSION_URL = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/version.txt?t=" .. tick()
 
