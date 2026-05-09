@@ -518,4 +518,4 @@ end)
 
 entitylib.start()
 
-print("Rivals V4.1.3")
+print("Rawr.xyz V4.1.3")
