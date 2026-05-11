@@ -167,7 +167,7 @@ end
 local function cameraStep()
     if isLobbyVisible() then return end
     local target = getClosestPlayerToMouse()
-    if target and lockChanceSA >= 100 or rand.NextNumber(rand, 0, 100) <= lockChanceSA then
+    if target and rand.NextNumber(rand, 0, 100) <= lockChanceSA then
         lockCameraToTarget(target)
     end
 end
@@ -183,28 +183,28 @@ run(function()
                 if cameraConnection then cameraConnection:Disconnect(); cameraConnection = nil end
             end
         end,
-        Tooltip = 'Locks camera on the closest enemy. Adjust Lock Chance for randomness.'
+        Tooltip = 'Aims camera at closest enemy.'
     })
 
     SilentAim:CreateDropdown({
         Name = 'Aim Part', List = {'Head', 'Body', 'Random'}, Default = 'Head',
         Function = function(val) aimPart = val end,
-        Tooltip = 'Part of the body to lock onto'
+        Tooltip = 'Body part to lock onto'
     })
     SilentAim:CreateSlider({
         Name = 'Smoothness', Min = 1, Max = 100, Default = 100,
         Function = function(val) smoothness = val / 100 end,
-        Suffix = '%', Tooltip = '100 = instant, lower = smoother lock'
+        Suffix = '%', Tooltip = 'Lock smoothness'
     })
     SilentAim:CreateToggle({
         Name = 'Wall Check', Default = true,
         Function = function(val) wallCheckEnabled = val end,
-        Tooltip = 'Only lock onto targets with clear line of sight'
+        Tooltip = 'Only lock when target is visible'
     })
     SilentAim:CreateSlider({
-        Name = 'Lock Chance', Min = 0, Max = 100, Default = 100,
+        Name = 'Hit Chance', Min = 0, Max = 100, Default = 100,
         Function = function(val) lockChanceSA = val end,
-        Suffix = '%', Tooltip = 'Probability per frame to lock camera. 100 = always lock, 0 = never lock.'
+        Suffix = '%', Tooltip = 'Chance to lock onto target each check'
     })
     ShowTarget = SilentAim:CreateToggle({
         Name = 'Show Target Info', Default = true
@@ -492,59 +492,58 @@ run(function()
     end})
 end)
 
--- Ragebot (with camera lock and rotation offsets)
+-- Ragebot (target strafe now built into main toggle)
 run(function()
-    local RagebotModule = vape.Categories.Blatant:CreateModule({Name = "Ragebot", Function = function(callback) end})
+    local RagebotModule = vape.Categories.Blatant:CreateModule({
+        Name = "Ragebot",
+        Function = function(callback)
+            if callback then
+                strafeConnection = runService.Heartbeat:Connect(function()
+                    if not entitylib.isAlive then return end
+                    local target = getClosestPlayerToMouse()
+                    if not target or not target.Character or not target.Character:FindFirstChild("Head") then return end
+                    local targetHead = target.Character.Head.Position
+                    local root = entitylib.character.RootPart
+                    local angle = tick() * strafeSpeed % (math.pi * 2)
+                    local offset = Vector3.new(math.sin(angle) * strafeDistance, 0, math.cos(angle) * strafeDistance)
+                    local newPos = targetHead + offset
+                    local lookDir = (targetHead - newPos).Unit
+                    local baseCF = CFrame.new(newPos, newPos + lookDir)
+                    local rotCF = CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
+                    root.CFrame = baseCF * rotCF
 
-    local strafeEnabled = false
+                    -- Perfect camera lock onto head
+                    gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, targetHead)
+                end)
+            else
+                if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
+            end
+        end,
+        Tooltip = 'Auto-strafe around target with camera lock.'
+    })
+
     local strafeSpeed = 10
     local strafeDistance = 8
-    local strafeTarget = nil
     local rotX = 0
     local rotY = 0
     local rotZ = 0
-    local antiVoidEnabled = false
-    local resolverEnabled = false
-    local lastPos = nil
-    local resolverConnection, strafeConnection
+    local strafeConnection = nil
 
-    RagebotModule:CreateToggle({Name = "Target Strafe", Default = false, Function = function(v)
-        strafeEnabled = v
-        if v then
-            strafeConnection = runService.Heartbeat:Connect(function()
-                if not entitylib.isAlive then return end
-                local target = getClosestPlayerToMouse()
-                if not target or not target.Character or not target.Character:FindFirstChild("Head") then return end
-                strafeTarget = target
-                local targetHead = target.Character.Head.Position
-                local root = entitylib.character.RootPart
-                local angle = tick() * strafeSpeed % (math.pi * 2)
-                local offset = Vector3.new(math.sin(angle) * strafeDistance, 0, math.cos(angle) * strafeDistance)
-                local newPos = targetHead + offset
-                local lookDir = (targetHead - newPos).Unit
-                local baseCF = CFrame.new(newPos, newPos + lookDir)
-                local rotCF = CFrame.Angles(math.rad(rotX), math.rad(rotY), math.rad(rotZ))
-                root.CFrame = baseCF * rotCF
-
-                -- Lock camera onto target (perfect accuracy)
-                lockCameraToTarget(target)
-            end)
-        else
-            if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
-            strafeTarget = nil
-        end
-    end})
     RagebotModule:CreateSlider({Name = "Strafe Speed", Min = 1, Max = 30, Default = 10, Function = function(v) strafeSpeed = v end, Suffix = "rad/s"})
     RagebotModule:CreateSlider({Name = "Strafe Distance", Min = 2, Max = 20, Default = 8, Function = function(v) strafeDistance = v end, Suffix = "studs"})
     RagebotModule:CreateSlider({Name = "Rotate X (Pitch)", Min = -180, Max = 180, Default = 0, Function = function(v) rotX = v end, Suffix = "°"})
     RagebotModule:CreateSlider({Name = "Rotate Y (Yaw)", Min = -180, Max = 180, Default = 0, Function = function(v) rotY = v end, Suffix = "°"})
     RagebotModule:CreateSlider({Name = "Rotate Z (Roll)", Min = -180, Max = 180, Default = 0, Function = function(v) rotZ = v end, Suffix = "°"})
 
+    -- Anti Void
     RagebotModule:CreateToggle({Name = "Anti Void", Default = false, Function = function(v)
-        antiVoidEnabled = v
         workspace.FallenPartsDestroyHeight = v and -99999 or 0
     end})
 
+    -- Position Resolver
+    local resolverEnabled = false
+    local lastPos = nil
+    local resolverConnection = nil
     RagebotModule:CreateToggle({Name = "Position Resolver", Default = false, Function = function(v)
         resolverEnabled = v
         if v then
