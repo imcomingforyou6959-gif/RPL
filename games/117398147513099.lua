@@ -71,7 +71,6 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
 
--- Team logic
 local function if_player_is_on_round_or_another(player)
     return player:GetAttribute("EnvironmentID") ~= nil
 end
@@ -225,7 +224,7 @@ run(function()
                 targetPlayer = nil
             end
         end,
-        Tooltip = 'Camera lock + auto‑click. Hold Mouse1/Mouse2.'
+        Tooltip = 'Redirects your bullets to the choosen part.'
     })
 
     SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to lock onto'})
@@ -422,7 +421,7 @@ run(function()
     })
 end)
 
--- No Fog
+-- Fog Controller
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd, origFogStart = Lighting.FogEnd, Lighting.FogStart
@@ -532,7 +531,6 @@ run(function()
     end})
 end)
 
--- Skin Unlocker
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
