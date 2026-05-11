@@ -127,7 +127,6 @@ local function isLobbyVisible()
     return false
 end
 
--- Silent Aim Module
 local targetPlayer = nil
 local isLeftMouseDown, isRightMouseDown = false, false
 local autoClickConnection = nil
@@ -254,12 +253,12 @@ run(function()
     SilentAim:CreateSlider({
         Name = 'Hit Chance', Min = 0, Max = 100, Default = 100,
         Function = function(val) lockChance = val end,
-        Suffix = '%', Tooltip = 'Chance to lock onto target each check'
+        Suffix = '%', Tooltip = 'Chance to Hit Target'
     })
     SilentAim:CreateSlider({
         Name = 'Click Interval', Min = 1, Max = 50, Default = 10,
         Function = function(val) clickInterval = val / 100 end,
-        Suffix = 's', Tooltip = 'Time between auto-clicks'
+        Suffix = 's', Tooltip = 'Time between auto shoot'
     })
     ShowTargetSA = SilentAim:CreateToggle({
         Name = 'Show Target Info', Default = true
@@ -300,7 +299,6 @@ run(function()
     })
 end)
 
--- Crosshair
 local crosshairEnabled = false
 local crosshairColor = Color3.fromRGB(128,128,128)
 local crosshairStyle = "Cross"
@@ -475,7 +473,6 @@ run(function()
     end})
 end)
 
--- Fullbright
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness, origClockTime, origFogEnd, origFogStart, origGlobalShadows, origOutdoorAmbient =
@@ -494,7 +491,6 @@ run(function()
     })
 end)
 
--- No Fog
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd, origFogStart = Lighting.FogEnd, Lighting.FogStart
@@ -507,7 +503,6 @@ run(function()
     })
 end)
 
--- FOV Changer
 run(function()
     local camera = workspace.CurrentCamera
     local defaultVert = 70
@@ -547,7 +542,6 @@ run(function()
     end})
 end)
 
--- Ragebot (with Target Strafe toggle and other features)
 run(function()
     local RagebotModule = vape.Categories.Blatant:CreateModule({
         Name = "Ragebot",
@@ -596,7 +590,7 @@ run(function()
                 if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
             end
         end,
-        Tooltip = 'Auto-strafe around target with camera lock.'
+        Tooltip = 'Strafe.'
     })
 
     RagebotModule:CreateSlider({Name = "Strafe Speed", Min = 1, Max = 30, Default = 10, Function = function(v) strafeSpeed = v end, Suffix = "rad/s"})
@@ -634,13 +628,12 @@ run(function()
     end})
 end)
 
--- Skin Unlocker
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
             shared.VapeSkinUnlockerActive = true
             pcall(function()
-                -- Full skin unlocker code (same as before)
+                -- sks
                 local Players = game:GetService("Players")
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
                 local HttpService = game:GetService("HttpService")
