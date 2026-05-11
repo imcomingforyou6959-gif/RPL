@@ -148,12 +148,19 @@ run(function()
         end
     end
 
+    local function onShoot()
+        if t.hs and t.hs.play then
+            t.hs.play()
+        end
+    end
+
     local function startRightAutoClick()
         if autoClickConnection then autoClickConnection:Disconnect() end
         autoClickConnection = runService.Heartbeat:Connect(function()
             if isRightDown and (tick() - lastRightClick >= clickInterval) then
                 if not isLobbyVisible() and canClick() then
                     mouse1click()
+                    onShoot()
                     lastRightClick = tick()
                 end
             end
@@ -170,9 +177,9 @@ run(function()
     inputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            -- Single shot
             if SilentAim and SilentAim.Enabled and not isLobbyVisible() and canClick() then
                 mouse1click()
+                onShoot()
             end
         elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
             if not isRightDown then
@@ -388,6 +395,122 @@ run(function()
 end)
 
 run(function()
+    local soundList = {
+        {name = "1nn", ext = ".mp3"}, {name = "67", ext = ".mp3"}, {name = "BatHit", ext = ".mp3"},
+        {name = "Beep", ext = ".mp3"}, {name = "Bonk", ext = ".mp3"}, {name = "Bow", ext = ".mp3"},
+        {name = "Bubble", ext = ".mp3"}, {name = "Bubble2", ext = ".mp3"}, {name = "CSGO", ext = ".mp3"},
+        {name = "Cod", ext = ".mp3"}, {name = "Fairy1", ext = ".mp3"}, {name = "Fairy2", ext = ".mp3"},
+        {name = "Fatality", ext = ".mp3"}, {name = "Fatality2", ext = ".mp3"}, {name = "Hentai1", ext = ".mp3"},
+        {name = "Hentai2", ext = ".mp3"}, {name = "Hentai3", ext = ".mp3"}, {name = "Lazer", ext = ".mp3"},
+        {name = "MarioCoins", ext = ".mp3"}, {name = "MinecraftXP", ext = ".mp3"}, {name = "Neverlose", ext = ".mp3"},
+        {name = "OSU", ext = ".mp3"}, {name = "PubgPan", ext = ".mp3"}, {name = "Rifk7", ext = ".mp3"},
+        {name = "RustHeadshot", ext = ".mp3"}, {name = "Skeet", ext = ".mp3"}, {name = "SpanishMoan", ext = ".mp3"},
+        {name = "StaryKrow", ext = ".mp3"}, {name = "Steve", ext = ".mp3"}, {name = "TF2Crit", ext = ".mp3"},
+        {name = "TF2Default", ext = ".mp3"}, {name = "Windows", ext = ".mp3"}, {name = "lobby", ext = ".mp3"},
+        {name = "boolean", ext = ".ogg"}, {name = "disable", ext = ".ogg"}, {name = "enable", ext = ".ogg"},
+        {name = "keypress", ext = ".ogg"}, {name = "keyrelease", ext = ".ogg"}, {name = "moan1", ext = ".ogg"},
+        {name = "moan2", ext = ".ogg"}, {name = "moan3", ext = ".ogg"}, {name = "moan4", ext = ".ogg"},
+        {name = "orthodox", ext = ".ogg"}, {name = "pmsound", ext = ".ogg"}, {name = "rifk", ext = ".ogg"},
+        {name = "scroll", ext = ".ogg"}, {name = "skeet", ext = ".ogg"}, {name = "swipein", ext = ".ogg"},
+        {name = "swipeout", ext = ".ogg"}, {name = "uwu", ext = ".ogg"}, {name = "ex", ext = ""}
+    }
+
+    local soundNames = {}
+    local soundMap = {}
+    for _, s in ipairs(soundList) do
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.name .. s.ext
+    end
+
+    local baseUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/main/assets/sounds/"
+    if not isfolder("newvape/assets/sounds") then
+        makefolder("newvape/assets/sounds")
+    end
+
+    local hitsoundEnabled = false
+    local currentSoundPath = "newvape/assets/sounds/Beep.mp3"
+    local soundCooldown = 0.1
+    local lastSoundTime = 0
+
+    local function playHitsound(path)
+        if tick() - lastSoundTime < soundCooldown then return end
+        lastSoundTime = tick()
+
+        local audioId
+        local success = pcall(function()
+            audioId = getcustomaudio(path)
+        end)
+        if success and audioId then
+            local sound = Instance.new("Sound", workspace.CurrentCamera)
+            sound.Volume = 1
+            sound.PlayOnRemove = false
+            sound.SoundId = audioId
+            sound:Play()
+            sound.Ended:Connect(function() sound:Destroy() end)
+        else
+            pcall(function()
+                if syn and syn.play_audio then
+                    syn.play_audio(path)
+                end
+            end)
+        end
+    end
+
+    t.hs = {play = function()
+        if hitsoundEnabled then
+            playHitsound(currentSoundPath)
+        end
+    end}
+
+    local HitsoundModule = vape.Categories.Utility:CreateModule({
+        Name = "Hitsound",
+        Function = function(callback) end
+    })
+
+    HitsoundModule:CreateToggle({
+        Name = "Hitsound",
+        Default = false,
+        Function = function(callback) hitsoundEnabled = callback end
+    })
+
+    HitsoundModule:CreateDropdown({
+        Name = "Select Sound",
+        List = soundNames,
+        Function = function(val)
+            local fullName = soundMap[val]
+            if fullName then
+                currentSoundPath = "newvape/assets/sounds/" .. fullName
+                if not isfile(currentSoundPath) then
+                    local rawUrl = baseUrl .. fullName
+                    local suc, res = pcall(function()
+                        return game:HttpGet(rawUrl)
+                    end)
+                    if suc and res then
+                        writefile(currentSoundPath, res)
+                        notif('Hitsound', 'Downloaded: ' .. fullName, 2, 'success')
+                    else
+                        notif('Hitsound', '404 – file missing on GitHub: ' .. fullName, 3, 'alert')
+                    end
+                else
+                    notif('Hitsound', 'Selected: ' .. fullName, 2, 'success')
+                end
+            end
+        end
+    })
+
+    HitsoundModule:CreateButton({
+        Name = "Preview Sound",
+        Function = function()
+            if hitsoundEnabled then
+                playHitsound(currentSoundPath)
+            else
+                notif('Hitsound', 'Enable Hitsound first', 2, 'alert')
+            end
+        end
+    })
+end)
+
+run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness = Lighting.Brightness
     local origClockTime = Lighting.ClockTime
@@ -523,4 +646,4 @@ end)
 
 entitylib.start()
 
-print("Rawr.xyz V4.1.4")
+print("Rivals V4.1.5")
