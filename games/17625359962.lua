@@ -71,7 +71,6 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'} do vape:Remove(v) end
 
--- Team logic
 local function chid_to_id(chid)
     return string.byte(chid or string.char(0))
 end
@@ -123,7 +122,6 @@ local function isLobbyVisible()
     return false
 end
 
--- Silent Aim
 local targetPlayer = nil
 local isLeftMouseDown, isRightMouseDown = false, false
 local autoClickConnection = nil
@@ -252,7 +250,6 @@ run(function()
     end})
 end)
 
--- Crosshair
 local crosshairEnabled = false
 local crosshairColor = Color3.fromRGB(128,128,128)
 local crosshairStyle = "Cross"
@@ -360,7 +357,6 @@ CrosshairModule:CreateToggle({Name="Outline", Default=false, Function=function(v
 CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function=function(h,s,v) outlineColor=Color3.fromHSV(h,s,v) end})
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 
--- Hitsound
 run(function()
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
@@ -404,7 +400,6 @@ run(function()
     end})
 end)
 
--- Fullbright
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness, origClockTime, origFogEnd, origFogStart, origGlobalShadows, origOutdoorAmbient =
@@ -423,7 +418,6 @@ run(function()
     })
 end)
 
--- No Fog
 run(function()
     local Lighting = game:GetService("Lighting")
     local origFogEnd, origFogStart = Lighting.FogEnd, Lighting.FogStart
@@ -436,7 +430,6 @@ run(function()
     })
 end)
 
--- FOV Changer
 run(function()
     local camera = workspace.CurrentCamera
     local defaultVert = 70; local defaultHoriz = 100
@@ -469,59 +462,75 @@ run(function()
     end})
 end)
 
--- Ragebot (Safe, physics-based strafe)
 run(function()
+    local ragebotEnabled = false
+    local strafeEnabled = false
+    local strafeConnection = nil
+
     local RagebotModule = vape.Categories.Blatant:CreateModule({
         Name = "Ragebot",
         Function = function(callback)
-            if callback then
-                strafeConnection = runService.Heartbeat:Connect(function()
-                    if not entitylib.isAlive then return end
-                    
-                    local target = getClosestPlayerToMouse()
-                    if not target or not target.Character then return end
-                    
-                    local targetHead = target.Character:FindFirstChild("Head")
-                    local root = entitylib.character.RootPart
-                    local humanoid = entitylib.character:FindFirstChildOfClass("Humanoid")
-                    
-                    if not (root and humanoid and targetHead) then return end
-                    
-                    -- Calculate strafe angle with randomness
-                    local currentTime = tick()
-                    local baseAngle = (currentTime * strafeSpeed) % (math.pi * 2)
-                    local randomOffset = 0
-                    if math.random() < 0.03 then
-                        randomOffset = (math.random() - 0.5) * 0.5
-                    end
-                    local strafeAngle = baseAngle + randomOffset
-                    
-                    -- Occasional pause
-                    if math.random() < 0.02 and shouldPause then return end
-                    
-                    -- Move using physics-safe call
-                    if strafeMethod == "Target" then
-                        local dirToTarget = (targetHead.Position - root.Position)
-                        if dirToTarget.Magnitude == 0 then return end
-                        local dirUnit = dirToTarget.Unit
-                        local perpDir = Vector3.new(-dirUnit.Z, 0, dirUnit.X)
-                        local moveDir = perpDir * math.cos(strafeAngle)
-                        humanoid:MoveTo(root.Position + moveDir * strafeDistance)
-                    else
-                        local offset = Vector3.new(
-                            math.cos(strafeAngle) * strafeDistance,
-                            0,
-                            math.sin(strafeAngle) * strafeDistance
-                        )
-                        humanoid:MoveTo(targetHead.Position + offset)
-                    end
-                    
-                    -- Camera aim (client-side)
-                    if cameraAimEnabled then
-                        local aimTarget = targetHead.Position + Vector3.new(0, aimOffset, 0)
-                        gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, aimTarget)
-                    end
-                end)
+            ragebotEnabled = callback
+            if not callback then
+                if strafeConnection then strafeConnection:Disconnect(); strafeConnection = nil end
+            else
+                if strafeEnabled then
+                    strafeConnection = runService.Heartbeat:Connect(strafeLoop)
+                end
+            end
+        end,
+        Tooltip = "Safe physics‑based strafing."
+    })
+
+    local function strafeLoop()
+        if not entitylib.isAlive then return end
+        local target = getClosestPlayerToMouse()
+        if not target or not target.Character then return end
+        local targetHead = target.Character:FindFirstChild("Head")
+        local root = entitylib.character.RootPart
+        local humanoid = entitylib.character:FindFirstChildOfClass("Humanoid")
+        if not (root and humanoid and targetHead) then return end
+
+        local currentTime = tick()
+        local baseAngle = (currentTime * strafeSpeed) % (math.pi * 2)
+        local randomOffset = 0
+        if math.random() < 0.03 then
+            randomOffset = (math.random() - 0.5) * 0.5
+        end
+        local strafeAngle = baseAngle + randomOffset
+
+        if math.random() < 0.02 and shouldPause then return end
+
+        if strafeMethod == "Target" then
+            local dirToTarget = (targetHead.Position - root.Position)
+            if dirToTarget.Magnitude == 0 then return end
+            local dirUnit = dirToTarget.Unit
+            local perpDir = Vector3.new(-dirUnit.Z, 0, dirUnit.X)
+            local moveDir = perpDir * math.cos(strafeAngle)
+            humanoid:MoveTo(root.Position + moveDir * strafeDistance)
+        else
+            local offset = Vector3.new(
+                math.cos(strafeAngle) * strafeDistance,
+                0,
+                math.sin(strafeAngle) * strafeDistance
+            )
+            humanoid:MoveTo(targetHead.Position + offset)
+        end
+
+        if cameraAimEnabled then
+            local aimTarget = targetHead.Position + Vector3.new(0, aimOffset, 0)
+            gameCamera.CFrame = CFrame.new(gameCamera.CFrame.Position, aimTarget)
+        end
+    end
+
+    RagebotModule:CreateToggle({
+        Name = "Strafe Enabled",
+        Default = false,
+        Function = function(callback)
+            strafeEnabled = callback
+            if ragebotEnabled and callback then
+                if strafeConnection then strafeConnection:Disconnect() end
+                strafeConnection = runService.Heartbeat:Connect(strafeLoop)
             else
                 if strafeConnection then
                     strafeConnection:Disconnect()
@@ -529,17 +538,16 @@ run(function()
                 end
             end
         end,
-        Tooltip = "Safe, physics-based strafing (hard to detect)."
+        Tooltip = "Turn strafing on/off"
     })
-    
+
     local strafeSpeed = 3
     local strafeDistance = 6
     local strafeMethod = "Target"
     local cameraAimEnabled = true
     local aimOffset = 0
     local shouldPause = true
-    local strafeConnection = nil
-    
+
     RagebotModule:CreateDropdown({
         Name = "Strafe Type",
         List = {"Target", "Circular"},
@@ -548,16 +556,12 @@ run(function()
     })
     RagebotModule:CreateSlider({
         Name = "Speed",
-        Min = 1,
-        Max = 10,
-        Default = 3,
+        Min = 1, Max = 10, Default = 3,
         Function = function(v) strafeSpeed = v end
     })
     RagebotModule:CreateSlider({
         Name = "Distance",
-        Min = 2,
-        Max = 20,
-        Default = 6,
+        Min = 2, Max = 20, Default = 6,
         Function = function(v) strafeDistance = v end
     })
     RagebotModule:CreateToggle({
@@ -567,27 +571,22 @@ run(function()
     })
     RagebotModule:CreateSlider({
         Name = "Aim Offset",
-        Min = -3,
-        Max = 3,
-        Default = 0,
-        Function = function(v) aimOffset = v end,
-        Decimal = 10
+        Min = -3, Max = 3, Default = 0, Decimal = 10,
+        Function = function(v) aimOffset = v end
     })
     RagebotModule:CreateToggle({
         Name = "Random Pauses",
         Default = true,
-        Function = function(v) shouldPause = v end,
-        Tooltip = "Stop occasionally to look more human"
+        Function = function(v) shouldPause = v end
     })
 end)
 
--- Skin Unlocker
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
         if callback and not shared.VapeSkinUnlockerActive then
             shared.VapeSkinUnlockerActive = true
             pcall(function()
-                -- full skin unlocker code (unchanged)
+                -- Services
                 local Players = game:GetService("Players")
                 local ReplicatedStorage = game:GetService("ReplicatedStorage")
                 local HttpService = game:GetService("HttpService")
