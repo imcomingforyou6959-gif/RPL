@@ -126,7 +126,6 @@ local function isLobbyVisible()
     return false
 end
 
--- Silent Aim (full options, auto‑click with interval)
 local targetPlayer = nil
 local isLeftMouseDown, isRightMouseDown = false, false
 local autoClickConnection = nil
@@ -256,7 +255,6 @@ run(function()
     end})
 end)
 
--- Crosshair
 local crosshairEnabled = false
 local crosshairColor = Color3.fromRGB(128,128,128)
 local crosshairStyle = "Cross"
@@ -366,7 +364,6 @@ CrosshairModule:CreateToggle({Name="Outline", Default=false, Function=function(v
 CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function=function(h,s,v) outlineColor=Color3.fromHSV(h,s,v) end})
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 
--- Hitsound
 run(function()
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
@@ -407,7 +404,6 @@ run(function()
     end})
 end)
 
--- Fullbright
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness, origClockTime, origFogEnd, origFogStart, origGlobalShadows, origOutdoorAmbient =
@@ -439,7 +435,6 @@ run(function()
     })
 end)
 
--- FOV Changer
 run(function()
     local camera = workspace.CurrentCamera
     local defaultVert = 70; local defaultHoriz = 100
@@ -472,7 +467,6 @@ run(function()
     end})
 end)
 
--- Ragebot (strafe *on main toggle*, improved stability)
 run(function()
     local RagebotModule = vape.Categories.Blatant:CreateModule({
         Name = "Ragebot",
