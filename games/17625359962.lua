@@ -461,6 +461,81 @@ run(function()
         notif('FOV', 'Reset to default', 2, 'success')
     end})
 end)
+                                                                                                                        
+run(function()
+    local deviceSpoofEnabled = false
+    local selectedDevice = "PC"
+    local conn = nil
+    local remoteCache = nil
+    local interval = 1
+    local lastSent = nil
+
+    local MAP = {
+        PC = "MouseKeyboard",
+        Phone = "Touch",
+        Controller = "Gamepad",
+        VR = "VR",
+    }
+
+    local function findRemote()
+        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+        if not remotes then return nil end
+        local replication = remotes:FindFirstChild("Replication")
+        if not replication then return nil end
+        local fighter = replication:FindFirstChild("Fighter")
+        if not fighter then return nil end
+        return fighter:FindFirstChild("SetControls")
+    end
+
+    local function sendDevice()
+        if not deviceSpoofEnabled then return end
+        local mapped = MAP[selectedDevice] or selectedDevice
+        if not mapped or mapped == lastSent then return end
+        if not remoteCache then remoteCache = findRemote() end
+        if not remoteCache then return end
+        pcall(function()
+            remoteCache:FireServer(mapped)
+        end)
+        lastSent = mapped
+    end
+
+    local DeviceSpoofModule = vape.Categories.Utility:CreateModule({
+        Name = "Device Spoofer",
+        Function = function(callback)
+            deviceSpoofEnabled = callback
+            if callback then
+                remoteCache = findRemote()
+                if not remoteCache then
+                    notif('Device Spoof', 'SetControls remote not found!', 3, 'alert')
+                    -- keep off
+                    DeviceSpoofModule:Toggle()
+                    return
+                end
+                -- heartbeat
+                sendDevice()
+                local acc = 0
+                conn = runService.Heartbeat:Connect(function(dt)
+                    acc = acc + dt
+                    if acc >= interval then
+                        acc = acc - interval
+                        sendDevice()
+                    end
+                end)
+            else
+                if conn then conn:Disconnect(); conn = nil end
+                lastSent = nil
+            end
+        end,
+        Tooltip = "Spoofs your device type."
+    })
+
+    DeviceSpoofModule:CreateDropdown({
+        Name = "Device Type",
+        List = {"PC", "Phone", "Controller", "VR"},
+        Default = "PC",
+        Function = function(val) selectedDevice = val end
+    })
+end)
                                                                                                                                                           
 run(function()
     local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
