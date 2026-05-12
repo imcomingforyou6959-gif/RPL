@@ -1023,6 +1023,9 @@ run(function()
             end
 
             local voidBulletEnabled = false
+            local voidAttachEnabled = false
+            local attachTarget = nil
+            local attachConnection = nil
 
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
@@ -1080,6 +1083,9 @@ run(function()
                         self.__conn1 = __y5z6a7.Heartbeat:Connect(function()
                             if not self.__active then return end
                             self.__target = self:__find()
+                            if voidAttachEnabled and self.__target then
+                                attachTarget = self.__target
+                            end
                         end)
 
                         local __l4m5n6 = __t6u7v8.StartShooting
@@ -1184,7 +1190,7 @@ run(function()
                             local __l2m3n4 = __f6g7h8.CFrame
                             local __o5p6q7 = __f6g7h8.Velocity
                             local __r8s9t0 = __f6g7h8.RotVelocity
-                            __f6g7h8.CFrame = __i9j0k1.CFrame * CFrame.new(0, -5, 0)
+                            __f6g7h8.CFrame = __i9j0k1.CFrame * CFrame.new(0, 0, 0)
                             __y5z6a7:BindToRenderStep("__restore", 101, function()
                                 __f6g7h8.CFrame = __l2m3n4
                                 __f6g7h8.Velocity = __o5p6q7
@@ -1261,18 +1267,62 @@ run(function()
         Tooltip = "Just Shoot"
     })
 
+    local voidAttachEnabled = false
+    local attachConnection = nil
+    local spinAngle = 0
+    local SPIN_SPEED = 10
+
+    local function startAttach()
+        local pl = playersService.LocalPlayer
+        if not pl then return end
+        local target = DesyncModule.__target  -- get current wallbang target
+        if not target or not target.Character then return end
+        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return end
+        local myRoot = pl.Character and pl.Character:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
+
+        if attachConnection then attachConnection:Disconnect() end
+        attachConnection = runService.Heartbeat:Connect(function()
+            if not voidAttachEnabled then return end
+            if not target or not target.Character then
+                target = DesyncModule.__target
+                if not target or not target.Character then return end
+                targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                if not targetRoot then return end
+            end
+            if not pl.Character then return end
+            myRoot = pl.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot then return end
+
+            local targetHead = target.Character:FindFirstChild("Head") or targetRoot
+            local posAbove = targetHead.Position + Vector3.new(0, 5, 0)
+            local lookAtCF = CFrame.lookAt(posAbove, targetHead.Position)
+            spinAngle = spinAngle + SPIN_SPEED
+            local finalCF = lookAtCF * CFrame.Angles(0, math.rad(spinAngle), 0)
+            myRoot.CFrame = finalCF
+        end)
+    end
+
+    local function stopAttach()
+        if attachConnection then attachConnection:Disconnect(); attachConnection = nil end
+        spinAngle = 0
+    end
+
     DesyncModule:CreateToggle({
-        Name = 'Void Logic',
+        Name = 'Void Logic (Attach Above Target)',
         Default = false,
         Function = function(state)
-            voidBulletEnabled = state
+            voidAttachEnabled = state
             if state then
-                notif('Rawr.xyz', 'Void redirection ON – all shots hit the head from a random void origin', 2, 'success')
+                startAttach()
+                notif('Rawr.xyz', 'Attached', 2, 'success')
             else
-                notif('Rawr.xyz', 'Void redirection OFF', 2, 'info')
+                stopAttach()
+                notif('Rawr.xyz', 'Detached', 2, 'info')
             end
         end,
-        Tooltip = 'Redirects bullets to originate from a random far‑away point, always hitting the enemy head.'
+        Tooltip = 'we love rawr.xyz.'
     })
 end)
                                                                                                                                                 
