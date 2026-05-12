@@ -367,6 +367,7 @@ run(function()
         {name="Bruh", id="rbxassetid://4578740568"},{name="Skeet", id="rbxassetid://5633695679"},
         {name="Neverlose", id="rbxassetid://6534948092"},{name="Fatality", id="rbxassetid://6534947869"},
         {name="Bonk", id="rbxassetid://5766898159"},{name="Minecraft", id="rbxassetid://4018616850"},
+        {name="Tom Scream", id="rbxassetid://7553397015"},{name="Prowler", id="rbxassetid://17727803845"},
     }
     local soundNames, soundMap = {}, {}
     for _, s in ipairs(assetSounds) do table.insert(soundNames, s.name); soundMap[s.name] = s.id end
