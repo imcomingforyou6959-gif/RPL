@@ -886,6 +886,7 @@ run(function()
     local remoteCache = nil
     local interval = 1
     local lastSent = nil
+    local initDone = false
 
     local MAP = {
         PC = "MouseKeyboard",
@@ -916,31 +917,42 @@ run(function()
         lastSent = mapped
     end
 
+    local function enableSpoof()
+        if deviceSpoofEnabled then return end
+        deviceSpoofEnabled = true
+        remoteCache = findRemote()
+        if not remoteCache then
+            notif('Device Spoof', 'SetControls remote not found!', 3, 'alert')
+            deviceSpoofEnabled = false
+            if DeviceSpoofModule then DeviceSpoofModule:Toggle() end
+            return
+        end
+        sendDevice()
+        local acc = 0
+        conn = runService.Heartbeat:Connect(function(dt)
+            if not deviceSpoofEnabled then return end
+            acc = acc + dt
+            if acc >= interval then
+                acc = acc - interval
+                sendDevice()
+            end
+        end)
+    end
+
+    local function disableSpoof()
+        deviceSpoofEnabled = false
+        if conn then conn:Disconnect(); conn = nil end
+        lastSent = nil
+    end
+
     local DeviceSpoofModule = vape.Categories.Utility:CreateModule({
         Name = "Device Spoofer",
         Function = function(callback)
-            deviceSpoofEnabled = callback
             if callback then
-                remoteCache = findRemote()
-                if not remoteCache then
-                    notif('Device Spoof', 'SetControls remote not found!', 3, 'alert')
-                    -- keep off
-                    DeviceSpoofModule:Toggle()
-                    return
-                end
-                -- heartbeat
-                sendDevice()
-                local acc = 0
-                conn = runService.Heartbeat:Connect(function(dt)
-                    acc = acc + dt
-                    if acc >= interval then
-                        acc = acc - interval
-                        sendDevice()
-                    end
-                end)
+                -- manual enable
+                enableSpoof()
             else
-                if conn then conn:Disconnect(); conn = nil end
-                lastSent = nil
+                disableSpoof()
             end
         end,
         Tooltip = "Spoofs your device type."
@@ -950,18 +962,41 @@ run(function()
         Name = "Device Type",
         List = {"PC", "Phone", "Controller", "VR"},
         Default = "PC",
-        Function = function(val) selectedDevice = val end
+        Function = function(val)
+            selectedDevice = val
+            if deviceSpoofEnabled then
+                -- resend with new device
+                lastSent = nil
+                sendDevice()
+            end
+        end
     })
+
+    task.defer(function()
+        task.wait(1)
+        if DeviceSpoofModule.Enabled then
+            enableSpoof()
+        else
+            --
+            disableSpoof()
+        end
+    end)
+
+    lplr.CharacterAdded:Connect(function()
+        if deviceSpoofEnabled then
+            lastSent = nil
+            sendDevice()
+        end
+    end)
 end)
                                                                                                                                             
 run(function()
     local DesyncModule = vape.Categories.Combat:CreateModule({
         Name = "Wallbang Method (Might be Detected)",
         Function = function(callback)
-            local isEnabled = callback   -- track enabled state
+            local isEnabled = callback
             local pendingTask = nil
 
-            -- Check if game lobby is hidden (i.e., actually in a match)
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
                 if mainGui then
@@ -974,10 +1009,9 @@ run(function()
                         end
                     end
                 end
-                return true  -- if we can't detect, assume active
+                return true
             end
 
-            -- Wait up to 30 seconds for game to become active and character to spawn
             local function waitForGame()
                 for _ = 1, 60 do
                     if isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
@@ -988,7 +1022,6 @@ run(function()
                 return false
             end
 
-            -- ========== ORIGINAL WALLBANG SETUP (EXACTLY AS BEFORE) ==========
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
 
