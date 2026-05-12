@@ -998,6 +998,81 @@ run(function()
                 local isEnabled = callback
                 local pendingTask = nil
 
+                if not shared.__wallbangVars then
+                    shared.__wallbangVars = {
+                        mode = "Static",
+                        offsetX = 0,
+                        offsetY = 5,
+                        offsetZ = 0,
+                        orbitRadius = 5,
+                        orbitSpeed = 1.5,
+                        orbitVerticalAmp = 3,
+                    }
+                end
+                local wb = shared.__wallbangVars
+
+                local visualPart = nil
+                local visualConn = nil
+
+                local function createVisual()
+                    if visualPart then visualPart:Destroy() end
+                    visualPart = Instance.new("Part")
+                    visualPart.Size = Vector3.new(1,1,1)
+                    visualPart.Shape = Enum.PartType.Ball
+                    visualPart.Material = Enum.Material.Neon
+                    visualPart.Color = Color3.fromRGB(255,0,0)
+                    visualPart.Anchored = true
+                    visualPart.CanCollide = false
+                    visualPart.Transparency = 0.3
+                    visualPart.Parent = workspace
+                end
+
+                local function getCurrentTarget()
+                    if shared.__s9t0u1 and shared.__s9t0u1.__target then
+                        return shared.__s9t0u1.__target
+                    end
+                    return nil
+                end
+
+                local function getOffsetPosition(targetPos, time)
+                    if wb.mode == "Static" then
+                        return targetPos + Vector3.new(wb.offsetX, wb.offsetY, wb.offsetZ)
+                    else -- Orbit
+                        local angle = time * wb.orbitSpeed * 2 * math.pi
+                        local xOff = math.cos(angle) * wb.orbitRadius
+                        local zOff = math.sin(angle) * wb.orbitRadius
+                        local yOff = math.sin(angle * 2) * wb.orbitVerticalAmp
+                        return targetPos + Vector3.new(xOff, yOff, zOff)
+                    end
+                end
+
+                local function updateVisual()
+                    if not visualPart then return end
+                    local target = getCurrentTarget()
+                    if target and target.Character then
+                        local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+                        if targetHead then
+                            local pos = getOffsetPosition(targetHead.Position, tick())
+                            visualPart.Position = pos
+                            visualPart.Visible = true
+                            return
+                        end
+                    end
+                    visualPart.Visible = false
+                end
+
+                local function startVisualUpdate()
+                    if visualConn then visualConn:Disconnect() end
+                    visualConn = runService.Heartbeat:Connect(updateVisual)
+                end
+
+                local function stopVisual()
+                    if visualConn then visualConn:Disconnect(); visualConn = nil end
+                    if visualPart then visualPart:Destroy(); visualPart = nil end
+                end
+
+                local voidBulletEnabled = false
+
                 local function isGameActive()
                     local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
                     if mainGui then
@@ -1022,54 +1097,6 @@ run(function()
                     end
                     return false
                 end
-
-                local offsetX = 0
-                local offsetY = 5
-                local offsetZ = 0
-                local visualPart = nil
-                local visualConn = nil
-
-                local function createVisual()
-                    if visualPart then visualPart:Destroy() end
-                    visualPart = Instance.new("Part")
-                    visualPart.Size = Vector3.new(1,1,1)
-                    visualPart.Shape = Enum.PartType.Ball
-                    visualPart.Material = Enum.Material.Neon
-                    visualPart.Color = Color3.fromRGB(255,0,0)
-                    visualPart.Anchored = true
-                    visualPart.CanCollide = false
-                    visualPart.Transparency = 0.3
-                    visualPart.Parent = workspace
-                end
-
-                local function updateVisual()
-                    if not visualPart then return end
-                    local target = nil
-                    if shared.__s9t0u1 and shared.__s9t0u1.__target then
-                        target = shared.__s9t0u1.__target
-                    end
-                    if target and target.Character then
-                        local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-                        if targetHead then
-                            visualPart.Position = targetHead.Position + Vector3.new(offsetX, offsetY, offsetZ)
-                            visualPart.Visible = true
-                            return
-                        end
-                    end
-                    visualPart.Visible = false
-                end
-
-                local function startVisualUpdate()
-                    if visualConn then visualConn:Disconnect() end
-                    visualConn = runService.Heartbeat:Connect(updateVisual)
-                end
-
-                local function stopVisual()
-                    if visualConn then visualConn:Disconnect(); visualConn = nil end
-                    if visualPart then visualPart:Destroy(); visualPart = nil end
-                end
-
-                local voidBulletEnabled = false
 
                 local function initializeWallbang()
                     if shared.__s9t0u1 then return true end
@@ -1231,8 +1258,18 @@ run(function()
                                 end
                                 local targetHead = __c3d4e5.Character:FindFirstChild("Head") or __i9j0k1
                                 local targetPos = targetHead.Position
-                                local offsetPos = targetPos + Vector3.new(offsetX, offsetY, offsetZ)
-                                local lookDown = CFrame.lookAt(offsetPos, targetPos)
+                                local now = tick()
+                                local newPos
+                                if wb.mode == "Static" then
+                                    newPos = targetPos + Vector3.new(wb.offsetX, wb.offsetY, wb.offsetZ)
+                                else
+                                    local angle = now * wb.orbitSpeed * 2 * math.pi
+                                    local xOff = math.cos(angle) * wb.orbitRadius
+                                    local zOff = math.sin(angle) * wb.orbitRadius
+                                    local yOff = math.sin(angle * 2) * wb.orbitVerticalAmp
+                                    newPos = targetPos + Vector3.new(xOff, yOff, zOff)
+                                end
+                                local lookDown = CFrame.lookAt(newPos, targetPos)
                                 local __l2m3n4 = __f6g7h8.CFrame
                                 local __o5p6q7 = __f6g7h8.Velocity
                                 local __r8s9t0 = __f6g7h8.RotVelocity
@@ -1290,8 +1327,8 @@ run(function()
                         pendingTask = task.delay(5, attemptInit)
                         return
                     end
-                    local success = pcall(initializeWallbang)
-                    if not success or not shared.__s9t0u1 then
+                    local suc = pcall(initializeWallbang)
+                    if not suc or not shared.__s9t0u1 then
                         pendingTask = task.delay(5, attemptInit)
                     else
                         if pendingTask then task.cancel(pendingTask); pendingTask = nil end
@@ -1321,91 +1358,56 @@ run(function()
         return
     end
 
-    local offsetX = 0
-    local offsetY = 5
-    local offsetZ = 0
-    local updateVisual = function() end
-    local visualPart = nil
-    local visualConn = nil
-
-    local function safeUpdateVisual()
-        if not visualPart then return end
-        local target = nil
-        if shared.__s9t0u1 and shared.__s9t0u1.__target then
-            target = shared.__s9t0u1.__target
-        end
-        if target and target.Character then
-            local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-            if targetHead then
-                visualPart.Position = targetHead.Position + Vector3.new(offsetX, offsetY, offsetZ)
-                visualPart.Visible = true
-                return
-            end
-        end
-        if visualPart then visualPart.Visible = false end
-    end
-
-    local function createVisual()
-        if visualPart then visualPart:Destroy() end
-        visualPart = Instance.new("Part")
-        visualPart.Size = Vector3.new(1,1,1)
-        visualPart.Shape = Enum.PartType.Ball
-        visualPart.Material = Enum.Material.Neon
-        visualPart.Color = Color3.fromRGB(255,0,0)
-        visualPart.Anchored = true
-        visualPart.CanCollide = false
-        visualPart.Transparency = 0.3
-        visualPart.Parent = workspace
-    end
-
-    local function startVisualUpdate()
-        if visualConn then visualConn:Disconnect() end
-        visualConn = runService.Heartbeat:Connect(safeUpdateVisual)
-    end
-
-    local function stopVisual()
-        if visualConn then visualConn:Disconnect(); visualConn = nil end
-        if visualPart then visualPart:Destroy(); visualPart = nil end
-    end
-
+    DesyncModule:CreateDropdown({
+        Name = "Position Mode",
+        List = {"Static", "Orbit"},
+        Default = "Static",
+        Function = function(v)
+            shared.__wallbangVars.mode = v
+        end,
+        Tooltip = "Static: fixed offset | Orbit: moving around target"
+    })
     DesyncModule:CreateSlider({
         Name = "X Offset",
-        Min = -20,
-        Max = 20,
-        Default = 0,
-        Function = function(v)
-            offsetX = v
-            safeUpdateVisual()
-        end,
+        Min = -20, Max = 20, Default = 0,
+        Function = function(v) shared.__wallbangVars.offsetX = v end,
         Suffix = "studs"
     })
     DesyncModule:CreateSlider({
         Name = "Y Offset",
-        Min = -20,
-        Max = 20,
-        Default = 5,
-        Function = function(v)
-            offsetY = v
-            safeUpdateVisual()
-        end,
+        Min = -20, Max = 20, Default = 5,
+        Function = function(v) shared.__wallbangVars.offsetY = v end,
         Suffix = "studs"
     })
     DesyncModule:CreateSlider({
         Name = "Z Offset",
-        Min = -20,
-        Max = 20,
-        Default = 0,
-        Function = function(v)
-            offsetZ = v
-            safeUpdateVisual()
-        end,
+        Min = -20, Max = 20, Default = 0,
+        Function = function(v) shared.__wallbangVars.offsetZ = v end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Orbit Radius",
+        Min = 0, Max = 15, Default = 5,
+        Function = function(v) shared.__wallbangVars.orbitRadius = v end,
+        Suffix = "studs"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Orbit Speed",
+        Min = 0, Max = 5, Default = 1.5,
+        Function = function(v) shared.__wallbangVars.orbitSpeed = v end,
+        Suffix = "Hz"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Vertical Amplitude",
+        Min = 0, Max = 10, Default = 3,
+        Function = function(v) shared.__wallbangVars.orbitVerticalAmp = v end,
         Suffix = "studs"
     })
     DesyncModule:CreateToggle({
         Name = 'Bullet Redirection',
         Default = false,
         Function = function(state)
-            if shared.__s9t0u1 and shared.__s9t0u1.__voidBulletEnabled then
+            if shared.__s9t0u1 then
                 shared.__s9t0u1.__voidBulletEnabled = state
             end
             if state then
@@ -1414,7 +1416,7 @@ run(function()
                 notif('Rawr.xyz', 'Detached', 2, 'info')
             end
         end,
-        Tooltip = 'Made for people like u <3'
+        Tooltip = 'Redirects bullets'
     })
 end)
                                                                                                                                                 
