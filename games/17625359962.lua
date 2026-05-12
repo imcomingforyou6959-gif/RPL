@@ -954,14 +954,14 @@ end)
                                                                                                                                                 
 run(function()
     if not hookfunction then
-        notif('Gun Mods', 'Your executor does not support hookfunction.', 5, 'alert')
+        notif('Rawr.xyz says', 'Your executor does not support hookfunction.', 5, 'alert')
         return
     end
 
     local gunModsEnabled = false
     local oldInput = nil
     local hookActive = false
-    local waitingForGame = false
+    local retryConn = nil
 
     local recoilVal = 0
     local spreadVal = 0
@@ -969,21 +969,27 @@ run(function()
     local shootCooldownVal = 0
     local quickShotCooldownVal = 0
 
-    local function applyHook()
-        if hookActive then return end
+    local function tryApplyHook()
+        -- if hook
+        if hookActive then
+            if retryConn then
+                retryConn:Disconnect()
+                retryConn = nil
+            end
+            return
+        end
 
         -- Wait
-        while isLobbyVisible() do
-            waitingForGame = true
-            task.wait(1)
-        end
-        waitingForGame = false
+        local lobbyVisible
+        pcall(function()
+            lobbyVisible = isLobbyVisible()
+        end)
+        if lobbyVisible then return end
 
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
         if not ok or not clientItemModule or not clientItemModule.Input then
-            notif('Gun Mods', 'ClientItem.Input not found.', 5, 'alert')
             return
         end
 
@@ -1004,9 +1010,29 @@ run(function()
             return oldInput(...)
         end)
         hookActive = true
+
+        -- Hook succeeded
+        if retryConn then
+            retryConn:Disconnect()
+            retryConn = nil
+        end
+    end
+
+    local function startRetrying()
+        if retryConn then return end
+        retryConn = runService.Heartbeat:Connect(tryApplyHook)
+    end
+
+    local function stopRetrying()
+        if retryConn then
+            retryConn:Disconnect()
+            retryConn = nil
+        end
     end
 
     local function removeHook()
+        -- stop retry connections
+        stopRetrying()
         if not hookActive or not oldInput then return end
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
@@ -1028,9 +1054,10 @@ run(function()
         Function = function(callback)
             gunModsEnabled = callback
             if callback then
-                -- thread
-                task.spawn(applyHook)
+                -- Start
+                startRetrying()
             else
+                stopRetrying()
                 removeHook()
             end
         end,
