@@ -1022,6 +1022,8 @@ run(function()
                 return false
             end
 
+            local voidBulletEnabled = false
+
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
 
@@ -1108,10 +1110,29 @@ run(function()
                             local __j8k9l0 = __d2e3f4 - Vector3.new(0, 5, 0)
                             local __m1n2o3 = CFrame.lookAt(__j8k9l0, __d2e3f4)
                             local __p4q5r6 = __g5h6i7:ToObjectSpace(CFrame.new(__d2e3f4 + Vector3.new(math.random(), math.random(), math.random())))
-                            __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
-                            __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
-                            __u3v4w5[utf8.char(2)] = __a9b0c1
-                            __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
+
+                            if voidBulletEnabled then
+                                local voidOrigin = Vector3.new(
+                                    math.random(-1000000, 1000000),
+                                    math.random(-1000000, 1000000),
+                                    math.random(-1000000, 1000000)
+                                )
+                                local voidDir = (__d2e3f4 - voidOrigin).Unit
+                                local newEnd = __d2e3f4
+                                local newStart = voidOrigin
+                                __j8k9l0 = newStart
+                                __m1n2o3 = CFrame.lookAt(newStart, newEnd)
+                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(newStart, newEnd) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                                __u3v4w5[utf8.char(2)] = __a9b0c1
+                                __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
+                            else
+                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(__m1n2o3:ToOrientation()))
+                                __u3v4w5[utf8.char(2)] = __a9b0c1
+                                __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
+                            end
+
                             self.__task1 = task.delay(0.15, function()
                                 self:__desync_stop()
                             end)
@@ -1232,72 +1253,20 @@ run(function()
         Tooltip = "Just Shoot"
     })
 
-    local voidSpinAngle = 0
-    local voidTetherConn = nil
-    local voidOriginalCFrame = nil
-    local voidBasePosition = nil
-    local voidSavedY = nil
-    local voidCharAddedConn = nil
-    local VOID_SPIN_SPEED = 3
-
-    local function startVoidSpin()
-        local pl = playersService.LocalPlayer
-        if not pl or not voidBasePosition or not voidSavedY then return end
-        voidSpinAngle = 0
-        if voidTetherConn then voidTetherConn:Disconnect() end
-        voidTetherConn = runService.Heartbeat:Connect(function()
-            if not pl or not pl.Character then return end
-            local root = pl.Character.PrimaryPart or pl.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                voidSpinAngle = voidSpinAngle + VOID_SPIN_SPEED
-                local quat = CFrame.Angles(0, math.rad(voidSpinAngle), 0)
-                local newCFrame = CFrame.new(voidBasePosition.X, voidSavedY, voidBasePosition.Z) * quat
-                pl.Character:SetPrimaryPartCFrame(newCFrame)
-            end
-        end)
-    end
-
-    local function stopVoidSpin()
-        if voidTetherConn then voidTetherConn:Disconnect(); voidTetherConn = nil end
-        if voidCharAddedConn then voidCharAddedConn:Disconnect(); voidCharAddedConn = nil end
-        voidSpinAngle = 0
-        voidBasePosition = nil
-        voidSavedY = nil
-    end
+    local voidBulletEnabled = false
 
     DesyncModule:CreateToggle({
         Name = 'Void Logic',
         Default = false,
         Function = function(state)
-            local pl = playersService.LocalPlayer
+            voidBulletEnabled = state
             if state then
-                local char = pl.Character
-                local root = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
-                if root then
-                    voidOriginalCFrame = root.CFrame
-                    voidSavedY = root.Position.Y
-                    local tx = root.Position.X + math.random(-9999999, 9999999)
-                    local tz = root.Position.Z + math.random(-9999999, 9999999)
-                    voidBasePosition = Vector3.new(tx, 0, tz)
-                    startVoidSpin()
-                    voidCharAddedConn = pl.CharacterAdded:Connect(function()
-                        task.wait(0.1)
-                        startVoidSpin()
-                    end)
-                else
-                    notif('Rawr.xyz', 'No character to teleport', 2, 'alert')
-                end
+                notif('Rawr.xyz', 'Void bullet redirection enabled – shots come from the void', 2, 'success')
             else
-                stopVoidSpin()
-                if voidOriginalCFrame then
-                    if pl.Character and (pl.Character.PrimaryPart or pl.Character:FindFirstChild("HumanoidRootPart")) then
-                        pl.Character:SetPrimaryPartCFrame(voidOriginalCFrame)
-                    end
-                    voidOriginalCFrame = nil
-                end
+                notif('Rawr.xyz', 'Void bullet redirection disabled', 2, 'info')
             end
         end,
-        Tooltip = 'Teleports you to a random void location and spins you (client-side).'
+        Tooltip = 'Redirects bullets to originate from a random void location, bypassing walls and geometry.'
     })
 end)
                                                                                                                                                 
