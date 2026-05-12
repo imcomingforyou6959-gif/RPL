@@ -1315,15 +1315,17 @@ run(function()
         Tooltip = "Just Shoot"
     })
 
+    if not DesyncModule then
+        notif('Rawr.xyz', 'Wallbang module creation failed – your executor may be incompatible', 3, 'alert')
+        return
+    end
+
     DesyncModule:CreateSlider({
         Name = "X Offset",
         Min = -20,
         Max = 20,
         Default = 0,
-        Function = function(v)
-            offsetX = v
-            updateVisual()
-        end,
+        Function = function(v) offsetX = v; updateVisual() end,
         Suffix = "studs"
     })
     DesyncModule:CreateSlider({
@@ -1331,10 +1333,7 @@ run(function()
         Min = -20,
         Max = 20,
         Default = 5,
-        Function = function(v)
-            offsetY = v
-            updateVisual()
-        end,
+        Function = function(v) offsetY = v; updateVisual() end,
         Suffix = "studs"
     })
     DesyncModule:CreateSlider({
@@ -1342,13 +1341,9 @@ run(function()
         Min = -20,
         Max = 20,
         Default = 0,
-        Function = function(v)
-            offsetZ = v
-            updateVisual()
-        end,
+        Function = function(v) offsetZ = v; updateVisual() end,
         Suffix = "studs"
     })
-
     DesyncModule:CreateToggle({
         Name = 'Void Bullet Redirection',
         Default = false,
