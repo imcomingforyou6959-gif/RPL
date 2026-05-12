@@ -776,11 +776,12 @@ end)
                                                                                                                                             
 run(function()
     local DesyncModule = vape.Categories.Combat:CreateModule({
-        Name = "Wallbang (Might be Detected)",
+        Name = "Wallbang Method (Might be Detected)",
         Function = function(callback)
+            local isEnabled = callback   -- track enabled state
             local pendingTask = nil
 
-            --
+            -- Check if game lobby is hidden (i.e., actually in a match)
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
                 if mainGui then
@@ -793,10 +794,10 @@ run(function()
                         end
                     end
                 end
-                return true
+                return true  -- if we can't detect, assume active
             end
 
-            --
+            -- Wait up to 30 seconds for game to become active and character to spawn
             local function waitForGame()
                 for _ = 1, 60 do
                     if isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
@@ -807,11 +808,10 @@ run(function()
                 return false
             end
 
-            --
+            -- ========== ORIGINAL WALLBANG SETUP (EXACTLY AS BEFORE) ==========
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
 
-                --
                 local __a1b2c3 = setmetatable({}, {
                     __index = function(_, __g7h8i9)
                         local __j0k1l2, __m3n4o5 = pcall(function()
@@ -976,31 +976,27 @@ run(function()
                 return true
             end
 
-            --
             local function attemptInit()
                 if shared.__s9t0u1 then
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     return
                 end
-                --
                 if not waitForGame() then
                     pendingTask = task.delay(5, attemptInit)
                     return
                 end
-                --
+                -- Extra 10‑second forced wait after game is confirmed active
                 for i = 1, 10 do
-                    if not DesyncModule.Enabled then
+                    if not isEnabled then
                         if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                         return
                     end
                     task.wait(1)
                 end
-                --
                 if not isGameActive() or not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then
                     pendingTask = task.delay(5, attemptInit)
                     return
                 end
-                --
                 local success = pcall(initializeWallbang)
                 if not success or not shared.__s9t0u1 then
                     pendingTask = task.delay(5, attemptInit)
@@ -1010,8 +1006,10 @@ run(function()
             end
 
             if callback then
+                isEnabled = true
                 attemptInit()
             else
+                isEnabled = false
                 if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                 if shared.__s9t0u1 then
                     shared.__s9t0u1:Shutdown()
