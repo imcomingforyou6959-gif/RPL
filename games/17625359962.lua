@@ -1869,79 +1869,57 @@ run(function()
             _G.autoFireEnabled = callback
             if callback then
                 print("AFE")
+                autoFireThreadRunning = true
+                if fireTask then task.cancel(fireTask) end
+                fireTask = task.spawn(function()
+                    local lastShootTime = 0
+                    while autoFireThreadRunning and _G.autoFireEnabled do
+                        local target = findBestTarget()
+                        if target then
+                            local now = tick()
+                            if now - lastShootTime >= _G.autoFireShootDelay then
+                                if math.random(1, 100) <= (_G.autoFireHitChance or 100) then
+                                    if (_G.autoFireHeadshotChance or 80) >= 100 or math.random(1, 100) <= (_G.autoFireHeadshotChance or 80) then
+                                        shoot()
+                                    else
+                                        local bodyPart = target.player.Character:FindFirstChild("HumanoidRootPart") or target.player.Character:FindFirstChild("UpperTorso")
+                                        if bodyPart then shoot() else shoot() end
+                                    end
+                                    lastShootTime = now
+                                end
+                            end
+                        end
+                        task.wait(0.02)
+                    end
+                end)
+
+                if targetUpdateTask then task.cancel(targetUpdateTask) end
+                targetUpdateTask = task.spawn(function()
+                    while _G.autoFireEnabled do
+                        local best = findBestTarget()
+                        if best and shared.__s9t0u1 then
+                            shared.__s9t0u1.__target = best.player
+                        end
+                        task.wait(0.2)
+                    end
+                end)
             else
                 print("AFO")
+                autoFireThreadRunning = false
+                if fireTask then task.cancel(fireTask); fireTask = nil end
+                if targetUpdateTask then task.cancel(targetUpdateTask); targetUpdateTask = nil end
             end
         end,
         Tooltip = "Automatically shoot nearby enemys"
     })
 
     local autoFireThreadRunning = true
-    local fireTask = task.spawn(function()
-        local lastShootTime = 0
-        while autoFireThreadRunning do
-            if _G.autoFireEnabled then
-                local target = findBestTarget()
-                if target then
-                    local now = tick()
-                    if now - lastShootTime >= _G.autoFireShootDelay then
-                        if math.random(1, 100) <= (_G.autoFireHitChance or 100) then
-                            if (_G.autoFireHeadshotChance or 80) >= 100 or math.random(1, 100) <= (_G.autoFireHeadshotChance or 80) then
-                                shoot()
-                            else
-                                local bodyPart = target.player.Character:FindFirstChild("HumanoidRootPart") or target.player.Character:FindFirstChild("UpperTorso")
-                                if bodyPart then shoot() else shoot() end
-                            end
-                            lastShootTime = now
-                        end
-                    end
-                end
-            end
-            task.wait(0.02)
-        end
-    end)
-
-    local targetUpdateTask = task.spawn(function()
-        while true do
-            if _G.autoFireEnabled then
-                local best = findBestTarget()
-                if best and shared.__s9t0u1 then
-                    shared.__s9t0u1.__target = best.player
-                end
-            end
-            task.wait(0.2)
-        end
-    end)
+    local fireTask = nil
+    local targetUpdateTask = nil
 
     local function updateWallbangRedir()
         if shared.__s9t0u1 then
             shared.__s9t0u1.__voidBulletEnabled = _G.autoFireBulletRedir
-        end
-    end
-
-    local voidDesyncCorners = {
-        Vector3.new(-5000, 2000, -5000),
-        Vector3.new(5000, 2000, -5000),
-        Vector3.new(5000, 2000, 5000),
-        Vector3.new(-5000, 2000, 5000),
-    }
-    local currentCorner = 1
-    local lastVoidTeleport = 0
-    local voidInterval = 0.2
-    local originalPosCache = nil
-
-    local function updateVoidDesync()
-        if not _G.autoFireVoidDesync then return end
-        local now = tick()
-        if now - lastVoidTeleport >= voidInterval then
-            lastVoidTeleport = now
-            currentCorner = (currentCorner % 4) + 1
-            local newPos = voidDesyncCorners[currentCorner]
-
-            if not originalPosCache then
-                local root = getLocalRoot()
-                if root then originalPosCache = root.CFrame end
-            end
         end
     end
 
@@ -2017,14 +1995,21 @@ run(function()
         Tooltip = "Redirects bullets"
     })
     AutoFireModule:CreateToggle({
-        Name = "Void Desync",
+        Name = "Void Desync (Teleport above map)",
         Default = _G.autoFireVoidDesync,
         Function = function(v) _G.autoFireVoidDesync = v end,
-        Tooltip = "Teleport"
+        Tooltip = "Teleports your desynced position rapidly between the four corners above the map"
     })
 
     updateWallbangRedir()
+
+    vape:Clean(function()
+        autoFireThreadRunning = false
+        if fireTask then pcall(task.cancel, fireTask) end
+        if targetUpdateTask then pcall(task.cancel, targetUpdateTask) end
+    end)
 end)
+
 run(function()
     if not hookfunction then
         notif('Gun Mods', 'Your executor does not support hookfunction.', 5, 'alert')
