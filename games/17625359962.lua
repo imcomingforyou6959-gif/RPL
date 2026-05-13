@@ -378,7 +378,7 @@ run(function()
     local customSoundNames = {}
 
     local function loadCustomSounds()
-        local folderPath = "newvape/assets/sounds"
+        local folderPath = "newvape\assets\sounds"
         if not isfolder or not isfolder(folderPath) then return end
         local files = nil
         if listfiles then
@@ -407,8 +407,8 @@ run(function()
         soundMap[s.name] = s.id
     end
     for _, name in ipairs(customSoundNames) do
-        table.insert(soundNames, "Custom: " .. name)
-        soundMap["Custom: " .. name] = customSoundPaths[name]
+        table.insert(soundNames, ": " .. name)
+        soundMap[": " .. name] = customSoundPaths[name]
     end
 
     local hitsoundEnabled = false
