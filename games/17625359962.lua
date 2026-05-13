@@ -1125,6 +1125,114 @@ run(function()
         end
     end)
 end)
+                                                                                                                                                                    
+run(function()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local UserInputService = game:GetService("UserInputService")
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local LocalPlayer = Players.LocalPlayer
+    local Camera = Workspace.CurrentCamera
+    local Bullet = nil
+
+    -- Try to get the Bullet module
+    local function getBulletModule()
+        local bulletFactory = ReplicatedStorage:FindFirstChild("Components") and ReplicatedStorage.Components:FindFirstChild("BulletFactory")
+        if bulletFactory then
+            local success, module = pcall(require, bulletFactory)
+            if success then return module end
+        end
+        return nil
+    end
+
+    Bullet = getBulletModule()
+    if not Bullet then
+        notif('Rawr.xyz', 'Bullet NMAP: BulletFactory module not found', 3, 'alert')
+        return
+    end
+
+    local function getClosestToMouse()
+        local mouseLocation = UserInputService:GetMouseLocation()
+        local closestPlayer = nil
+        local closestCharacter = nil
+        local closestDistance = math.huge
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local character = player.Character
+                local rootPart = character.HumanoidRootPart
+                local screenPos, onScreen = Camera:WorldToScreenPoint(rootPart.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mouseLocation).Magnitude
+                    if dist < closestDistance then
+                        closestDistance = dist
+                        closestPlayer = player
+                        closestCharacter = character
+                    end
+                end
+            end
+        end
+        return closestPlayer, closestCharacter
+    end
+
+    local oldFire = nil
+    local nmapEnabled = false
+    local hookActive = false
+
+    local function applyHook()
+        if not Bullet or hookActive then return end
+        if nmapEnabled then
+            oldFire = Bullet.Fire
+            Bullet.Fire = function(bulletId, origin, bulletPos, ...)
+                local player, character = getClosestToMouse()
+                if player and character and character:FindFirstChild("Head") then
+                    -- Redirect origin to a point just in front of the head (wallbang offset)
+                    local newOrigin = (character.Head.CFrame * CFrame.new(0, 0, 1)).p
+                    -- Make bullet travel instantly (large distance)
+                    local newBulletPos = (character.Head.Position - newOrigin).Unit * 10000
+                    return oldFire(bulletId, newOrigin, newBulletPos, ...)
+                end
+                return oldFire(bulletId, origin, bulletPos, ...)
+            end
+            hookActive = true
+        else
+            if oldFire and Bullet then
+                Bullet.Fire = oldFire
+                hookActive = false
+            end
+        end
+    end
+
+    local NMAPModule = vape.Categories.Combat:CreateModule({
+        Name = "Bullet NMAP",
+        Function = function(callback)
+            nmapEnabled = callback
+            applyHook()
+            if callback then
+                notif('Rawr.xyz', 'Bullet NMAP enabled – bullets redirect to nearest enemy', 2, 'success')
+            else
+                notif('Rawr.xyz', 'Bullet NMAP disabled', 2, 'info')
+            end
+        end,
+        Tooltip = "test"
+    })
+
+    NMAPModule:CreateToggle({
+        Name = "Enable",
+        Default = false,
+        Function = function(v)
+            nmapEnabled = v
+            applyHook()
+            notif('Rawr.xyz', v and 'NMAP ON' or 'NMAP OFF', 1, v and 'success' or 'info')
+        end
+    })
+
+    -- On script unload, restore original function
+    vape:Clean(function()
+        if oldFire and Bullet then
+            Bullet.Fire = oldFire
+        end
+    end)
+end)
 
 run(function()
     -- Global defaults
