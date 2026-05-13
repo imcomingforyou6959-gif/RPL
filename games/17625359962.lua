@@ -767,12 +767,16 @@ run(function()
     local heartbeatConn = nil
     local lastNotifTime = 0
     local NOTIF_COOLDOWN = 5
+    local detectedCache = {}
+    local CACHE_DURATION = 3
 
-    local function showKatanaWarning(playerName)
-        if tick() - lastNotifTime < NOTIF_COOLDOWN then return end
-        lastNotifTime = tick()
-        notif('Rawr.xyz', playerName .. ' is holding a Katana!', 5, 'alert')
-    end
+    local soundPlayed = false
+    local alertSoundId = "rbxassetid://138118203571469"
+
+    local detectionRange = 150
+    local dotThreshold = 0.3
+    local useSound = true
+    local useNotification = true
 
     local function findWeaponName(player)
         local viewModels = workspace:FindFirstChild("ViewModels")
@@ -788,12 +792,43 @@ run(function()
                 end
             end
         end
+
         local char = player.Character
         if char then
             local tool = char:FindFirstChildOfClass("Tool")
             if tool then return tool.Name end
+            for _, child in ipairs(char:GetChildren()) do
+                if child:IsA("Tool") or (child:IsA("Model") and child:FindFirstChild("Handle")) then
+                    return child.Name
+                end
+            end
         end
+
+        local backpack = player:FindFirstChildOfClass("Backpack")
+        if backpack then
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") then
+                    return tool.Name
+                end
+            end
+        end
+
+        local weaponAttr = player:GetAttribute("WeaponName") or player:GetAttribute("CurrentWeapon")
+        if weaponAttr then return weaponAttr end
+
         return nil
+    end
+
+    local function playAlertSound()
+        if not useSound then return end
+        pcall(function()
+            local sound = Instance.new("Sound")
+            sound.SoundId = alertSoundId
+            sound.Volume = 1
+            sound.Parent = game:GetService("CoreGui")
+            sound:Play()
+            game:GetService("Debris"):AddItem(sound, 2)
+        end)
     end
 
     local function detectKatana()
@@ -802,20 +837,31 @@ run(function()
         local lpRoot = lpChar and (lpChar:FindFirstChild("HumanoidRootPart") or lpChar.PrimaryPart)
         if not lpRoot then return end
 
+        local now = tick()
         for _, player in ipairs(playersService:GetPlayers()) do
             if player ~= lplr and isEnemy(player) then
+                if detectedCache[player] and now - detectedCache[player] < CACHE_DURATION then
+                    continue
+                end
+
                 local weaponName = findWeaponName(player)
                 if weaponName and string.find(string.lower(weaponName), "katana") then
                     local char = player.Character
                     if char then
                         local rootPart = char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
-                        if rootPart and (lpRoot.Position - rootPart.Position).Magnitude <= 150 then
-                            local dirToUs = (lpRoot.Position - rootPart.Position).Unit
+                        if rootPart and (lpRoot.Position - rootPart.Position).Magnitude <= detectionRange then
                             local forward = rootPart.CFrame.LookVector
+                            local dirToUs = (lpRoot.Position - rootPart.Position).Unit
                             local dot = forward:Dot(dirToUs)
-                            if dot >= 0.3 then
-                                showKatanaWarning(player.Name)
-                                return
+                            if dot >= dotThreshold then
+                                detectedCache[player] = now
+                                if useNotification and now - lastNotifTime >= NOTIF_COOLDOWN then
+                                    lastNotifTime = now
+                                    notif('Katana Detected', player.Name .. ' has a katana!', 3, 'alert')
+                                    playAlertSound()
+                                elseif useNotification and now - lastNotifTime < NOTIF_COOLDOWN then
+                                    print(string.format("[Katana] %s is holding a katana (cooldown)", player.Name))
+                                end
                             end
                         end
                     end
@@ -832,18 +878,53 @@ run(function()
                 if not heartbeatConn then
                     heartbeatConn = runService.Heartbeat:Connect(detectKatana)
                 end
+                detectedCache = {}
             else
                 if heartbeatConn then
                     heartbeatConn:Disconnect()
                     heartbeatConn = nil
                 end
+                detectedCache = {}
             end
         end,
-        Tooltip = "Warns you when an enemy has a katana"
+        Tooltip = "Warns you when an enemy has a katana :>"
+    })
+
+    KatanaModule:CreateSlider({
+        Name = "Detection Range",
+        Min = 50, Max = 500, Default = detectionRange,
+        Function = function(v) detectionRange = v end,
+        Suffix = "studs"
+    })
+    KatanaModule:CreateSlider({
+        Name = "Angle Threshold",
+        Min = 0, Max = 1, Default = dotThreshold, Decimal = 100,
+        Function = function(v) dotThreshold = v end,
+        Suffix = " (0=any, 1=directly facing)",
+        Tooltip = "humus"
+    })
+    KatanaModule:CreateToggle({
+        Name = "Sound Alert",
+        Default = useSound,
+        Function = function(v) useSound = v end,
+        Tooltip = "Play a sound when katana is detected"
+    })
+    KatanaModule:CreateToggle({
+        Name = "Notification Alert",
+        Default = useNotification,
+        Function = function(v) useNotification = v end,
+        Tooltip = "Show on‑screen notification"
+    })
+    KatanaModule:CreateSlider({
+        Name = "Notification Cooldown (s)",
+        Min = 1, Max = 10, Default = NOTIF_COOLDOWN,
+        Function = function(v) NOTIF_COOLDOWN = v end,
+        Suffix = "s"
     })
 
     vape:Clean(function()
         if heartbeatConn then heartbeatConn:Disconnect() end
+        detectedCache = {}
     end)
 end)
 
