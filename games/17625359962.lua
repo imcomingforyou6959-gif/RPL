@@ -1159,15 +1159,15 @@ local function computePosition(pos, cf, vel, now)
     if preset == "Above" then
         if cf and type(cf) == "CFrame" then
             local frontOffset = cf.LookVector * 5
-            return predictedPos + frontOffset + Vector3.new(0, 10, 0)
+            return predictedPos + frontOffset + Vector3.new(0, 12, 0)
         else
-            return predictedPos + Vector3.new(0, 10, 0)
+            return predictedPos + Vector3.new(0, 12, 0)
         end
     elseif preset == "Below" then
         return predictedPos + Vector3.new(0, -1, 0)
     elseif preset == "Orbit" then
         local radius = 6
-        local speed = 1.5
+        local speed = 2
         local vertAmp = 3
         local angleRad = now * speed * 2 * math.pi
         local xOff = math.cos(angleRad) * radius
@@ -1199,6 +1199,7 @@ end
             local boundaryActive = false
             local barrierAddedConn = nil
             local barrierList = {}
+            local antiVoidConn = nil
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1326,17 +1327,60 @@ end
             end
 
             local function enableBoundaryBypass()
-                if boundaryActive then return end
-                boundaryActive = true
-                scanBarriers()
-                barrierAddedConn = workspace.DescendantAdded:Connect(onBarrierAdded)
-            end
+    if boundaryActive then return end
+    boundaryActive = true
 
-            local function disableBoundaryBypass()
-                boundaryActive = false
-                if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
-                barrierList = {}
+    local killParts = {"KillPart", "DeathPart", "OutOfBounds", "Barrier", "InvisibleWall", "Boundary", "ClimbBlocker"}
+    local function process(inst)
+        if not inst or not inst.Parent then return end
+        if inst:IsA("BasePart") then
+            local name = inst.Name
+            for _, kp in ipairs(killParts) do
+                if name == kp or (inst.Parent and inst.Parent.Name == "Barriers") then
+                    pcall(function()
+                        inst.CanCollide = false
+                        inst.CanTouch = false
+                        inst.Transparency = 1
+                        inst.Material = Enum.Material.Air
+                    end)
+                    break
+                end
             end
+        end
+    end
+
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        process(descendant)
+    end
+
+    barrierAddedConn = workspace.DescendantAdded:Connect(process)
+
+    local function antiVoid()
+        local root = getLocalRoot()
+        if not root then return end
+        local fallenHeight = workspace.FallenPartsDestroyHeight or -500
+        if root.Position.Y < fallenHeight + 10 then
+            local target = shared.__s9t0u1 and shared.__s9t0u1.__target
+            if target and target.Character then
+                local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+                if targetHead then
+                    root.CFrame = CFrame.new(targetHead.Position + Vector3.new(0, 5, 0))
+                    pcall(function() notif('Boundary says', 'Prevented Death', 1, 'alert') end)
+                end
+            end
+        end
+    end
+
+    if antiVoidConn then antiVoidConn:Disconnect() end
+    antiVoidConn = runService.Heartbeat:Connect(antiVoid)
+end
+
+local function disableBoundaryBypass()
+    boundaryActive = false
+    if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
+    if antiVoidConn then antiVoidConn:Disconnect(); antiVoidConn = nil end
+    barrierList = {}
+end
 
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
