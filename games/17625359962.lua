@@ -221,7 +221,7 @@ run(function()
                 targetPlayer = nil
             end
         end,
-        Tooltip = 'Camera lock + auto‑click. Hold Mouse1/Mouse2.'
+        Tooltip = 'Redirects Bullets :3'
     })
     SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to lock onto'})
     SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='Lock smoothness'})
