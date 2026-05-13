@@ -358,6 +358,7 @@ CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 
 run(function()
+    -- Hitsounds
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
         {name="Bubble", id="rbxassetid://6534947588"},{name="Pick", id="rbxassetid://1347140027"},
@@ -369,12 +370,59 @@ run(function()
         {name="Bonk", id="rbxassetid://5766898159"},{name="Minecraft", id="rbxassetid://4018616850"},
         {name="TomScream", id="rbxassetid://7553397015"},{name="Prowler", id="rbxassetid://131169447699141"},
         {name="CSGO", id="rbxassetid://133002449941130"},{name="Fortnite", id="rbxassetid://140073271098075"},
+        {name="iphone", id="rbxassetid://131935970184832"},{name="Lmk", id="rbxassetid://118833207462382"},
     }
-    local soundNames, soundMap = {}, {}
-    for _, s in ipairs(assetSounds) do table.insert(soundNames, s.name); soundMap[s.name] = s.id end
+
+    local customSounds = {}
+    local customSoundPaths = {}
+    local customSoundNames = {}
+
+    local function loadCustomSounds()
+        local folderPath = "newvape/assets/sounds"
+        if not isfolder or not isfolder(folderPath) then return end
+        local files = nil
+        if listfiles then
+            files = listfiles(folderPath)
+        else
+            return
+        end
+        for _, filePath in ipairs(files) do
+            if filePath:match("%.mp3$") then
+                local fileName = filePath:match("([^/\\]+)%.mp3$")
+                if fileName then
+                    table.insert(customSoundNames, fileName)
+                    customSoundPaths[fileName] = filePath
+                end
+            end
+        end
+    end
+
+    loadCustomSounds()
+
+    local soundNames = {}
+    local soundMap = {}
+
+    for _, s in ipairs(assetSounds) do
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.id
+    end
+    for _, name in ipairs(customSoundNames) do
+        table.insert(soundNames, "Custom: " .. name)
+        soundMap["Custom: " .. name] = customSoundPaths[name]
+    end
+
     local hitsoundEnabled = false
     local currentSoundId = soundMap["Bell"]
     local hitConnection = nil
+    local customAudioId = nil
+
+    local function getCustomSoundId(filePath)
+        if getcustomaudio then
+            return getcustomaudio(filePath)
+        end
+        return nil
+    end
+
     local function applySoundReplacement()
         if hitConnection then hitConnection:Disconnect() end
         if not hitsoundEnabled then return end
@@ -384,22 +432,54 @@ run(function()
         end)
         if viewModel then
             hitConnection = viewModel.ChildAdded:Connect(function(v)
-                if v:IsA("Sound") and v.SoundId ~= currentSoundId then v.SoundId = currentSoundId; v.Pitch = 1; v.Volume = 1 end
+                if v:IsA("Sound") then
+                    local newSoundId = currentSoundId
+                    if type(newSoundId) == "string" and newSoundId:match("%.mp3$") then
+                        local audioId = getCustomSoundId(newSoundId)
+                        if audioId then
+                            newSoundId = audioId
+                        else
+                            return
+                        end
+                    end
+                    if v.SoundId ~= newSoundId then
+                        v.SoundId = newSoundId
+                        v.Pitch = 1
+                        v.Volume = 1
+                    end
+                end
             end)
         end
     end
+
     local HitsoundModule = vape.Categories.Utility:CreateModule({
         Name = "Hitsound",
         Function = function(callback)
-            hitsoundEnabled = callback; applySoundReplacement()
-            if not callback and hitConnection then hitConnection:Disconnect(); hitConnection = nil end
+            hitsoundEnabled = callback
+            applySoundReplacement()
+            if not callback and hitConnection then
+                hitConnection:Disconnect()
+                hitConnection = nil
+            end
         end
     })
-    HitsoundModule:CreateToggle({Name="Hitsound", Default=false, Function=function(c) hitsoundEnabled=c; applySoundReplacement() end})
-    HitsoundModule:CreateDropdown({Name="Select Sound", List=soundNames, Function=function(val)
-        currentSoundId = soundMap[val] or currentSoundId; applySoundReplacement()
-        notif('Hitsound', 'Selected: '..val, 2, 'success')
-    end})
+    HitsoundModule:CreateToggle({
+        Name = "Hitsound",
+        Default = false,
+        Function = function(c)
+            hitsoundEnabled = c
+            applySoundReplacement()
+        end
+    })
+    HitsoundModule:CreateDropdown({
+        Name = "Select Sound",
+        List = soundNames,
+        Function = function(val)
+            currentSoundId = soundMap[val] or soundMap["Bell"]
+            applySoundReplacement()
+            notif('Hitsound', 'Selected: '..val, 2, 'success')
+        end
+    })
 end)
 
 run(function()
