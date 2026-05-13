@@ -1576,12 +1576,6 @@ run(function()
         end,
         Tooltip = "Disable barriers"
     })
-    DesyncModule:CreateToggle({
-        Name = "Void Spam",
-        Default = _G.wallbangVoidDesync,
-        Function = function(v) _G.wallbangVoidDesync = v end,
-        Tooltip = "testin"
-    })
 end)
                                                                                                                                                                                                         
 run(function()
@@ -1747,6 +1741,12 @@ run(function()
         Min = 0, Max = 100, Default = _G.autoFireHitChance,
         Function = function(v) _G.autoFireHitChance = v end,
         Suffix = "%"
+    })
+        AutoFireModule:CreateToggle({
+        Name = "Void Spam",
+        Default = _G.wallbangVoidDesync,
+        Function = function(v) _G.wallbangVoidDesync = v end,
+        Tooltip = "testin"
     })
     AutoFireModule:CreateSlider({
         Name = "Headshot Chance (%)",
