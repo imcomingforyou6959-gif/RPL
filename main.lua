@@ -44,6 +44,35 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
+local function downloadSounds()
+	local soundFiles = {
+		-- MP3 files
+		"1nn.mp3", "67.mp3", "BatHit.mp3", "Beep.mp3", "Bonk.mp3", "Bow.mp3",
+		"Bubble.mp3", "Bubble2.mp3", "CSGO.mp3", "Cod.mp3", "Fairy1.mp3",
+		"Fairy2.mp3", "Fatality.mp3", "Fatality2.mp3", "Hentai1.mp3",
+		"Hentai2.mp3", "Hentai3.mp3", "Lazer.mp3", "MarioCoins.mp3",
+		"MinecraftXP.mp3", "Neverlose.mp3", "OSU.mp3", "PubgPan.mp3",
+		"Rifk7.mp3", "RustHeadshot.mp3", "Skeet.mp3", "SpanishMoan.mp3",
+		"StaryKrow.mp3", "Steve.mp3", "TF2Crit.mp3", "TF2Default.mp3",
+		"Windows.mp3",
+		-- OGG files
+		"boolean.ogg", "disable.ogg", "enable.ogg", "keypress.ogg",
+		"keyrelease.ogg", "lobby.mp3", "moan1.ogg", "moan2.ogg", "moan3.ogg",
+		"moan4.ogg", "orthodox.ogg", "pmsound.ogg", "rifk.ogg"
+	}
+	local soundFolder = "newvape/assets/sounds/"
+	if not isfolder(soundFolder) then
+		makefolder(soundFolder)
+	end
+	for _, fileName in ipairs(soundFiles) do
+		local filePath = soundFolder .. fileName
+		local success, err = pcall(downloadFile, filePath, nil)
+		if not success then
+			warn("Failed to download sound: " .. fileName .. " - " .. tostring(err))
+		end
+	end
+end
+
 local function finishLoading()
 	vape.Init = nil
 	vape:Load()
@@ -95,6 +124,8 @@ if not isfolder('newvape/assets/'..gui) then
 end
 vape = loadstring(downloadFile('newvape/guis/'..gui..'.lua'), 'gui')()
 shared.vape = vape
+
+downloadSounds()
 
 if not shared.VapeIndependent then
 	loadstring(downloadFile('newvape/games/universal.lua'), 'universal')()
