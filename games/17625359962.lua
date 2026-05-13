@@ -1131,11 +1131,7 @@ run(function()
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
     if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.2 end
     if _G.wallbangPreset == nil then _G.wallbangPreset = "Above" end
-    if _G.wallbangIdleSpam == nil then _G.wallbangIdleSpam = false end
-    if _G.wallbangIdleSpeed == nil then _G.wallbangIdleSpeed = 2 end
-    if _G.wallbangIdleAmp == nil then _G.wallbangIdleAmp = 8 end
-    if _G.wallbangVoidSpam == nil then _G.wallbangVoidSpam = false end
-    if _G.wallbangVoidInterval == nil then _G.wallbangVoidInterval = 1 end
+    if _G.wallbangVoidDesync == nil then _G.wallbangVoidDesync = false end
 
     local function getLocalRoot()
         local char = lplr.Character
@@ -1152,7 +1148,7 @@ run(function()
             local boundaryActive = false
             local barrierAddedConn = nil
             local barrierList = {}
-            local voidLastTeleport = 0
+            local voidDesyncTimer = 0
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1210,21 +1206,16 @@ run(function()
                 local preset = _G.wallbangPreset or "Above"
                 local finalPos
 
-                if _G.wallbangIdleSpam then
-                    local amp = _G.wallbangIdleAmp or 8
-                    local speed = _G.wallbangIdleSpeed or 2
-                    local yOff = math.sin(now * speed * 2 * math.pi) * amp
-                    local frontOffset = cf.LookVector * 5
-                    finalPos = predictedPos + frontOffset + Vector3.new(0, yOff + 5, 0)
-                elseif _G.wallbangVoidSpam and now - voidLastTeleport >= (_G.wallbangVoidInterval or 1) then
-                    voidLastTeleport = now
-                    local voidX = math.random(-5000, 5000)
-                    local voidZ = math.random(-5000, 5000)
-                    finalPos = Vector3.new(voidX, -500, voidZ)
+                if _G.wallbangVoidDesync then
+                    finalPos = Vector3.new(math.random(-5000, 5000), 1000, math.random(-5000, 5000))
                 else
                     if preset == "Above" then
-                        local frontOffset = cf.LookVector * 5
-                        finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
+                        if cf and type(cf) == "CFrame" then
+                            local frontOffset = cf.LookVector * 5
+                            finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
+                        else
+                            finalPos = predictedPos + Vector3.new(0, 10, 0)
+                        end
                     elseif preset == "Below" then
                         finalPos = predictedPos + Vector3.new(0, -1, 0)
                     elseif preset == "Orbit" then
@@ -1248,9 +1239,9 @@ run(function()
 
                 if _G.wallbangBoundaryBypass then
                     local fallenHeight = workspace.FallenPartsDestroyHeight or -500
-                    if finalPos.Y < fallenHeight + 20 or math.abs(finalPos.X) > 10000 or math.abs(finalPos.Z) > 10000 then
-                        finalPos = predictedPos + Vector3.new(0, 5, 0)
-                        pcall(function() notif('Rawr.xyz', 'Boundary corrected', 1, 'alert') end)
+                    if finalPos.Y < fallenHeight + 20 then
+                        finalPos = Vector3.new(finalPos.X, fallenHeight + 50, finalPos.Z)
+                        pcall(function() notif('Rawr.xyz', 'Boundary corrected (prevent death)', 1, 'alert') end)
                     end
                 end
                 return finalPos
@@ -1402,7 +1393,7 @@ run(function()
                             local __m1n2o3 = CFrame.lookAt(__j8k9l0, __d2e3f4)
                             local __p4q5r6 = __g5h6i7:ToObjectSpace(CFrame.new(__d2e3f4 + Vector3.new(math.random(), math.random(), math.random())))
 
-                            if _G.ragebotBulletRedir then
+                            if _G.autoFireBulletRedir then
                                 local voidOrigin = Vector3.new(
                                     math.random(-5000000, 5000000),
                                     math.random(-5000000, 5000000),
@@ -1555,7 +1546,7 @@ run(function()
                 disableBoundaryBypass()
             end
         end,
-        Tooltip = "helpful"
+        Tooltip = "Desync & positioning"
     })
 
     DesyncModule:CreateDropdown({
@@ -1583,7 +1574,13 @@ run(function()
                 disableBoundaryBypass()
             end
         end,
-        Tooltip = "Disable barriers & prevent falling out of map"
+        Tooltip = "Disable barriers"
+    })
+    DesyncModule:CreateToggle({
+        Name = "Void Spam",
+        Default = _G.wallbangVoidDesync,
+        Function = function(v) _G.wallbangVoidDesync = v end,
+        Tooltip = "testin"
     })
 end)
                                                                                                                                                                                                         
