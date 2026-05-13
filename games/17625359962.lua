@@ -499,9 +499,9 @@ run(function()
         end
     })
 end)
-                                                                                                        
+
 run(function()
-    -- Starting
+    -- Subspace Tripmine
     local labels = {}
     local labelCount = 0
     local childAddedConn, childRemovedConn, renderConn, queueConn
@@ -537,7 +537,7 @@ run(function()
         part:SetAttribute("Rivals_TrapName", displayName)
         txt.Text = displayName
         txt.Size = 18
-        txt.Color = Color3.fromRGB(255, 120, 120)   -- soft red
+        txt.Color = Color3.fromRGB(255, 120, 120)
         txt.Center = true
         txt.Outline = true
         txt.Visible = false
@@ -679,7 +679,7 @@ run(function()
         Tooltip = "ESP for subspace"
     })
 end)
-                                                                                                        
+
 run(function()
     local antiSmokeRunning = false
     local workerConn = nil
@@ -795,7 +795,6 @@ run(function()
                 if child.Name:lower():find("flash") then handleFlashInstance(child) end
             end)
         end
-        -- clean
         repeat
             local found = workspace:FindFirstChild("FlashbangEffect", true)
             if found then handleFlashInstance(found) end
@@ -838,13 +837,11 @@ run(function()
     local detectedCache = {}
     local CACHE_DURATION = 3
 
-    local soundPlayed = false
-    local alertSoundId = "rbxassetid://138118203571469"
-
     local detectionRange = 150
     local dotThreshold = 0.3
     local useSound = true
     local useNotification = true
+    local alertSoundId = "rbxassetid://138118203571469"
 
     local function findWeaponName(player)
         local viewModels = workspace:FindFirstChild("ViewModels")
@@ -860,7 +857,6 @@ run(function()
                 end
             end
         end
-
         local char = player.Character
         if char then
             local tool = char:FindFirstChildOfClass("Tool")
@@ -871,7 +867,6 @@ run(function()
                 end
             end
         end
-
         local backpack = player:FindFirstChildOfClass("Backpack")
         if backpack then
             for _, tool in ipairs(backpack:GetChildren()) do
@@ -880,10 +875,8 @@ run(function()
                 end
             end
         end
-
         local weaponAttr = player:GetAttribute("WeaponName") or player:GetAttribute("CurrentWeapon")
         if weaponAttr then return weaponAttr end
-
         return nil
     end
 
@@ -904,14 +897,12 @@ run(function()
         local lpChar = lplr.Character
         local lpRoot = lpChar and (lpChar:FindFirstChild("HumanoidRootPart") or lpChar.PrimaryPart)
         if not lpRoot then return end
-
         local now = tick()
         for _, player in ipairs(playersService:GetPlayers()) do
             if player ~= lplr and isEnemy(player) then
                 if detectedCache[player] and now - detectedCache[player] < CACHE_DURATION then
                     continue
                 end
-
                 local weaponName = findWeaponName(player)
                 if weaponName and string.find(string.lower(weaponName), "katana") then
                     local char = player.Character
@@ -1027,7 +1018,7 @@ run(function()
         notif('FOV', 'Reset to default', 2, 'success')
     end})
 end)
-                                                                                                                        
+
 run(function()
     local deviceSpoofEnabled = false
     local selectedDevice = "PC"
@@ -1035,7 +1026,6 @@ run(function()
     local remoteCache = nil
     local interval = 1
     local lastSent = nil
-    local initDone = false
 
     local MAP = {
         PC = "MouseKeyboard",
@@ -1098,7 +1088,6 @@ run(function()
         Name = "Device Spoofer",
         Function = function(callback)
             if callback then
-                -- manual enable
                 enableSpoof()
             else
                 disableSpoof()
@@ -1114,7 +1103,6 @@ run(function()
         Function = function(val)
             selectedDevice = val
             if deviceSpoofEnabled then
-                -- resend with new device
                 lastSent = nil
                 sendDevice()
             end
@@ -1126,7 +1114,6 @@ run(function()
         if DeviceSpoofModule.Enabled then
             enableSpoof()
         else
-            --
             disableSpoof()
         end
     end)
@@ -1138,10 +1125,11 @@ run(function()
         end
     end)
 end)
-                                                                                                                                            
+
 run(function()
-    -- Global defaults
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
+    if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.2 end
+    if _G.wallbangPreset == nil then _G.wallbangPreset = "Above" end
 
     local DesyncModule = vape.Categories.Combat:CreateModule({
         Name = "Wallbang Method",
@@ -1153,6 +1141,7 @@ run(function()
             local boundaryActive = false
             local barrierAddedConn = nil
             local barrierList = {}
+            local wallbangCore = nil
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1192,24 +1181,68 @@ run(function()
                 visualPart.Parent = workspace
             end
 
-            local function updateVisual()
-                if not visualPart then return end
+            local function getTargetPositionAndVel()
                 local target = shared.__s9t0u1 and shared.__s9t0u1.__target
-                if target and target.Character then
-                    local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-                    if targetHead then
-                        local targetVel = Vector3.new()
-                        local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
-                        if rootPart then targetVel = rootPart.Velocity end
-                        local predPos = targetHead.Position + targetVel * 0.2
-                        local frontOffset = predPos + targetHead.CFrame.LookVector * 5
-                        local finalPos = frontOffset + Vector3.new(0, 10, 0)
-                        visualPart.Position = finalPos
-                        visualPart.Visible = true
-                        return
+                if not target or not target.Character then return nil, nil, nil
+                end
+                local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+                if not targetHead then return nil, nil, nil
+                end
+                local targetVel = Vector3.new()
+                local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
+                if rootPart then targetVel = rootPart.Velocity end
+                return targetHead.Position, targetHead.CFrame, targetVel
+            end
+
+            local function computePosition(pos, cf, vel)
+                if not pos then return nil end
+                local predTime = _G.wallbangPredictionTime or 0.2
+                local predictedPos = pos + vel * predTime
+                local preset = _G.wallbangPreset or "Above"
+                local finalPos
+                if preset == "Above" then
+                    local frontOffset = cf.LookVector * 5
+                    finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
+                elseif preset == "Below" then
+                    finalPos = predictedPos + Vector3.new(0, -1, 0)
+                elseif preset == "Orbit" then
+                    local time = tick()
+                    local radius = 6
+                    local speed = 1.5
+                    local vertAmp = 3
+                    local angleRad = time * speed * 2 * math.pi
+                    local xOff = math.cos(angleRad) * radius
+                    local zOff = math.sin(angleRad) * radius
+                    local yOff = math.sin(angleRad * 2) * vertAmp
+                    finalPos = predictedPos + Vector3.new(xOff, yOff, zOff)
+                elseif preset == "Random" then
+                    local randX = math.random(-8, 8)
+                    local randZ = math.random(-8, 8)
+                    local randY = math.random(-3, 10)
+                    finalPos = predictedPos + Vector3.new(randX, randY, randZ)
+                else
+                    finalPos = predictedPos + Vector3.new(0, 5, 0)
+                end
+                if _G.wallbangBoundaryBypass then
+                    local fallenHeight = workspace.FallenPartsDestroyHeight or -500
+                    if finalPos.Y < fallenHeight + 20 or math.abs(finalPos.X) > 10000 or math.abs(finalPos.Z) > 10000 then
+                        finalPos = predictedPos + Vector3.new(0, 5, 0)
+                        pcall(function() notif('Rawr.xyz', 'Boundary corrected', 1, 'alert') end)
                     end
                 end
-                if visualPart then visualPart.Visible = false end
+                return finalPos
+            end
+
+            local function updateVisual()
+                if not visualPart then return end
+                local pos, cf, vel = getTargetPositionAndVel()
+                local finalPos = computePosition(pos, cf, vel)
+                if finalPos then
+                    visualPart.Position = finalPos
+                    visualPart.Visible = true
+                else
+                    visualPart.Visible = false
+                end
             end
 
             local function startVisualUpdate()
@@ -1418,20 +1451,9 @@ run(function()
                             local targetPos = targetHead.Position
                             local targetCF = targetHead.CFrame
                             local targetVel = __i9j0k1.Velocity
-
-                            local predictedPos = targetPos + targetVel * 0.2
-                            local frontOffset = targetCF.LookVector * 5
-                            local finalPos = predictedPos + frontOffset + Vector3.new(0, 10, 0)
-
-                            if _G.wallbangBoundaryBypass then
-                                local fallenHeight = workspace.FallenPartsDestroyHeight or -500
-                                if finalPos.Y < fallenHeight + 20 or math.abs(finalPos.X) > 10000 or math.abs(finalPos.Z) > 10000 then
-                                    finalPos = predictedPos + Vector3.new(0, 5, 0)
-                                    pcall(function() notif('Rawr.xyz', 'Boundary corrected', 1, 'alert') end)
-                                end
-                            end
-
-                            local lookDown = CFrame.lookAt(finalPos, predictedPos)
+                            local finalPos = computePosition(targetPos, targetCF, targetVel)
+                            if not finalPos then return end
+                            local lookDown = CFrame.lookAt(finalPos, targetPos)
                             local __l2m3n4 = __f6g7h8.CFrame
                             local __o5p6q7 = __f6g7h8.Velocity
                             local __r8s9t0 = __f6g7h8.RotVelocity
@@ -1517,6 +1539,20 @@ run(function()
         Tooltip = "hvh shit"
     })
 
+    DesyncModule:CreateDropdown({
+        Name = "Preset",
+        List = {"Above", "Below", "Orbit", "Random"},
+        Default = _G.wallbangPreset,
+        Function = function(v) _G.wallbangPreset = v end,
+        Tooltip = "Position relative to target"
+    })
+    DesyncModule:CreateSlider({
+        Name = "Prediction Time (s)",
+        Min = 0.1, Max = 0.5, Default = _G.wallbangPredictionTime, Decimal = 100,
+        Function = function(v) _G.wallbangPredictionTime = v end,
+        Suffix = "s",
+        Tooltip = "Compensates for desync"
+    })
     DesyncModule:CreateToggle({
         Name = "Boundary Bypass",
         Default = _G.wallbangBoundaryBypass,
@@ -1543,7 +1579,7 @@ run(function()
         Tooltip = 'Redirects bullets to always hit.'
     })
 end)
-                                                                                                                                                
+
 run(function()
     if not hookfunction then
         notif('Gun Mods', 'Your executor does not support hookfunction.', 5, 'alert')
@@ -1562,36 +1598,25 @@ run(function()
     local quickShotCooldownVal = 0
 
     local function tryApplyHook()
-        --
         if not gunModsEnabled then return end
-
-        --
         local lobbyVisible
         pcall(function() lobbyVisible = isLobbyVisible() end)
         if lobbyVisible then
-            --
             if gunModsEnabled then
                 pendingTask = task.delay(10, tryApplyHook)
             end
             return
         end
-
-        --
         if hookActive then return end
-
-        --
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
         if not ok or not clientItemModule or not clientItemModule.Input then
-            --
             if gunModsEnabled then
                 pendingTask = task.delay(10, tryApplyHook)
             end
             return
         end
-
-        -- hook here
         local inputFunc = clientItemModule.Input
         oldInput = hookfunction(inputFunc, function(...)
             local args = {...}
@@ -1619,10 +1644,8 @@ run(function()
     end
 
     local function removeHook()
-        cancelPending()   -- don't re‑hook
-
+        cancelPending()
         if not hookActive or not oldInput then return end
-
         local ok, clientItemModule = pcall(function()
             return require(lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
         end)
@@ -1630,7 +1653,6 @@ run(function()
             pcall(function() hookfunction(clientItemModule.Input, oldInput) end)
             pcall(function() clientItemModule.Input = oldInput end)
         end
-
         hookActive = false
         oldInput = nil
     end
@@ -1640,8 +1662,7 @@ run(function()
         Function = function(callback)
             gunModsEnabled = callback
             if callback then
-                -- Start initia
-                cancelPending()   -- just in case
+                cancelPending()
                 pendingTask = task.delay(15, tryApplyHook)
             else
                 removeHook()
@@ -1681,7 +1702,7 @@ run(function()
         Suffix = "s"
     })
 end)
-                                                                                                                                                          
+
 run(function()
     if hookmetamethod and getnamecallmethod then
         local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
@@ -2262,7 +2283,6 @@ run(function()
                         end
                     end
 
-                    -- FINAL
                     pcall(function()
                         local ViewProfile = require(player.PlayerScripts.Modules.Pages.ViewProfile)
                         if ViewProfile and ViewProfile.Fetch then
