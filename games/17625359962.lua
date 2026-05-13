@@ -358,7 +358,7 @@ CrosshairModule:CreateColorSlider({Name="Outline Color", Visible=false, Function
 CrosshairModule:CreateSlider({Name="Outline Thickness", Min=0,Max=3,Default=0.5,Decimal=10, Visible=false, Function=function(v) outlineThickness=v end, Suffix="px"})
 
 run(function()
-    -- hitsounds
+    -- Built‑in asset sounds (always available)
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
         {name="Bubble", id="rbxassetid://6534947588"},{name="Pick", id="rbxassetid://1347140027"},
@@ -373,31 +373,17 @@ run(function()
         {name="iphone", id="rbxassetid://131935970184832"},{name="Lmk", id="rbxassetid://118833207462382"},
     }
 
-    local customSounds = {}
-    local customSoundNames = {}
-    local soundFolder = "newvape/assets/sounds"
+    local customSounds = {
+        {name="1nn", path="rbxasset://sounds/1nn.mp3"},
+        {name="67", path="rbxasset://sounds/67.mp3"},
+        {name="Hentai1", path="rbxasset://sounds/Hentai1.mp3"},
+        {name="Hentai2", path="rbxasset://sounds/Hentai2.mp3"},
+        {name="Hentai3", path="rbxasset://sounds/Hentai3.mp3"},
+        {name="Fairy1", path="rbxasset://sounds/Fairy1.mp3"},
+        {name="Fairy2", path="rbxasset://sounds/Fairy2.mp3"},
+    }
 
-    local function loadCustomSounds()
-        if not isfolder or not isfolder(soundFolder) then return end
-        local files = nil
-        if listfiles then
-            files = listfiles(soundFolder)
-        else
-            return
-        end
-        for _, filePath in ipairs(files) do
-            if filePath:match("%.mp3$") then
-                local fileName = filePath:match("([^/\\]+)%.mp3$")
-                if fileName then
-                    table.insert(customSoundNames, fileName)
-                    customSounds[fileName] = "rbxasset://sounds/" .. fileName .. ".mp3"
-                end
-            end
-        end
-    end
-
-    loadCustomSounds()
-
+    -- Build dropdown list
     local soundNames = {}
     local soundMap = {}
 
@@ -405,9 +391,9 @@ run(function()
         table.insert(soundNames, s.name)
         soundMap[s.name] = s.id
     end
-    for _, name in ipairs(customSoundNames) do
-        table.insert(soundNames, "Local: " .. name)
-        soundMap["Local: " .. name] = customSounds[name]
+    for _, s in ipairs(customSounds) do
+        table.insert(soundNames, "Local: " .. s.name)
+        soundMap["Local: " .. s.name] = s.path
     end
 
     local hitsoundEnabled = false
