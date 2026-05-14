@@ -930,7 +930,6 @@ end)
                                                                                                                     
 run(function()
     local playersService = game:GetService("Players")
-    local runService = game:GetService("RunService")
     local localPlayer = playersService.LocalPlayer
 
     local MATERIALS = {
@@ -939,27 +938,13 @@ run(function()
         "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
     }
 
-    local BODY_PARTS = {
-        "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+    local ALL_PARTS = {
+        "Head", "Torso",
+        "Left Arm", "Right Arm", "Left Leg", "Right Leg",            -- R6
+        "UpperTorso", "LowerTorso",                                   -- R15
+        "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
+        "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg"
     }
-
-    local function getValidParts(character)
-        local parts = {}
-        if not character then return parts end
-        for _, name in ipairs(BODY_PARTS) do
-            local part = character:FindFirstChild(name)
-            if part and part:IsA("BasePart") then
-                table.insert(parts, name)
-            end
-        end
-        for _, name in ipairs({"UpperTorso", "LowerTorso"}) do
-            local part = character:FindFirstChild(name)
-            if part and part:IsA("BasePart") then
-                table.insert(parts, name)
-            end
-        end
-        return parts
-    end
 
     local modifications = {}
 
@@ -975,85 +960,59 @@ run(function()
         end
     end
 
+    --
     localPlayer.CharacterAdded:Connect(function(char)
         task.wait(0.1)
         applyModifications()
     end)
 
+    --
     if localPlayer.Character then
         applyModifications()
     end
 
+    --
     local SelfVisualsModule = vape.Categories.Render:CreateModule({
         Name = "Self Visuals",
-        Function = function(enabled)
-        end,
+        Function = function(enabled) end,
         Tooltip = "Custom materials and colors on your body parts"
     })
 
-    local selectedPart = nil
+    --
+    local selectedPart = "Head"
     local selectedMaterial = "Plastic"
     local selectedColor = Color3.new(1, 1, 1)
 
-    local partDropdown
-    local function updatePartList()
-        local parts = getValidParts(localPlayer.Character)
-        if #parts == 0 then
-            parts = BODY_PARTS
-        end
-        partDropdown:SetOptions(parts)
-        if not selectedPart or not table.find(parts, selectedPart) then
-            selectedPart = parts[1] or "Head"
-        end
-    end
-    updatePartList()
-
-    partDropdown = SelfVisualsModule:CreateDropdown({
+    --
+    SelfVisualsModule:CreateDropdown({
         Name = "Body Part",
-        List = BODY_PARTS,
+        List = ALL_PARTS,
         Default = "Head",
-        Function = function(val)
-            selectedPart = val
-        end
+        Function = function(val) selectedPart = val end
     })
-                                                                                                                                    
-    localPlayer.CharacterAdded:Connect(function()
-        task.wait(0.1)
-        updatePartList()
-    end)
-    task.spawn(function()
-        while true do
-            updatePartList()
-            task.wait(5)
-        end
-    end)
 
+    --
     SelfVisualsModule:CreateDropdown({
         Name = "Material",
         List = MATERIALS,
         Default = "Plastic",
-        Function = function(val)
-            selectedMaterial = val
-        end,
-        Tooltip = "Choose a material for the selected part"
+        Function = function(val) selectedMaterial = val end
     })
 
-    local colorSlider
-    colorSlider = SelfVisualsModule:CreateColorSlider({
+    -- 
+    SelfVisualsModule:CreateColorSlider({
         Name = "Color",
+        Visible = true,
         Function = function(h, s, v)
             selectedColor = Color3.fromHSV(h, s, v)
-        end,
-        Tooltip = "Pick a color for the selected part"
+        end
     })
 
+    -- 
     SelfVisualsModule:CreateButton({
         Name = "Add Visual",
         Function = function()
-            if not selectedPart then
-                vape:CreateNotification("Self Visuals", "No part selected", 2, "alert")
-                return
-            end
+            --
             for i, mod in ipairs(modifications) do
                 if mod.partName == selectedPart then
                     table.remove(modifications, i)
@@ -1066,33 +1025,32 @@ run(function()
                 color = selectedColor
             })
             applyModifications()
-            vape:CreateNotification("Self Visuals", "Added visual for " .. selectedPart, 2, "success")
-        end,
-        Tooltip = "Apply this material/color to the chosen body part"
+            vape:CreateNotification("Self Visuals", "Added " .. selectedPart, 2, "success")
+        end
     })
 
+    -- 
     SelfVisualsModule:CreateButton({
         Name = "Remove Visual",
         Function = function()
-            if not selectedPart then return end
             for i, mod in ipairs(modifications) do
                 if mod.partName == selectedPart then
                     table.remove(modifications, i)
+                    -- Restore
                     local char = localPlayer.Character
                     if char then
                         local part = char:FindFirstChild(selectedPart)
                         if part and part:IsA("BasePart") then
-                            part.Material = Enum.Material.Plastic  -- default
+                            part.Material = Enum.Material.Plastic
                             part.Color = Color3.new(1, 1, 1)
                         end
                     end
-                    vape:CreateNotification("Self Visuals", "Removed visual for " .. selectedPart, 2, "info")
+                    vape:CreateNotification("Self Visuals", "Removed " .. selectedPart, 2, "info")
                     return
                 end
             end
             vape:CreateNotification("Self Visuals", "No visual on " .. selectedPart, 2, "alert")
-        end,
-        Tooltip = "Remove the m/c from the part"
+        end
     })
 
     SelfVisualsModule:CreateButton({
@@ -1109,8 +1067,7 @@ run(function()
                 end
             end
             vape:CreateNotification("Self Visuals", "All visuals cleared", 2, "info")
-        end,
-        Tooltip = "Remove all visuals"
+        end
     })
 
     vape:Clean(function()
@@ -1124,14 +1081,8 @@ run(function()
             end
         end
     end)
-
-    localPlayer.CharacterAdded:Connect(function(char)
-        task.wait(0.1)
-        updatePartList()
-        applyModifications()
-    end)
 end)
-
+                                                                                                                                            
 run(function()
     local antiSmokeRunning = false
     local workerConn = nil
