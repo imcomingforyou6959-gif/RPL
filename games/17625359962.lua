@@ -931,7 +931,8 @@ end)
 run(function()
     local Players = game:GetService("Players")
     local localPlayer = Players.LocalPlayer
-    
+    local HttpService = game:GetService("HttpService")
+
     local R15_PARTS = {
         "Head",
         "UpperTorso", "LowerTorso",
@@ -940,109 +941,63 @@ run(function()
         "LeftHand", "RightHand",
         "LeftFoot", "RightFoot"
     }
-    
+
     local MATERIALS = {
         "Plastic", "Wood", "Brick", "Concrete", "CorrodedMetal", "DiamondPlate",
         "Foil", "Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Sand",
         "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
     }
-    
+
     local PRESET_CONFIGS = {
-        ["Glass"] = {material = "ForceField", transparency = 0.3},
-        ["Metal"] = {material = "Metal", transparency = 0},
-        ["Neon"] = {material = "Neon", transparency = 0},
-        ["Wood"] = {material = "Wood", transparency = 0},
-        ["Marble"] = {material = "Marble", transparency = 0},
-        ["Ice"] = {material = "Ice", transparency = 0.1},
+        ["Glass"]   = {material = "ForceField", transparency = 0.3},
+        ["Metal"]   = {material = "Metal", transparency = 0},
+        ["Neon"]    = {material = "Neon", transparency = 0},
+        ["Wood"]    = {material = "Wood", transparency = 0},
+        ["Marble"]  = {material = "Marble", transparency = 0},
+        ["Ice"]     = {material = "Ice", transparency = 0.1},
         ["Emerald"] = {material = "Marble", transparency = 0},
-        ["Concrete"] = {material = "Concrete", transparency = 0},
+        ["Concrete"]= {material = "Concrete", transparency = 0},
         ["Diamond"] = {material = "DiamondPlate", transparency = 0},
-        ["Slate"] = {material = "Slate", transparency = 0},
+        ["Slate"]   = {material = "Slate", transparency = 0},
     }
-    
-    local originalProperties = {}
+
+    local configPath = "newvape/assets/visuals.json"
     local modifications = {}
+    local originalProperties = {}
     local isEnabled = false
-    
-    local configPath = "newvape/assets/configfilehere.json"
-    local HttpService = game:GetService("HttpService")
-    
+
     local function ensureFolder()
-        if not isfolder("newvape") then
-            makefolder("newvape")
-        end
-        if not isfolder("newvape/assets") then
-            makefolder("newvape/assets")
-        end
+        if not isfolder("newvape") then makefolder("newvape") end
+        if not isfolder("newvape/assets") then makefolder("newvape/assets") end
     end
-    
-    local function loadConfigFromDisk()
+
+    local function loadConfig()
         ensureFolder()
-        if not isfile(configPath) then
-            return nil
-        end
-        
+        if not isfile(configPath) then return nil end
         local ok, data = pcall(function()
-            local fileContent = readfile(configPath)
-            return HttpService:JSONDecode(fileContent)
+            return HttpService:JSONDecode(readfile(configPath))
         end)
-        
-        if not ok then
-            return nil
-        end
-        
-        return data
+        if ok and data then return data end
+        return nil
     end
-    
-    local function saveConfigToDisk(data)
+
+    local function saveConfig()
         ensureFolder()
-        local ok, serialized = pcall(function()
-            return HttpService:JSONEncode(data)
-        end)
-        
-        if not ok then
-            return false
-        end
-        
-        pcall(function()
-            writefile(configPath, serialized)
-        end)
-        
-        return true
-    end
-    
-    local function saveCurrentConfig()
-        local configData = {
+        local data = {
             modifications = modifications,
             selectedColor = selectedColor,
             selectedMaterial = selectedMaterial,
             selectedTransparency = selectedTransparency,
             selectedPreset = selectedPreset
         }
-        
-        saveConfigToDisk(configData)
-        vape:CreateNotification("Self Visuals", "Config saved", 1.5, "success")
+        pcall(function()
+            writefile(configPath, HttpService:JSONEncode(data))
+        end)
     end
-    
-    local function loadAndApplyConfig()
-        local configData = loadConfigFromDisk()
-        if not configData or not configData.modifications then
-            return
-        end
-        
-        modifications = configData.modifications or {}
-        if configData.selectedColor then selectedColor = configData.selectedColor end
-        if configData.selectedMaterial then selectedMaterial = configData.selectedMaterial end
-        if configData.selectedTransparency then selectedTransparency = configData.selectedTransparency end
-        
-        applyAllModifications()
-        vape:CreateNotification("Self Visuals", "Config loaded", 1.5, "success")
-    end
-    
+
     local function cacheOriginalProperties()
         local char = localPlayer.Character
         if not char then return end
-        
         for _, partName in ipairs(R15_PARTS) do
             local part = char:FindFirstChild(partName)
             if part and part:IsA("BasePart") then
@@ -1054,122 +1009,105 @@ run(function()
             end
         end
     end
-    
-    local function getPart(partName)
-        local char = localPlayer.Character
-        if not char then return nil end
-        return char:FindFirstChild(partName)
-    end
-    
-    local function getModificationIndex(partName)
-        for i, mod in ipairs(modifications) do
-            if mod.partName == partName then
-                return i
-            end
-        end
-        return nil
-    end
-    
-    local function applyModification(partName, material, color, transparency)
-        local part = getPart(partName)
+
+    local function applyPart(partName, material, color, transparency)
+        local part = localPlayer.Character and localPlayer.Character:FindFirstChild(partName)
         if not part or not part:IsA("BasePart") then return end
-        
         part.Material = Enum.Material[material] or Enum.Material.Plastic
         part.Color = color
         part.Transparency = transparency or 0
     end
-    
+
     local function restorePart(partName)
-        local part = getPart(partName)
+        local part = localPlayer.Character and localPlayer.Character:FindFirstChild(partName)
         if not part or not part:IsA("BasePart") then return end
-        
-        local original = originalProperties[partName]
-        if original then
-            part.Material = original.material
-            part.Color = original.color
-            part.Transparency = original.transparency
+        local orig = originalProperties[partName]
+        if orig then
+            part.Material = orig.material
+            part.Color = orig.color
+            part.Transparency = orig.transparency
         else
             part.Material = Enum.Material.Plastic
             part.Color = Color3.new(1, 1, 1)
             part.Transparency = 0
         end
     end
-    
-    local function applyAllModifications()
+
+    local function applyAll()
         for _, mod in ipairs(modifications) do
-            applyModification(mod.partName, mod.material, mod.color, mod.transparency)
+            applyPart(mod.partName, mod.material, mod.color, mod.transparency)
         end
     end
-    
+
     local function restoreAll()
         local char = localPlayer.Character
         if not char then return end
-        
         for _, partName in ipairs(R15_PARTS) do
             restorePart(partName)
         end
     end
-    
+
     localPlayer.CharacterAdded:Connect(function(char)
         task.wait(0.1)
         originalProperties = {}
         cacheOriginalProperties()
-        applyAllModifications()
+        applyAll()
     end)
-    
+
     if localPlayer.Character then
         cacheOriginalProperties()
     end
-    
-    local SelfVisualsModule = vape.Categories.Render:CreateModule({
-        Name = "Self Visuals",
-        Function = function(callback)
-            isEnabled = callback
-            if not callback then
-                restoreAll()
-            else
-                cacheOriginalProperties()
-                applyAllModifications()
-            end
-        end,
-        Tooltip = "Customize materials and colors on your body parts"
-    })
-    
+
     local selectedPart = "Head"
     local selectedMaterial = "Plastic"
     local selectedColor = Color3.new(1, 1, 1)
     local selectedTransparency = 0
     local selectedPreset = "None"
-    
-    local partsList = {"All"}
-    for _, part in ipairs(R15_PARTS) do
-        table.insert(partsList, part)
+
+    local function findModIndex(partName)
+        for i, mod in ipairs(modifications) do
+            if mod.partName == partName then return i end
+        end
+        return nil
     end
-    
-    SelfVisualsModule:CreateDropdown({
+
+    local SelfVisuals = vape.Categories.Render:CreateModule({
+        Name = "Self Visuals",
+        Function = function(callback)
+            isEnabled = callback
+            if callback then
+                cacheOriginalProperties()
+                applyAll()
+            else
+                restoreAll()
+            end
+        end,
+        Tooltip = "Customize your local player! <3"
+    })
+
+    local partList = {"All"}
+    for _, part in ipairs(R15_PARTS) do
+        table.insert(partList, part)
+    end
+    SelfVisuals:CreateDropdown({
         Name = "Body Part",
-        List = partsList,
+        List = partList,
         Default = "Head",
         Function = function(val)
             selectedPart = val
-            
-            if val == "All" then
-                selectedColor = Color3.new(1, 1, 1)
-                selectedTransparency = 0
-                return
-            end
-            
-            local modIndex = getModificationIndex(val)
-            if modIndex then
-                local mod = modifications[modIndex]
+            if val == "All" then return end
+
+            local idx = findModIndex(val)
+            if idx then
+                local mod = modifications[idx]
                 selectedMaterial = mod.material
                 selectedColor = mod.color
                 selectedTransparency = mod.transparency or 0
             else
-                local original = originalProperties[val]
-                if original then
-                    selectedColor = original.color
-                    selectedTransparency = original.transparency
+                local part = localPlayer.Character and localPlayer.Character:FindFirstChild(val)
+                if part then
+                    selectedColor = part.Color
+                    selectedTransparency = part.Transparency
                 else
                     selectedColor = Color3.new(1, 1, 1)
                     selectedTransparency = 0
@@ -1177,157 +1115,121 @@ run(function()
             end
         end
     })
-    
-    SelfVisualsModule:CreateDropdown({
+
+    SelfVisuals:CreateDropdown({
         Name = "Material",
         List = MATERIALS,
         Default = "Plastic",
-        Function = function(val)
-            selectedMaterial = val
-        end
+        Function = function(val) selectedMaterial = val end
     })
-    
-    local presetList = {"None"}
-    for presetName, _ in pairs(PRESET_CONFIGS) do
-        table.insert(presetList, presetName)
-    end
-    table.sort(presetList)
-    
-    SelfVisualsModule:CreateDropdown({
+
+    local presetNames = {"None"}
+    for name in pairs(PRESET_CONFIGS) do table.insert(presetNames, name) end
+    table.sort(presetNames)
+    SelfVisuals:CreateDropdown({
         Name = "Preset",
-        List = presetList,
+        List = presetNames,
         Default = "None",
         Function = function(val)
             selectedPreset = val
-            
             if val ~= "None" then
-                local preset = PRESET_CONFIGS[val]
-                if preset then
-                    selectedMaterial = preset.material
-                    selectedTransparency = preset.transparency or 0
-                end
+                local p = PRESET_CONFIGS[val]
+                selectedMaterial = p.material
+                selectedTransparency = p.transparency or 0
             end
         end
     })
-    
-    SelfVisualsModule:CreateColorSlider({
+
+    SelfVisuals:CreateColorSlider({
         Name = "Color",
         Function = function(h, s, v)
             selectedColor = Color3.fromHSV(h, s, v)
         end
     })
-    
-    SelfVisualsModule:CreateSlider({
+
+    SelfVisuals:CreateSlider({
         Name = "Transparency",
-        Min = 0,
-        Max = 1,
-        Default = 0,
-        Decimal = 100,
-        Function = function(v)
-            selectedTransparency = v
-        end,
-        Suffix = ""
+        Min = 0, Max = 1, Default = 0, Decimal = 100,
+        Function = function(v) selectedTransparency = v end
     })
-    
-    local function addModification(partName, material, color, transparency)
-        if partName == "All" then
-            applyToAllParts(material, color, transparency)
-            return
-        end
-        
-        local modIndex = getModificationIndex(partName)
-        if modIndex then
-            table.remove(modifications, modIndex)
-        end
-        
-        table.insert(modifications, {
-            partName = partName,
-            material = material,
-            color = color,
-            transparency = transparency or 0
-        })
-        
-        applyModification(partName, material, color, transparency)
-        vape:CreateNotification("Self Visuals", "Applied to " .. partName, 1.5, "success")
-        saveCurrentConfig()
-    end
-    
-    local function applyToAllParts(material, color, transparency)
-        modifications = {}
-        
-        for _, partName in ipairs(R15_PARTS) do
-            table.insert(modifications, {
-                partName = partName,
-                material = material,
-                color = color,
-                transparency = transparency or 0
-            })
-        end
-        
-        applyAllModifications()
-        vape:CreateNotification("Self Visuals", "Applied to all parts", 2, "success")
-        saveCurrentConfig()
-    end
-    
-    SelfVisualsModule:CreateButton({
+
+    SelfVisuals:CreateButton({
         Name = "Apply",
         Function = function()
-            addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
+            if selectedPart == "All" then
+                modifications = {}
+                for _, partName in ipairs(R15_PARTS) do
+                    table.insert(modifications, {
+                        partName = partName,
+                        material = selectedMaterial,
+                        color = selectedColor,
+                        transparency = selectedTransparency
+                    })
+                end
+                applyAll()
+                notif("Rawr.xyz says", "Applied to all parts", 2, "success")
+            else
+                local idx = findModIndex(selectedPart)
+                if idx then table.remove(modifications, idx) end
+                table.insert(modifications, {
+                    partName = selectedPart,
+                    material = selectedMaterial,
+                    color = selectedColor,
+                    transparency = selectedTransparency
+                })
+                applyPart(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
+                notif("Rawr.xyz says", "Applied to " .. selectedPart, 1.5, "success")
+            end
+            saveConfig()
         end
     })
-    
-    SelfVisualsModule:CreateButton({
+
+    SelfVisuals:CreateButton({
         Name = "Remove",
         Function = function()
             if selectedPart == "All" then
                 modifications = {}
                 restoreAll()
-                vape:CreateNotification("Self Visuals", "Removed all visuals", 2, "info")
-                saveCurrentConfig()
-                return
-            end
-            
-            local modIndex = getModificationIndex(selectedPart)
-            if modIndex then
-                table.remove(modifications, modIndex)
-                restorePart(selectedPart)
-                vape:CreateNotification("Self Visuals", "Removed from " .. selectedPart, 1.5, "info")
-                saveCurrentConfig()
+                vape:CreateNotification("Rawr.xyz says", "Removed all visuals", 2, "info")
             else
-                vape:CreateNotification("Self Visuals", "No visual on " .. selectedPart, 1.5, "alert")
+                local idx = findModIndex(selectedPart)
+                if idx then
+                    table.remove(modifications, idx)
+                    restorePart(selectedPart)
+                    notif("Rawr.xyz says", "Removed from " .. selectedPart, 1.5, "info")
+                else
+                    notif("Rawr.xyz says", "No visual on " .. selectedPart, 1.5, "alert")
+                end
             end
+            saveConfig()
         end
     })
-    
-    SelfVisualsModule:CreateButton({
-        Name = "Save Config",
-        Function = function()
-            saveCurrentConfig()
-        end
-    })
-    
-    SelfVisualsModule:CreateButton({
-        Name = "Load Config",
-        Function = function()
-            loadAndApplyConfig()
-        end
-    })
-    
-    SelfVisualsModule:CreateButton({
+
+    SelfVisuals:CreateButton({
         Name = "Clear All",
         Function = function()
             modifications = {}
             restoreAll()
-            vape:CreateNotification("Self Visuals", "All visuals cleared", 2, "info")
-            saveCurrentConfig()
+            saveConfig()
+            notif("Rawr.xyz says", "All visuals cleared", 2, "info")
         end
     })
-    
+
+    local saved = loadConfig()
+    if saved then
+        modifications = saved.modifications or {}
+        selectedColor = saved.selectedColor or Color3.new(1, 1, 1)
+        selectedMaterial = saved.selectedMaterial or "Plastic"
+        selectedTransparency = saved.selectedTransparency or 0
+        selectedPreset = saved.selectedPreset or "None"
+        if localPlayer.Character then
+            applyAll()
+        end
+    end
+
     vape:Clean(function()
         restoreAll()
     end)
-    
-    loadAndApplyConfig()
 end)
                                                                                                                                             
 run(function()
