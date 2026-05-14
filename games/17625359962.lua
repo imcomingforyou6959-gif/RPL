@@ -947,20 +947,97 @@ run(function()
         "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
     }
     
-    local MATERIAL_PRESETS = {
+    local PRESET_CONFIGS = {
         ["Glass"] = {material = "ForceField", transparency = 0.3},
         ["Metal"] = {material = "Metal", transparency = 0},
         ["Neon"] = {material = "Neon", transparency = 0},
         ["Wood"] = {material = "Wood", transparency = 0},
         ["Marble"] = {material = "Marble", transparency = 0},
-        ["Gold"] = {material = "Metal", transparency = 0},
         ["Ice"] = {material = "Ice", transparency = 0.1},
         ["Emerald"] = {material = "Marble", transparency = 0},
+        ["Concrete"] = {material = "Concrete", transparency = 0},
+        ["Diamond"] = {material = "DiamondPlate", transparency = 0},
+        ["Slate"] = {material = "Slate", transparency = 0},
     }
     
     local originalProperties = {}
     local modifications = {}
     local isEnabled = false
+    
+    local configPath = "newvape/assets/configfilehere.json"
+    local HttpService = game:GetService("HttpService")
+    
+    local function ensureFolder()
+        if not isfolder("newvape") then
+            makefolder("newvape")
+        end
+        if not isfolder("newvape/assets") then
+            makefolder("newvape/assets")
+        end
+    end
+    
+    local function loadConfigFromDisk()
+        ensureFolder()
+        if not isfile(configPath) then
+            return nil
+        end
+        
+        local ok, data = pcall(function()
+            local fileContent = readfile(configPath)
+            return HttpService:JSONDecode(fileContent)
+        end)
+        
+        if not ok then
+            return nil
+        end
+        
+        return data
+    end
+    
+    local function saveConfigToDisk(data)
+        ensureFolder()
+        local ok, serialized = pcall(function()
+            return HttpService:JSONEncode(data)
+        end)
+        
+        if not ok then
+            return false
+        end
+        
+        pcall(function()
+            writefile(configPath, serialized)
+        end)
+        
+        return true
+    end
+    
+    local function saveCurrentConfig()
+        local configData = {
+            modifications = modifications,
+            selectedColor = selectedColor,
+            selectedMaterial = selectedMaterial,
+            selectedTransparency = selectedTransparency,
+            selectedPreset = selectedPreset
+        }
+        
+        saveConfigToDisk(configData)
+        vape:CreateNotification("Self Visuals", "Config saved", 1.5, "success")
+    end
+    
+    local function loadAndApplyConfig()
+        local configData = loadConfigFromDisk()
+        if not configData or not configData.modifications then
+            return
+        end
+        
+        modifications = configData.modifications or {}
+        if configData.selectedColor then selectedColor = configData.selectedColor end
+        if configData.selectedMaterial then selectedMaterial = configData.selectedMaterial end
+        if configData.selectedTransparency then selectedTransparency = configData.selectedTransparency end
+        
+        applyAllModifications()
+        vape:CreateNotification("Self Visuals", "Config loaded", 1.5, "success")
+    end
     
     local function cacheOriginalProperties()
         local char = localPlayer.Character
@@ -1062,6 +1139,7 @@ run(function()
     local selectedMaterial = "Plastic"
     local selectedColor = Color3.new(1, 1, 1)
     local selectedTransparency = 0
+    local selectedPreset = "None"
     
     local partsList = {"All"}
     for _, part in ipairs(R15_PARTS) do
@@ -1075,14 +1153,12 @@ run(function()
         Function = function(val)
             selectedPart = val
             
-            --
             if val == "All" then
                 selectedColor = Color3.new(1, 1, 1)
                 selectedTransparency = 0
                 return
             end
             
-            --
             local modIndex = getModificationIndex(val)
             if modIndex then
                 local mod = modifications[modIndex]
@@ -1090,7 +1166,6 @@ run(function()
                 selectedColor = mod.color
                 selectedTransparency = mod.transparency or 0
             else
-                -- 
                 local original = originalProperties[val]
                 if original then
                     selectedColor = original.color
@@ -1109,6 +1184,29 @@ run(function()
         Default = "Plastic",
         Function = function(val)
             selectedMaterial = val
+        end
+    })
+    
+    local presetList = {"None"}
+    for presetName, _ in pairs(PRESET_CONFIGS) do
+        table.insert(presetList, presetName)
+    end
+    table.sort(presetList)
+    
+    SelfVisualsModule:CreateDropdown({
+        Name = "Preset",
+        List = presetList,
+        Default = "None",
+        Function = function(val)
+            selectedPreset = val
+            
+            if val ~= "None" then
+                local preset = PRESET_CONFIGS[val]
+                if preset then
+                    selectedMaterial = preset.material
+                    selectedTransparency = preset.transparency or 0
+                end
+            end
         end
     })
     
@@ -1131,49 +1229,7 @@ run(function()
         Suffix = ""
     })
     
-    SelfVisualsModule:CreateButton({
-        Name = "Presets: Glass",
-        Function = function()
-            selectedMaterial = "ForceField"
-            selectedTransparency = 0.3
-            if selectedPart == "All" then
-                applyToAllParts("ForceField", selectedColor, 0.3)
-            else
-                addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
-            end
-            vape:CreateNotification("Self Visuals", "Applied Glass preset", 1.5, "success")
-        end
-    })
-    
-    SelfVisualsModule:CreateButton({
-        Name = "Presets: Metal",
-        Function = function()
-            selectedMaterial = "Metal"
-            selectedTransparency = 0
-            if selectedPart == "All" then
-                applyToAllParts("Metal", selectedColor, 0)
-            else
-                addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
-            end
-            vape:CreateNotification("Self Visuals", "Applied Metal preset", 1.5, "success")
-        end
-    })
-    
-    SelfVisualsModule:CreateButton({
-        Name = "Presets: Neon",
-        Function = function()
-            selectedMaterial = "Neon"
-            selectedTransparency = 0
-            if selectedPart == "All" then
-                applyToAllParts("Neon", selectedColor, 0)
-            else
-                addModification(selectedPart, selectedMaterial, selectedColor, selectedTransparency)
-            end
-            vape:CreateNotification("Self Visuals", "Applied Neon preset", 1.5, "success")
-        end
-    })
-    
-    function addModification(partName, material, color, transparency)
+    local function addModification(partName, material, color, transparency)
         if partName == "All" then
             applyToAllParts(material, color, transparency)
             return
@@ -1193,9 +1249,10 @@ run(function()
         
         applyModification(partName, material, color, transparency)
         vape:CreateNotification("Self Visuals", "Applied to " .. partName, 1.5, "success")
+        saveCurrentConfig()
     end
     
-    function applyToAllParts(material, color, transparency)
+    local function applyToAllParts(material, color, transparency)
         modifications = {}
         
         for _, partName in ipairs(R15_PARTS) do
@@ -1209,6 +1266,7 @@ run(function()
         
         applyAllModifications()
         vape:CreateNotification("Self Visuals", "Applied to all parts", 2, "success")
+        saveCurrentConfig()
     end
     
     SelfVisualsModule:CreateButton({
@@ -1225,6 +1283,7 @@ run(function()
                 modifications = {}
                 restoreAll()
                 vape:CreateNotification("Self Visuals", "Removed all visuals", 2, "info")
+                saveCurrentConfig()
                 return
             end
             
@@ -1233,9 +1292,24 @@ run(function()
                 table.remove(modifications, modIndex)
                 restorePart(selectedPart)
                 vape:CreateNotification("Self Visuals", "Removed from " .. selectedPart, 1.5, "info")
+                saveCurrentConfig()
             else
                 vape:CreateNotification("Self Visuals", "No visual on " .. selectedPart, 1.5, "alert")
             end
+        end
+    })
+    
+    SelfVisualsModule:CreateButton({
+        Name = "Save Config",
+        Function = function()
+            saveCurrentConfig()
+        end
+    })
+    
+    SelfVisualsModule:CreateButton({
+        Name = "Load Config",
+        Function = function()
+            loadAndApplyConfig()
         end
     })
     
@@ -1245,12 +1319,15 @@ run(function()
             modifications = {}
             restoreAll()
             vape:CreateNotification("Self Visuals", "All visuals cleared", 2, "info")
+            saveCurrentConfig()
         end
     })
     
     vape:Clean(function()
         restoreAll()
     end)
+    
+    loadAndApplyConfig()
 end)
                                                                                                                                             
 run(function()
