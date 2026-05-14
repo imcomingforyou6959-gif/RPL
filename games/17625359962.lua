@@ -2810,6 +2810,7 @@ run(function()
     local userInputService = game:GetService("UserInputService")
     local camera = workspace.CurrentCamera
     local localPlayer = playersService.LocalPlayer
+    local replicatedStorage = game:GetService("ReplicatedStorage")
 
     local config = {
         killFeedEnabled = true,
@@ -2832,6 +2833,36 @@ run(function()
     }
 
     local lastHitNotifTime = 0
+    local gameReady = false
+    local hooksInitialized = false
+
+    local function isGameActive()
+        local mainGui = localPlayer:FindFirstChild("PlayerGui")
+        if mainGui then
+            local mainFrame = mainGui:FindFirstChild("MainFrame")
+            if mainFrame then
+                local lobby = mainFrame:FindFirstChild("Lobby")
+                if lobby then
+                    local currency = lobby:FindFirstChild("Currency")
+                    return currency and currency.Visible == false
+                end
+            end
+        end
+        return false
+    end
+
+    local function waitForGame(timeout)
+        timeout = timeout or 120
+        local start = tick()
+        while tick() - start < timeout do
+            if isGameActive() and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                return true
+            end
+            task.wait(0.5)
+        end
+        return false
+    end
+
 
     local function killFeed(killerName, victimName, weaponName)
         if not config.killFeedEnabled then return end
@@ -2851,7 +2882,6 @@ run(function()
     local hitDirectionArrows = {}
     local function addHitDirection(sourcePosition)
         if not config.hitDirectionEnabled then return end
-        
         local camPos = camera.CFrame.Position
         local direction = (sourcePosition - camPos).Unit
         local lookAt = camera.CFrame.LookVector
@@ -2995,52 +3025,84 @@ run(function()
             local root = sourcePlayer.Character:FindFirstChild("HumanoidRootPart")
             if root then addHitDirection(root.Position) end
         end
-        
         if sourcePlayer and targetPlayer and sourcePlayer ~= targetPlayer then
             hitLog(sourcePlayer.Name, targetPlayer.Name, damage)
         end
     end
 
-    local replicatedStorage = game:GetService("ReplicatedStorage")
-    local hitRemote = replicatedStorage:FindFirstChild("Remotes")
-    if hitRemote then
-        hitRemote = hitRemote:FindFirstChild("Replication")
-        if hitRemote then
-            hitRemote = hitRemote:FindFirstChild("Fighter")
+    local function initHooks()
+        if hooksInitialized then return end
+        hooksInitialized = true
+
+        local function tryHookHitRemote()
+            local hitRemote = replicatedStorage:FindFirstChild("Remotes")
             if hitRemote then
-                hitRemote = hitRemote:FindFirstChild("HitNotify")
-            end
-        end
-    end
-    
-    if hitRemote then
-        hitRemote.OnClientEvent:Connect(function(data)
-            local damage = data[utf8.char(0)] or 0
-            local hitPart = data[utf8.char(2)]
-            local victim = nil
-            if typeof(hitPart) == "Instance" then
-                local char = hitPart:FindFirstAncestorOfClass("Model")
-                if char then
-                    victim = playersService:GetPlayerFromCharacter(char)
+                hitRemote = hitRemote:FindFirstChild("Replication")
+                if hitRemote then
+                    hitRemote = hitRemote:FindFirstChild("Fighter")
+                    if hitRemote then
+                        hitRemote = hitRemote:FindFirstChild("HitNotify")
+                    end
                 end
             end
-            if victim and localPlayer ~= victim then
-                onHit(localPlayer, victim, hitPart, damage, "Weapon")
+            if hitRemote then
+                hitRemote.OnClientEvent:Connect(function(data)
+                    local damage = data[utf8.char(0)] or 0
+                    local hitPart = data[utf8.char(2)]
+                    local victim = nil
+                    if typeof(hitPart) == "Instance" then
+                        local char = hitPart:FindFirstAncestorOfClass("Model")
+                        if char then
+                            victim = playersService:GetPlayerFromCharacter(char)
+                        end
+                    end
+                    if victim and localPlayer ~= victim then
+                        onHit(localPlayer, victim, hitPart, damage, "Weapon")
+                    end
+                end)
+                return true
+            end
+            return false
+        end
+
+        for i = 1, 20 do
+            if tryHookHitRemote() then break end
+            task.wait(0.5)
+        end
+        if not hitRemote then
+            vape:CreateNotification("Rawr.xyz", "HitNotify remote not found after retries – effects inactive", 5, "alert")
+        end
+
+        spawn(function()
+            local EliminationsDisplay = nil
+            for _ = 1, 30 do
+                local success, module = pcall(function()
+                    return require(localPlayer.PlayerScripts:WaitForChild("Modules"):WaitForChild("EliminationsDisplay", 5))
+                end)
+                if success and module and module.NewElimination then
+                    EliminationsDisplay = module
+                    break
+                end
+                task.wait(0.5)
+            end
+            if EliminationsDisplay then
+                local oldNewElimination = EliminationsDisplay.NewElimination
+                EliminationsDisplay.NewElimination = function(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
+                    oldNewElimination(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
+                    killFeed(eliminator.Name, victim.Name, weaponname or "Unknown")
+                end
+            else
+                vape:CreateNotification("Rawr.xyz", "EliminationsDisplay not found – kill feed won't work", 3, "alert")
             end
         end)
-    else
-        vape:CreateNotification("Rawr.xyz", "HitNotify remote not found – effects won't trigger", 5, "alert")
     end
 
-    pcall(function()
-        local EliminationsDisplay = require(localPlayer.PlayerScripts.Modules.EliminationsDisplay)
-        if EliminationsDisplay and EliminationsDisplay.NewElimination then
-            local oldNewElimination = EliminationsDisplay.NewElimination
-            EliminationsDisplay.NewElimination = function(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
-                oldNewElimination(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
-                killFeed(eliminator.Name, victim.Name, weaponname or "Unknown")
-            end
+    spawn(function()
+        if not waitForGame() then
+            vape:CreateNotification("Rawr.xyz", "Game load timeout – Check your internet", 5, "alert")
         end
+        gameReady = true
+        initHooks()
     end)
 
     local VisualModule = vape.Categories.Visual or vape.Categories.Render or vape.Categories.Utility
