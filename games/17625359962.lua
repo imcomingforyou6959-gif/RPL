@@ -288,7 +288,6 @@ run(function()
                 if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
                 if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
                 targetPlayer = nil
-                -- Clear caches on disable
                 screenCache = {}
                 visibilityCache = {}
             end
@@ -2805,5 +2804,326 @@ run(function()
     end
 end)
 
+-- ============================================================================
+-- ENHANCED VISUAL FEATURES (Kill Feed, Hit Direction, Damage Numbers, Hit Effects)
+-- ============================================================================
+run(function()
+    local playersService = game:GetService("Players")
+    local runService = game:GetService("RunService")
+    local userInputService = game:GetService("UserInputService")
+    local camera = workspace.CurrentCamera
+    local localPlayer = playersService.LocalPlayer
+
+    local config = {
+        killFeedEnabled = true,
+        killFeedDuration = 3,
+        hitDirectionEnabled = true,
+        hitDirectionColor = Color3.fromRGB(255, 80, 80),
+        damageNumbersEnabled = true,
+        damageNumberColor = Color3.fromRGB(255, 255, 255),
+        damageNumberSize = 18,
+        damageNumberDuration = 1,
+        hitChamsEnabled = true,
+        hitChamsDuration = 0.2,
+        hitChamsColor = Color3.fromRGB(255, 0, 0),
+        hitChamsTransparency = 0.3,
+        bodyCloneEnabled = true,
+        bodyCloneDuration = 0.3,
+        bodyCloneTransparency = 0.6,
+    }
+
+    local killFeedMessages = {}
+    local killFeedContainer = nil
+
+    local function createKillFeedContainer()
+        if killFeedContainer then return end
+        killFeedContainer = Instance.new("Frame")
+        killFeedContainer.Name = "KillFeedContainer"
+        killFeedContainer.Size = UDim2.new(0, 300, 0, 200)
+        killFeedContainer.Position = UDim2.new(1, -310, 0, 10)
+        killFeedContainer.BackgroundTransparency = 1
+        killFeedContainer.Parent = game:GetService("CoreGui")
+        
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 5)
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = killFeedContainer
+    end
+
+    local function addKillFeed(killerName, victimName, weaponName)
+        if not config.killFeedEnabled then return end
+        createKillFeedContainer()
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 0, 30)
+        frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+        frame.BackgroundTransparency = 0.3
+        frame.BorderSizePixel = 0
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = frame
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = string.format("%s  [%s]  %s", killerName, weaponName, victimName)
+        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 13
+        label.TextXAlignment = Enum.TextXAlignment.Center
+        label.Parent = frame
+        
+        frame.Parent = killFeedContainer
+        
+        local startTime = tick()
+        local fadeConn
+        fadeConn = runService.RenderStepped:Connect(function()
+            local elapsed = tick() - startTime
+            if elapsed >= config.killFeedDuration then
+                frame:Destroy()
+                fadeConn:Disconnect()
+            else
+                local alpha = 1 - (elapsed / config.killFeedDuration)
+                frame.BackgroundTransparency = 0.3 + (1 - alpha) * 0.7
+                label.TextTransparency = 1 - alpha
+            end
+        end)
+    end
+
+    local hitDirectionArrows = {}
+    local function addHitDirection(sourcePosition)
+        if not config.hitDirectionEnabled then return end
+        
+        local camPos = camera.CFrame.Position
+        local direction = (sourcePosition - camPos).Unit
+        local lookAt = camera.CFrame.LookVector
+        local angle = math.deg(math.acos(lookAt:Dot(direction)))
+        local isBehind = angle > 90
+        
+        local arrow = Drawing.new("Triangle")
+        arrow.Visible = true
+        arrow.Color = config.hitDirectionColor
+        arrow.Filled = true
+        arrow.Thickness = 1
+        arrow.Transparency = 0.3
+        
+        local screenCenter = camera.ViewportSize / 2
+        local radius = 50
+        local radAngle = math.rad(angle)
+        local offsetX = math.sin(radAngle) * radius
+        local offsetY = -math.cos(radAngle) * radius
+        
+        if isBehind then
+            arrow.PointA = screenCenter + Vector2.new(-15, -15)
+            arrow.PointB = screenCenter + Vector2.new(15, -15)
+            arrow.PointC = screenCenter + Vector2.new(0, 0)
+        else
+            local tip = screenCenter + Vector2.new(offsetX, offsetY)
+            local perp = Vector2.new(-offsetY, offsetX).Unit * 10
+            arrow.PointA = tip + perp
+            arrow.PointB = tip - perp
+            arrow.PointC = screenCenter
+        end
+        
+        table.insert(hitDirectionArrows, arrow)
+        
+        task.delay(0.5, function()
+            arrow.Visible = false
+            arrow:Remove()
+            for i, a in ipairs(hitDirectionArrows) do
+                if a == arrow then table.remove(hitDirectionArrows, i); break end
+            end
+        end)
+    end
+
+    local damageNumbers = {}
+    local function addDamageNumber(targetPart, damage)
+        if not config.damageNumbersEnabled then return end
+        local screenPos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+        if not onScreen then return end
+        
+        local text = Drawing.new("Text")
+        text.Text = "-" .. math.floor(damage)
+        text.Size = config.damageNumberSize
+        text.Color = config.damageNumberColor
+        text.Center = true
+        text.Outline = true
+        text.Font = 2
+        text.Position = Vector2.new(screenPos.X, screenPos.Y)
+        text.Visible = true
+        
+        table.insert(damageNumbers, text)
+        local startTime = tick()
+        local conn
+        conn = runService.RenderStepped:Connect(function()
+            local elapsed = tick() - startTime
+            if elapsed >= config.damageNumberDuration then
+                text:Remove()
+                conn:Disconnect()
+                for i, t in ipairs(damageNumbers) do if t == text then table.remove(damageNumbers, i); break end end
+            else
+                local offsetY = -elapsed * 30
+                text.Position = Vector2.new(screenPos.X, screenPos.Y + offsetY)
+                text.Transparency = elapsed / config.damageNumberDuration
+            end
+        end)
+    end
+
+    local hitChamsList = {}
+    local function addHitChams(part)
+        if not config.hitChamsEnabled then return end
+        if not part or not part.Parent then return end
+        
+        local originalColor = part.Color
+        local originalTransparency = part.Transparency
+        local originalMaterial = part.Material
+        
+        part.Color = config.hitChamsColor
+        part.Transparency = config.hitChamsTransparency
+        part.Material = Enum.Material.Neon
+        
+        local startTime = tick()
+        local conn
+        conn = runService.Heartbeat:Connect(function()
+            if tick() - startTime >= config.hitChamsDuration then
+                part.Color = originalColor
+                part.Transparency = originalTransparency
+                part.Material = originalMaterial
+                conn:Disconnect()
+                for i, p in ipairs(hitChamsList) do if p == part then table.remove(hitChamsList, i); break end end
+            end
+        end)
+        table.insert(hitChamsList, part)
+    end
+
+    local clones = {}
+    local function addBodyClone(character)
+        if not config.bodyCloneEnabled then return end
+        if not character or not character.Parent then return end
+        
+        local clone = character:Clone()
+        clone.Name = "HitClone"
+        for _, descendant in ipairs(clone:GetDescendants()) do
+            if descendant:IsA("BasePart") then
+                descendant.Transparency = config.bodyCloneTransparency
+                descendant.Material = Enum.Material.Neon
+                descendant.Color = config.hitChamsColor
+                descendant.CanCollide = false
+            elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
+                descendant.Transparency = 1
+            end
+        end
+        clone.Parent = workspace
+        
+        local startTime = tick()
+        local conn
+        conn = runService.Heartbeat:Connect(function()
+            if tick() - startTime >= config.bodyCloneDuration then
+                clone:Destroy()
+                conn:Disconnect()
+                for i, c in ipairs(clones) do if c == clone then table.remove(clones, i); break end end
+            end
+        end)
+        table.insert(clones, clone)
+    end
+
+    function onHit(sourcePlayer, targetPlayer, hitPart, damage, weaponName)
+        if hitPart then addDamageNumber(hitPart, damage) end
+        if hitPart then addHitChams(hitPart) end
+        if targetPlayer and targetPlayer.Character then
+            addBodyClone(targetPlayer.Character)
+        end
+        if sourcePlayer and sourcePlayer.Character then
+            local root = sourcePlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then addHitDirection(root.Position) end
+        end
+    end
+
+    -- Hook into the game's HitNotify remote
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    local hitRemote = replicatedStorage:FindFirstChild("Remotes")
+    if hitRemote then
+        hitRemote = hitRemote:FindFirstChild("Replication")
+        if hitRemote then
+            hitRemote = hitRemote:FindFirstChild("Fighter")
+            if hitRemote then
+                hitRemote = hitRemote:FindFirstChild("HitNotify")
+            end
+        end
+    end
+    
+    if hitRemote then
+        hitRemote.OnClientEvent:Connect(function(data)
+            -- data: table with keys utf8.char(0)=damage, utf8.char(2)=hitPart (Instance)
+            local damage = data[utf8.char(0)] or 0
+            local hitPart = data[utf8.char(2)]
+            local victim = nil
+            if typeof(hitPart) == "Instance" then
+                local char = hitPart:FindFirstAncestorOfClass("Model")
+                if char then
+                    victim = playersService:GetPlayerFromCharacter(char)
+                end
+            end
+            if victim and localPlayer ~= victim then
+                onHit(localPlayer, victim, hitPart, damage, "Weapon")
+            end
+        end)
+    else
+        warn("HitNotify remote not found. Enhanced visuals won't trigger automatically.")
+    end
+
+    -- Kill Feed: hook elimination display
+    pcall(function()
+        local EliminationsDisplay = require(localPlayer.PlayerScripts.Modules.EliminationsDisplay)
+        if EliminationsDisplay and EliminationsDisplay.NewElimination then
+            local oldNewElimination = EliminationsDisplay.NewElimination
+            EliminationsDisplay.NewElimination = function(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
+                oldNewElimination(self, eliminator, victim, timestamp, weaponslot, weaponname, ...)
+                addKillFeed(eliminator.Name, victim.Name, weaponname or "Unknown")
+            end
+        end
+    end)
+
+    -- UI Controls
+    local VisualModule = vape.Categories.Visual or vape.Categories.Render or vape.Categories.Utility
+    if VisualModule then
+        local CustomEffects = VisualModule:CreateModule({
+            Name = "Hit Effects",
+            Function = function(callback) end
+        })
+        
+        CustomEffects:CreateToggle({ Name = "Kill Feed", Default = config.killFeedEnabled, Function = function(v) config.killFeedEnabled = v end })
+        CustomEffects:CreateSlider({ Name = "Kill Feed Duration (s)", Min = 1, Max = 10, Default = config.killFeedDuration, Function = function(v) config.killFeedDuration = v end })
+        CustomEffects:CreateToggle({ Name = "Hit Direction Indicator", Default = config.hitDirectionEnabled, Function = function(v) config.hitDirectionEnabled = v end })
+        CustomEffects:CreateColorSlider({ Name = "Direction Color", Function = function(h,s,v) config.hitDirectionColor = Color3.fromHSV(h,s,v) end })
+        CustomEffects:CreateToggle({ Name = "Damage Numbers", Default = config.damageNumbersEnabled, Function = function(v) config.damageNumbersEnabled = v end })
+        CustomEffects:CreateSlider({ Name = "Damage Number Size", Min = 10, Max = 30, Default = config.damageNumberSize, Function = function(v) config.damageNumberSize = v end })
+        CustomEffects:CreateSlider({ Name = "Damage Number Duration (s)", Min = 0.5, Max = 2, Default = config.damageNumberDuration, Decimal = 10, Function = function(v) config.damageNumberDuration = v end })
+        CustomEffects:CreateToggle({ Name = "Hit Chams (Neon)", Default = config.hitChamsEnabled, Function = function(v) config.hitChamsEnabled = v end })
+        CustomEffects:CreateSlider({ Name = "Hit Chams Duration (s)", Min = 0.1, Max = 1, Default = config.hitChamsDuration, Decimal = 10, Function = function(v) config.hitChamsDuration = v end })
+        CustomEffects:CreateColorSlider({ Name = "Hit Chams Color", Function = function(h,s,v) config.hitChamsColor = Color3.fromHSV(h,s,v) end })
+        CustomEffects:CreateSlider({ Name = "Hit Chams Transparency", Min = 0, Max = 1, Default = config.hitChamsTransparency, Decimal = 10, Function = function(v) config.hitChamsTransparency = v end })
+        CustomEffects:CreateToggle({ Name = "Body Clone Highlight", Default = config.bodyCloneEnabled, Function = function(v) config.bodyCloneEnabled = v end })
+        CustomEffects:CreateSlider({ Name = "Body Clone Duration (s)", Min = 0.2, Max = 1, Default = config.bodyCloneDuration, Decimal = 10, Function = function(v) config.bodyCloneDuration = v end })
+        CustomEffects:CreateSlider({ Name = "Body Clone Transparency", Min = 0, Max = 1, Default = config.bodyCloneTransparency, Decimal = 10, Function = function(v) config.bodyCloneTransparency = v end })
+    end
+
+    -- Cleanup
+    vape:Clean(function()
+        if killFeedContainer then killFeedContainer:Destroy() end
+        for _, arrow in ipairs(hitDirectionArrows) do arrow:Remove() end
+        for _, text in ipairs(damageNumbers) do text:Remove() end
+        for _, part in ipairs(hitChamsList) do
+            if part and part.Parent then
+                part.Color = Color3.fromRGB(255,255,255)
+                part.Transparency = 0
+                part.Material = Enum.Material.Plastic
+            end
+        end
+        for _, clone in ipairs(clones) do clone:Destroy() end
+    end)
+end)
+
 entitylib.start()
-print("Rawr.xyz V4.3.0")
+print("Rawr.xyz V4.4.0")
