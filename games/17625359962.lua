@@ -3134,4 +3134,4 @@ run(function()
 end)
 
 entitylib.start()
-print("Rawr.xyz V4.4.0")
+print("Rawr.xyz V4.5.1")
