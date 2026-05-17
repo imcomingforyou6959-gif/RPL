@@ -26,7 +26,7 @@ local function downloadFile(path, func)
 		writefile(path, res)
 	end
 	return (func or readfile)(path)
-end
+end -- 
 
 vape.Place = 11630038968
 if isfile('newvape/games/'..vape.Place..'.lua') then
