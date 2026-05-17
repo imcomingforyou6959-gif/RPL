@@ -409,7 +409,7 @@ run(function()
 
     local customColorsEnabled = false
     local showTracersEnabled = true
-    local lifetimeMultiplier = 1
+    local tracerLifetime = 1  -- in seconds
 
     local function createColoredTracer(startPos, endPos, color, sizeThickness, duration, hasLight)
         if not startPos or not endPos or not color then return end
@@ -445,15 +445,15 @@ run(function()
     end
 
     local function customCreateTaser(startPos, endPos)
-        createColoredTracer(startPos, endPos, taserColor, 0.2, 2 * lifetimeMultiplier, true)
+        createColoredTracer(startPos, endPos, taserColor, 0.2, tracerLifetime, true)
     end
 
     local function customCreateSniper(startPos, endPos)
-        createColoredTracer(startPos, endPos, sniperColor, 0.17, 4 * lifetimeMultiplier, false)
+        createColoredTracer(startPos, endPos, sniperColor, 0.17, tracerLifetime, false)
     end
 
     local function customCreateBullet(startPos, endPos)
-        createColoredTracer(startPos, endPos, bulletColor, 0.1, 0.05 * lifetimeMultiplier, false)
+        createColoredTracer(startPos, endPos, bulletColor, 0.1, tracerLifetime, false)
     end
 
     local function emptyTracer() end
@@ -500,13 +500,13 @@ run(function()
     })
 
     TracerVisuals:CreateSlider({
-        Name = "Lifetime Multiplier",
-        Min = 0.5,
-        Max = 5,
+        Name = "Lifetime (seconds)",
+        Min = 0.1,
+        Max = 10,
         Default = 1,
         Decimal = 10,
         Function = function(val)
-            lifetimeMultiplier = val
+            tracerLifetime = val
         end
     })
 
