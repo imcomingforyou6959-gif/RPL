@@ -35,6 +35,10 @@ if checkBlacklist() then
     while true do task.wait(10) end
 end
 
+repeat task.wait() until lplr and lplr.PlayerGui:FindFirstChild("Home") and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+repeat task.wait() until replicatedStorageService:FindFirstChild("Remotes") and replicatedStorageService.Remotes:FindFirstChild("RequestTeamChange")
+task.wait(0.5)
+
 local cloneref = cloneref or function(obj) return obj end
 
 local playersService = cloneref(game:GetService('Players'))
