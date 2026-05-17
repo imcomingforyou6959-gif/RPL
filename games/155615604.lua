@@ -1059,18 +1059,20 @@ run(function()
     local Method
     local mouseClicked = false
     local renderStepConnection
+    local watchdogConnection
 
     local function tryShoot(origin, targetPart, tool)
-        if not tool or not targetPart or not targetPart.Position then return end
+        if not tool or not targetPart or not targetPart.Parent then return end
         local ammo = tool:GetAttribute("Local_CurrentAmmo")
         if not ammo or ammo <= 0 then return end
         local reloadSession = tool:GetAttribute("Local_ReloadSession")
         if reloadSession and reloadSession > 0 then return end
 
-        tool:SetAttribute("Local_IsShooting", true)
         local projectileCount = tool:GetAttribute("ProjectileCount") or 1
         local hits = {}
         local lastBehavior
+        tool:SetAttribute("Local_IsShooting", true)
+
         for _ = 1, projectileCount do
             local muzzle = (tool:FindFirstChild("muzzle") and tool.muzzle.Position) or origin
             lastBehavior = tool:GetAttribute("Behavior")
@@ -1166,89 +1168,115 @@ run(function()
         Function = function(callback)
             if CircleObject then CircleObject.Visible = callback and Mode and Mode.Value == 'Mouse' end
             if callback then
+                if renderStepConnection then renderStepConnection:Disconnect() end
                 renderStepConnection = runService.RenderStepped:Connect(function()
-                    if not entitylib or not entitylib.isAlive then return end
-                    local character = entitylib.character and entitylib.character.Character
-                    local head = entitylib.character and entitylib.character.Head
-                    if not head or not character then return end
+                    pcall(function()
+                        if not entitylib or not entitylib.isAlive then return end
+                        local character = entitylib.character and entitylib.character.Character
+                        local head = entitylib.character and entitylib.character.Head
+                        if not head or not character then
+                            task.wait(0.05)
+                            return
+                        end
 
-                    local origin = head.CFrame
-                    local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
-                        Range = Range and Range.Value or 150,
-                        Wallcheck = Target and Target.Walls and Target.Walls.Enabled or nil,
-                        Part = 'Head',
-                        Origin = origin.Position,
-                        Players = Target and Target.Players and Target.Players.Enabled,
-                        NPCs = Target and Target.NPCs and Target.NPCs.Enabled
-                    })
+                        local origin = head.CFrame
+                        local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
+                            Range = Range and Range.Value or 150,
+                            Wallcheck = Target and Target.Walls and Target.Walls.Enabled or nil,
+                            Part = 'Head',
+                            Origin = origin.Position,
+                            Players = Target and Target.Players and Target.Players.Enabled,
+                            NPCs = Target and Target.NPCs and Target.NPCs.Enabled
+                        })
 
-                    if ent and ent.Player and not passesTeamCheckSA(ent.Player) then
-                        ent = nil
-                    end
+                        if ent and ent.Player and not passesTeamCheckSA(ent.Player) then
+                            ent = nil
+                        end
 
-                    if ShowTarget and ShowTarget.Enabled and ent and targetinfo then
-                        targetinfo.Targets[ent] = tick() + 1
-                    end
+                        if ShowTarget and ShowTarget.Enabled and ent and targetinfo then
+                            targetinfo.Targets[ent] = tick() + 1
+                        end
 
-                    if CircleObject then
-                        CircleObject.Position = inputService:GetMouseLocation()
-                    end
+                        if CircleObject then
+                            CircleObject.Position = inputService:GetMouseLocation()
+                        end
 
-                    if AutoFire and AutoFire.Enabled then
-                        local mouseDown = mouse1click()
-                        local windowActive = (isrbxactive or iswindowactive)()
-                        if mouseDown and windowActive then
-                            if ent and canClick() then
-                                if Method and Method.Value == 'Click' then
-                                    if delayCheck < tick() then
-                                        if mouseClicked then
-                                            mouse1release()
-                                            mouseClicked = false
-                                            delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
-                                        else
-                                            mouse1press()
-                                            mouseClicked = true
-                                            delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
+                        if AutoFire and AutoFire.Enabled then
+                            local mouseDown = mouse1click()
+                            local windowActive = (isrbxactive or iswindowactive)()
+                            if mouseDown and windowActive then
+                                if ent and canClick() then
+                                    if Method and Method.Value == 'Click' then
+                                        if delayCheck < tick() then
+                                            if mouseClicked then
+                                                mouse1release()
+                                                mouseClicked = false
+                                                delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
+                                            else
+                                                mouse1press()
+                                                mouseClicked = true
+                                                delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
+                                            end
                                         end
-                                    end
-                                else
-                                    if delayCheck < tick() then
-                                        delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
-                                        local tool = character:FindFirstChildOfClass("Tool")
-                                        if tool and ent.Head then
-                                            tryShoot(origin.Position, ent.Head, tool)
+                                    else
+                                        if delayCheck < tick() then
+                                            delayCheck = tick() + (AutoFireShootDelay and AutoFireShootDelay.Value or 0)
+                                            local tool = character:FindFirstChildOfClass("Tool")
+                                            if tool and ent.Head and ent.Head.Parent then
+                                                tryShoot(origin.Position, ent.Head, tool)
+                                            end
                                         end
                                     end
                                 end
-                            end
-                        else
-                            if mouseClicked then
-                                mouse1release()
-                                mouseClicked = false
+                            else
+                                if mouseClicked then
+                                    mouse1release()
+                                    mouseClicked = false
+                                end
                             end
                         end
-                    end
 
-                    if Face and Face.Enabled and ent then
-                        local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
-                        if rootPart and entitylib.character and entitylib.character.RootPart then
-                            local vec = rootPart.Position * Vector3.new(1,0,1)
-                            entitylib.character.RootPart.CFrame = CFrame.lookAt(
-                                entitylib.character.RootPart.Position,
-                                Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
-                            )
+                        if Face and Face.Enabled and ent then
+                            local rootPart = ent.Character and ent.Character:FindFirstChild("HumanoidRootPart")
+                            if rootPart and entitylib.character and entitylib.character.RootPart then
+                                local vec = rootPart.Position * Vector3.new(1,0,1)
+                                entitylib.character.RootPart.CFrame = CFrame.lookAt(
+                                    entitylib.character.RootPart.Position,
+                                    Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
+                                )
+                            end
                         end
-                    end
 
-                    if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
-                        t.bt.m = true
-                        t.bt.p = ent.HumanoidRootPart.Position
+                        if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
+                            t.bt.m = true
+                            t.bt.p = ent.HumanoidRootPart.Position
+                        end
+                    end)
+                end)
+
+                if watchdogConnection then watchdogConnection:Disconnect() end
+                watchdogConnection = runService.Heartbeat:Connect(function()
+                    if SilentAim and SilentAim.Enabled then
+                        if not renderStepConnection or not renderStepConnection.Connected then
+                            if renderStepConnection then
+                                pcall(function() renderStepConnection:Disconnect() end)
+                            end
+                            renderStepConnection = runService.RenderStepped:Connect(function()
+                                SilentAim:Toggle()
+                                task.wait(0.1)
+                                SilentAim:Toggle()
+                            end)
+                        end
                     end
                 end)
             else
                 if renderStepConnection then
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
+                end
+                if watchdogConnection then
+                    watchdogConnection:Disconnect()
+                    watchdogConnection = nil
                 end
                 if mouseClicked then
                     mouse1release()
@@ -1338,98 +1366,6 @@ run(function()
     })
     Face = SilentAim:CreateToggle({ Name = 'Face target' })
     ShowTarget = SilentAim:CreateToggle({ Name = "Show Target Info" })
-end)
-
-run(function()
-    local Pitch
-    local Original = CFrame.new()
-
-    Pitch = vape.Categories.Blatant:CreateModule({
-        Name = 'Head Pitch Spinbot (Client)',
-        Function = function(callback)
-            if callback then
-                if entitylib and entitylib.character and entitylib.character.Character then
-                    local character = entitylib.character.Character
-                    local torso = character:FindFirstChild("Torso")
-                    local neck = torso and torso:FindFirstChild("Neck")
-                    if neck then
-                        Original = neck.C1
-                        Pitch:Clean(runService.PreSimulation:Connect(function()
-                            if entitylib and entitylib.isAlive then
-                                local char = entitylib.character.Character
-                                local t = char and char:FindFirstChild("Torso")
-                                local n = t and t:FindFirstChild("Neck")
-                                if n then
-                                    n.C1 = n.C1 * CFrame.Angles(math.rad(145), 0, 0)
-                                end
-                            end
-                        end))
-                    end
-                end
-            else
-                if entitylib and entitylib.isAlive then
-                    local character = entitylib.character.Character
-                    local torso = character and character:FindFirstChild("Torso")
-                    local neck = torso and torso:FindFirstChild("Neck")
-                    if neck then
-                        neck.C1 = Original
-                    end
-                end
-            end
-        end
-    })
-end)
-
-run(function()
-    vape.Categories.Combat:CreateModule({
-        Name = "HitNotifications",
-        Function = function(callback) t.hn.e = callback end
-    })
-end)
-
-run(function()
-    local GunMods
-    local Range
-    local SpreadRadius
-    local FireRate
-
-    local function itemAdded(v)
-        if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
-            v:SetAttribute("Range", Range and Range.Value)
-            v:SetAttribute("AccurateRange", Range and Range.Value)
-            v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
-            v:SetAttribute("FireRate", FireRate and FireRate.Value)
-        end
-    end
-
-    local function characterAdded(char)
-        if not char then return end
-        local character = char.Character
-        if character then
-            GunMods:Clean(character.ChildAdded:Connect(itemAdded))
-            local children = character:GetChildren()
-            for i = 1, #children do itemAdded(children[i]) end
-        end
-        local backpack = lplr and lplr.Backpack
-        if backpack then
-            GunMods:Clean(backpack.ChildAdded:Connect(itemAdded))
-            local children = backpack:GetChildren()
-            for i = 1, #children do itemAdded(children[i]) end
-        end
-    end
-
-    GunMods = vape.Categories.Combat:CreateModule({
-        Name = "GunMods",
-        Function = function(callback)
-            if callback then
-                if entitylib and entitylib.character then characterAdded(entitylib.character) end
-                GunMods:Clean(entitylib.Events.LocalAdded:Connect(characterAdded))
-            end
-        end
-    })
-    Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
-    SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
-    FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
 end)
 
 run(function()
@@ -2087,7 +2023,7 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.6")
+print("Hello, V4.9.7")
 
 --⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀
 --⠀⠀⠀⠀⢀⡴⣆⠀⠀⠀⠀⠀⣠⡀⠀⠀⠀⠀⠀⠀⣼⣿⡗⠀⠀⠀⠀
