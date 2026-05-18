@@ -1240,18 +1240,13 @@ run(function()
 
         local originalHits = args[1]
         if SilentAim and SilentAim.Enabled then
-            local newHits = {}
             for _, hit in ipairs(originalHits) do
-                local newHit = {}
-                for k, v in pairs(hit) do
-                    newHit[k] = v
+                if typeof(hit) == "table" then
+                    hit[1] = origin                -- origin position
+                    hit[2] = targetPart.Position   -- target position
+                    hit[3] = targetPart            -- target part
                 end
-                newHit[1] = origin
-                newHit[2] = targetPart.Position
-                newHit[3] = targetPart
-                table.insert(newHits, newHit)
             end
-            args[1] = newHits
 
             pcall(function()
                 if t.hn.e and targetPart.Parent then
