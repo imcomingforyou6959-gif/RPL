@@ -13,29 +13,48 @@ local run = function(func, issue)
 end
 
 local blacklistUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
-local function checkBlacklist()
+local function fetchBlacklist()
     local httpService = game:GetService("HttpService")
     local success, result = pcall(function()
         return game:HttpGet(blacklistUrl)
     end)
-    if not success then return false end
+    if not success then return nil end
     local ok, data = pcall(httpService.JSONDecode, httpService, result)
-    if not (ok and data and type(data.BlacklistedUsers) == "table") then return false end
-    local userId = game.Players.LocalPlayer.UserId
-    if data.BlacklistedUsers[tostring(userId)] or data.BlacklistedUsers[userId] then
-        pcall(function()
-            game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted. All Appeals Must be Sent in https://discord.gg/RJj7vrNwBy")
-        end)
-        return true
+    if ok and data and type(data.BlacklistedUsers) == "table" then
+        return data.BlacklistedUsers
     end
-    return false
+    return nil
 end
 
-if checkBlacklist() then
+local function isBlacklisted(blacklistTable)
+    local userId = game.Players.LocalPlayer.UserId
+    return blacklistTable and (blacklistTable[tostring(userId)] or blacklistTable[userId])
+end
+
+local blacklist = fetchBlacklist()
+if blacklist and isBlacklisted(blacklist) then
+    pcall(function()
+        game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted. All Appeals Must be Sent in https://discord.gg/RJj7vrNwBy")
+    end)
     task.wait(2)
     if vape then vape:Uninject() end
     return true
 end
+
+task.spawn(function()
+    while true do
+        task.wait(30)
+        local blist = fetchBlacklist()
+        if isBlacklisted(blist) then
+            pcall(function()
+                game.Players.LocalPlayer:Kick("Rawr.xyz | You have been blacklisted. All Appeals Must be Sent in https://discord.gg/RJj7vrNwBy")
+            end)
+            task.wait(2)
+            if vape then vape:Uninject() end
+            break
+        end
+    end
+end)
 
 local startWait = tick()
 repeat
