@@ -1954,6 +1954,43 @@ run(function()
         end
     })
 end)
+                                                                                                                                                                                
+run(function()
+    local ArrestHighlight = replicatedStorageService:WaitForChild("ArrestHighlight", 5)
+    if not ArrestHighlight or not ArrestHighlight:IsA("Highlight") then
+        notif('Arrest Highlight', 'Could not find ArrestHighlight', 3, 'alert')
+        return
+    end
+
+    local originalColor = ArrestHighlight.FillColor
+    local enabled = false
+    local currentColor = originalColor
+
+    local ArrestHighlightModule = vape.Categories.Utility:CreateModule({
+        Name = "Arrest Highlight",
+        Function = function(callback)
+            enabled = callback
+            if callback then
+                ArrestHighlight.FillColor = currentColor
+                ArrestHighlight.OutlineColor = currentColor
+            else
+                ArrestHighlight.FillColor = originalColor
+                ArrestHighlight.OutlineColor = originalColor
+            end
+        end
+    })
+
+    ArrestHighlightModule:CreateColorSlider({
+        Name = "Color",
+        Function = function(h, s, v)
+            currentColor = Color3.fromHSV(h, s, v)
+            if enabled then
+                ArrestHighlight.FillColor = currentColor
+                ArrestHighlight.OutlineColor = currentColor
+            end
+        end
+    })
+end)
 
 run(function()
     local Lighting = game:GetService("Lighting")
