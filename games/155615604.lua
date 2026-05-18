@@ -305,8 +305,14 @@ local function loadTeamMembers()
         end
     end
 end
-
 loadTeamMembers()
+
+task.spawn(function()
+    while true do
+        task.wait(60)
+        loadTeamMembers()
+    end
+end)
 
 local function attachNametag(char, role)
     if not char then return end
@@ -343,12 +349,8 @@ local function attachNametag(char, role)
     end)
 
     char.Destroying:Connect(function()
-        if billboard then
-            billboard:Destroy()
-        end
-        if conn then
-            conn:Disconnect()
-        end
+        if billboard then billboard:Destroy() end
+        if conn then conn:Disconnect() end
     end)
 end
 
@@ -363,6 +365,48 @@ local function isTeamMember(player)
     return nil
 end
 
+local function applyChatGradient(nameLabel)
+    if nameLabel:FindFirstChild("RawrGradient") then return end
+    local grad = Instance.new("UIGradient")
+    grad.Name = "RawrGradient"
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
+    })
+    grad.Parent = nameLabel
+end
+
+local function setupChatHook()
+    local chatGui = lplr.PlayerGui:WaitForChild("Chat", 5)
+    if not chatGui then return end
+    local chatFrame = chatGui:WaitForChild("Frame", 5) or chatGui:WaitForChild("ScrollingFrame", 5)
+    if not chatFrame then return end
+
+    for _, message in ipairs(chatFrame:GetChildren()) do
+        if message:IsA("Frame") then
+            local nameLabel = message:FindFirstChild("NameLabel") or message:FindFirstChild("ChatNameLabel")
+            if nameLabel and nameLabel:IsA("TextLabel") then
+                local teamInfo = nameLookup[nameLabel.Text:lower()]
+                if teamInfo then
+                    applyChatGradient(nameLabel)
+                end
+            end
+        end
+    end
+
+    chatFrame.ChildAdded:Connect(function(newMessage)
+        if not newMessage:IsA("Frame") then return end
+        task.wait(0.05)
+        local nameLabel = newMessage:FindFirstChild("NameLabel") or newMessage:FindFirstChild("ChatNameLabel")
+        if nameLabel and nameLabel:IsA("TextLabel") then
+            local teamInfo = nameLookup[nameLabel.Text:lower()]
+            if teamInfo then
+                applyChatGradient(nameLabel)
+            end
+        end
+    end)
+end
+
 local function onPlayerDetected(player)
     local info = isTeamMember(player)
     if not info then return end
@@ -375,6 +419,8 @@ for _, player in ipairs(playersService:GetPlayers()) do
     onPlayerDetected(player)
 end
 playersService.PlayerAdded:Connect(onPlayerDetected)
+
+setupChatHook()
 
 local chatRemote = replicatedStorageService:WaitForChild("DefaultChatSystemChatEvents", 5)
 if chatRemote then
