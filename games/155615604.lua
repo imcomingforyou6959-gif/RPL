@@ -279,7 +279,11 @@ run(function()
             end
         end
 
-        return old(self, unpack(args))
+        if #args > 0 then
+            return old(self, table.unpack(args))
+        else
+            return old(self, ...)
+        end
     end)
 
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
