@@ -2028,27 +2028,63 @@ run(function()
 end)
                                                                                                                                                                                 
 run(function()
-    local ArrestHighlight = replicatedStorageService:WaitForChild("ArrestHighlight", 5)
-    if not ArrestHighlight or not ArrestHighlight:IsA("Highlight") then
-        notif('Arrest Highlight', 'Could not find ArrestHighlight', 3, 'alert')
-        return
+    local ArrestHighlight = replicatedStorageService:FindFirstChild("ArrestHighlight")
+    local originalColor = nil
+    local enabled = false
+    local currentColor = Color3.fromRGB(255, 255, 255)
+    local highlightConn = nil
+
+    local function applyColor()
+        if not ArrestHighlight or not ArrestHighlight:IsA("Highlight") then return end
+        if enabled then
+            ArrestHighlight.FillColor = currentColor
+            ArrestHighlight.OutlineColor = currentColor
+        elseif originalColor then
+            ArrestHighlight.FillColor = originalColor
+            ArrestHighlight.OutlineColor = originalColor
+        end
     end
 
-    local originalColor = ArrestHighlight.FillColor
-    local enabled = false
-    local currentColor = originalColor
+    local function onHighlightAppeared(hl)
+        if hl and hl:IsA("Highlight") and hl.Name == "ArrestHighlight" then
+            ArrestHighlight = hl
+            if not originalColor then
+                originalColor = hl.FillColor
+            end
+            applyColor()
+            hl.Destroying:Connect(function()
+                ArrestHighlight = nil
+                if highlightConn then
+                    highlightConn:Disconnect()
+                    highlightConn = nil
+                end
+                highlightConn = replicatedStorageService.ChildAdded:Connect(function(child)
+                    if child.Name == "ArrestHighlight" and child:IsA("Highlight") then
+                        onHighlightAppeared(child)
+                        if highlightConn then highlightConn:Disconnect() end
+                    end
+                end)
+            end)
+        end
+    end
+
+    if ArrestHighlight then
+        onHighlightAppeared(ArrestHighlight)
+    else
+        highlightConn = replicatedStorageService.ChildAdded:Connect(function(child)
+            if child.Name == "ArrestHighlight" and child:IsA("Highlight") then
+                onHighlightAppeared(child)
+                highlightConn:Disconnect()
+                highlightConn = nil
+            end
+        end)
+    end
 
     local ArrestHighlightModule = vape.Categories.Utility:CreateModule({
         Name = "Arrest Highlight",
         Function = function(callback)
             enabled = callback
-            if callback then
-                ArrestHighlight.FillColor = currentColor
-                ArrestHighlight.OutlineColor = currentColor
-            else
-                ArrestHighlight.FillColor = originalColor
-                ArrestHighlight.OutlineColor = originalColor
-            end
+            applyColor()
         end
     })
 
@@ -2057,11 +2093,18 @@ run(function()
         Function = function(h, s, v)
             currentColor = Color3.fromHSV(h, s, v)
             if enabled then
-                ArrestHighlight.FillColor = currentColor
-                ArrestHighlight.OutlineColor = currentColor
+                applyColor()
             end
         end
     })
+
+    vape:Clean(function()
+        if ArrestHighlight and ArrestHighlight:IsA("Highlight") and originalColor then
+            ArrestHighlight.FillColor = originalColor
+            ArrestHighlight.OutlineColor = originalColor
+        end
+        if highlightConn then highlightConn:Disconnect() end
+    end)
 end)
 
 run(function()
