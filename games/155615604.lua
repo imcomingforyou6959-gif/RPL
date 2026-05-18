@@ -258,7 +258,8 @@ run(function()
     local old
 
     old = hookmetamethod(game, '__namecall', function(self, ...)
-        if getnamecallmethod() ~= "FireServer" or self ~= ShootEvent then
+        local method = getnamecallmethod()
+        if method ~= "FireServer" or self ~= ShootEvent then
             return old(self, ...)
         end
         if checkcaller() then return old(self, ...) end
@@ -267,23 +268,18 @@ run(function()
         if typeof(args[1]) == "table" then
             if t.sa and t.sa.redirect then
                 t.sa.redirect(args)
-            else
-                if t.hn.e then
-                    for _, v in ipairs(args[1]) do
-                        local part = v[3]
-                        if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
-                            notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
-                        end
+            end
+            if t.hn.e then
+                for _, hit in ipairs(args[1]) do
+                    local part = hit[3]
+                    if typeof(part) == "Instance" and part.Parent and part.Parent:FindFirstChild("Humanoid") then
+                        notif('Rawr.xyz', 'hit ' .. part.Parent.Name .. "'s " .. part.Name, 3)
                     end
                 end
             end
         end
 
-        if #args > 0 then
-            return old(self, table.unpack(args))
-        else
-            return old(self, ...)
-        end
+        return old(self, args[1])
     end)
 
     vape:Clean(function() hookmetamethod(game, "__namecall", old) end)
