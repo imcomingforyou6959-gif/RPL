@@ -1689,7 +1689,7 @@ run(function()
             local selfpos = rootPart.Position
             local localfacing = rootPart.CFrame.LookVector * Vector3.new(1,0,1)
 
-            local plrs = entitylib.AllPositions({
+            local plrs = entitylib.AllTargets({
                 Range = AttackRange and AttackRange.Value or 13,
                 Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
                 Part = 'RootPart',
@@ -1698,7 +1698,7 @@ run(function()
                 Limit = Max and Max.Value or 10
             })
 
-            if not plrs then return end
+            if not plrs or #plrs == 0 then return end
 
             for i = 1, #plrs do
                 local v = plrs[i]
@@ -1715,7 +1715,7 @@ run(function()
                                 local distMag = delta.Magnitude
                                 table.insert(attacked, {
                                     Entity = v,
-                                    Check = distMag > (AttackRange and AttackRange.Value or 13) and BoxSwingColor or BoxAttackColor
+                                    Check = distMag <= (AttackRange and AttackRange.Value or 13) and BoxAttackColor or BoxSwingColor
                                 })
                                 if targetinfo then targetinfo.Targets[v] = tick() + 1 end
 
@@ -1772,7 +1772,7 @@ run(function()
                     )
                 end
             end
-        end) -- pcall
+        end)
     end
 
     Killaura = vape.Categories.Blatant:CreateModule({
@@ -1889,6 +1889,18 @@ run(function()
     ParticleColor2 = Killaura:CreateColorSlider({ Name='Color End', Function=function(h,s,v) for _,part in pairs(Particles) do part.ParticleEmitter.Color = ColorSequence.new{ ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)), ColorSequenceKeypoint.new(1, Color3.fromHSV(h,s,v)) } end end, Darker=true, Visible=false })
     ParticleSize = Killaura:CreateSlider({ Name='Size', Min=0, Max=1, Default=0.2, Decimal=100, Function=function(val) for _,v in pairs(Particles) do v.ParticleEmitter.Size = NumberSequence.new(val) end end, Darker=true, Visible=false })
     Face = Killaura:CreateToggle({ Name='Face target' })
+
+    vape:Clean(function()
+        if renderStepConnection then renderStepConnection:Disconnect() end
+        if Boxes then
+            for _, v in pairs(Boxes) do v:Destroy() end
+            table.clear(Boxes)
+        end
+        if Particles then
+            for _, v in pairs(Particles) do v:Destroy() end
+            table.clear(Particles)
+        end
+    end)
 end)
 
 run(function()
