@@ -149,7 +149,9 @@ end
 
 for _, v in {
     'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
-    'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot'
+    'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot',
+    'KillAura', 'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
+    'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest'
 } do vape:Remove(v) end
 
 local t = {
