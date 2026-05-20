@@ -5053,8 +5053,9 @@ run(function()
         Function = function(callback)
             if callback then
                 if not hasRakNet() then
-                    notif('Desync', 'Your executor does not support RakNet. This module requires RakNet.', 5, 'alert')
-                    Desync:Toggle()
+                    warn("rawr.xyz says RakNet is NOT available! Turn on RakNet in your executor.")
+                    notif('Desync', 'RakNet is not available. Turn on RakNet in your executor.', 5, 'alert')
+                    task.defer(function() Desync:Toggle() end)
                     return
                 end
 
@@ -5098,23 +5099,29 @@ run(function()
         Function = function(callback)
             if callback then
                 if not hasRakNet() then
-                    notif('StateSpoofer', 'Your executor does not support RakNet. This module requires RakNet.', 5, 'alert')
-                    StateSpoofer:Toggle()
+                    warn("RAWR.XYZ - StateSpoofer: RakNet is NOT available! Turn on RakNet in your executor.")
+                    notif('StateSpoofer', 'This Module Requires Raknet.', 5, 'alert')
+                    task.defer(function() StateSpoofer:Toggle() end)
                     return
                 end
 
                 if not State or not State.Value then
                     notif('StateSpoofer', 'Please select a state first.', 3, 'alert')
-                    StateSpoofer:Toggle()
+                    task.defer(function() StateSpoofer:Toggle() end)
                     return
                 end
 
                 hook = function(packet)
-                    if packet.AsArray[1] == 0x1b then
-                        local data = packet.AsBuffer
-                        buffer.writeu8(data, 25, Enum.HumanoidStateType[State.Value].Value + 32)
-                        packet:SetData(data)
-                    end
+                    pcall(function()
+                        if not packet or not packet.AsArray or not packet.AsArray[1] then return end
+                        if packet.AsArray[1] == 0x1b then
+                            local data = packet.AsBuffer
+                            if data and buffer and buffer.writeu8 then
+                                buffer.writeu8(data, 25, Enum.HumanoidStateType[State.Value].Value + 32)
+                                packet:SetData(data)
+                            end
+                        end
+                    end)
                 end
 
                 raknet.add_send_hook(hook)
