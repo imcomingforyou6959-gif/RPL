@@ -4999,6 +4999,117 @@ run(function()
 	})
 	
 end)
+
+run(function()
+	local Jesus
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	
+	Jesus = vape.Categories.Blatant:CreateModule({
+		Name = 'Jesus',
+		Function = function(callback)
+			if callback then
+				local terrain = workspace:FindFirstChildWhichIsA('Terrain')
+				params.FilterDescendantsInstances = {terrain}
+				local Platform = Instance.new('Part')
+				Platform.CanQuery = false
+				Platform.Anchored = true
+				Platform.Size = Vector3.one
+				Platform.Transparency = 1
+				Platform.Parent = gameCamera
+	
+				Jesus:Clean(Platform)
+				Jesus:Clean(runService.PreSimulation:Connect(function()
+					if entitylib.isAlive then
+						local root = entitylib.character.RootPart
+						local ray = workspace:Raycast(root.Position, Vector3.new(0, -((root.Size.Y / 2) + entitylib.character.HipHeight + math.abs(root.AssemblyLinearVelocity.Y * 0.032)), 0), params)
+	
+						if ray and ray.Material == Enum.Material.Water then
+							Platform.CFrame = CFrame.new(ray.Position)
+						else
+							Platform.CFrame = CFrame.new(10000, 10000, 10000)
+						end
+					end
+				end))
+			end
+		end,
+		Tooltip = 'Allow you to stand on terrain water'
+	})
+end)
+
+run(function()
+	local Desync
+	local hook
+	
+	Desync = vape.Categories.Blatant:CreateModule({
+		Name = 'Desync',
+		Function = function(callback)
+			if callback then
+				if not rakNetCheck('Desync') then
+					Desync:Toggle()
+					return
+				end
+	
+				hook = function(packet)
+					if packet.AsArray[1] == 0x1b then
+						local data = packet.AsBuffer
+						buffer.writeu32(data, 1, 0xFFFFFFFF)
+						packet:SetData(data)
+					end
+				end
+	
+				raknet.add_send_hook(hook)
+			elseif hook then
+				raknet.remove_send_hook(hook)
+				hook = nil
+			end
+		end,
+		Tooltip = 'Prevent the server from replicating your current position to other players.'
+	})
+end)
+
+run(function()
+	local StateSpoofer
+	local State
+	local hook
+	
+	StateSpoofer = vape.Categories.Utility:CreateModule({
+		Name = 'StateSpoofer',
+		Function = function(callback)
+			if callback then
+				if not rakNetCheck('StateSpoofer') then
+					StateSpoofer:Toggle()
+					return
+				end
+	
+				hook = function(packet)
+					if packet.AsArray[1] == 0x1b then
+						local data = packet.AsBuffer
+						buffer.writeu8(data, 25, Enum.HumanoidStateType[State.Value].Value + 32)
+						packet:SetData(data)
+					end
+				end
+	
+				raknet.add_send_hook(hook)
+			elseif hook then
+				raknet.remove_send_hook(hook)
+				hook = nil
+			end
+		end,
+		Tooltip = 'Spoof humanoid states on the server.'
+	})
+	local states = {}
+	for _, v in Enum.HumanoidStateType:GetEnumItems() do
+		if v.Name ~= 'None' then
+			table.insert(states, v.Name)
+		end
+	end
+	State = StateSpoofer:CreateDropdown({
+		Name = 'Humanoid State',
+		List = states
+	})
+end)
+
 	
 run(function()
 	local Radar
@@ -5965,143 +6076,87 @@ run(function()
 end)
 	
 run(function()
-    local ChatSpammer
-    local Lines
-    local Mode
-    local Delay
-    local Hide
-    local hideConnections = {}
-
-    local function ensureDefaultLine()
-        if Lines and type(Lines.ListEnabled) == "table" and #Lines.ListEnabled == 0 then
-            if Lines.Add then
-                Lines:Add("love sent from rawr <3")
-            else
-                table.insert(Lines.ListEnabled, "love sent from rawr <3")
-            end
-        end
-    end
-
-    ChatSpammer = vape.Categories.Utility:CreateModule({
-        Name = 'ChatSpammer',
-        Function = function(callback)
-            if callback then
-                ensureDefaultLine()
-
-                local lines = Lines and Lines.ListEnabled
-                if not lines or #lines == 0 then
-                    notif('ChatSpammer', 'No lines to spam!', 2, 'alert')
-                    ChatSpammer:Toggle()
-                    return
-                end
-
-                if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                    if Hide and Hide.Enabled then
-                        local exp = coreGui:FindFirstChild('ExperienceChat')
-                        if exp then
-                            local scrollView = exp:FindFirstChild('RCTScrollContentView', true)
-                            if scrollView then
-                                local conn = scrollView.ChildAdded:Connect(function(msg)
-                                    if typeof(msg) == "Instance" and msg.Name:sub(1,2) == '0-' and msg.ContentText == 'You must wait before sending another message.' then
-                                        msg.Visible = false
-                                    end
-                                end)
-                                table.insert(hideConnections, conn)
-                            end
-                        end
-                    end
-
-                elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
-                    if Hide and Hide.Enabled then
-                        local event = replicatedStorage.DefaultChatSystemChatEvents.OnNewSystemMessage.OnClientEvent
-                        for _, conn in ipairs(getconnections(event)) do
-                            if conn.Function then
-                                local oldFunc = conn.Function
-                                local newFunc = function(data, ...)
-                                    if data.Message and data.Message:find('ChatFloodDetector') then return end
-                                    return oldFunc(data, ...)
-                                end
-                                conn.Function = newFunc
-                                table.insert(hideConnections, {conn = conn, oldFunc = oldFunc})
-                                break
-                            end
-                        end
-                    end
-                else
-                    notif('ChatSpammer', 'Unsupported chat system', 5, 'warning')
-                    ChatSpammer:Toggle()
-                    return
-                end
-
-                local ind = 1
-                task.spawn(function()
-                    while ChatSpammer.Enabled do
-                        local message
-                        if Mode and Mode.Value == 'Order' then
-                            message = lines[ind] or lines[1]
-                            ind = (ind % #lines) + 1
-                        else
-                            message = lines[math.random(1, #lines)]
-                        end
-
-                        if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                            textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
-                        else
-                            replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
-                        end
-
-                        task.wait(Delay and Delay.Value or 1)
-                    end
-                end)
-
-            else
-                for _, item in ipairs(hideConnections) do
-                    pcall(function()
-                        if type(item) == "table" and item.conn and item.oldFunc then
-                            item.conn.Function = item.oldFunc
-                        else
-                            item:Disconnect()
-                        end
-                    end)
-                end
-                table.clear(hideConnections)
-            end
-        end,
-        Tooltip = 'Automatically types messages in chat'
-    })
-
-    Lines = ChatSpammer:CreateTextList({Name = 'Lines'})
-    ensureDefaultLine()
-
-    Mode = ChatSpammer:CreateDropdown({
-        Name = 'Mode',
-        List = {'Random', 'Order'}
-    })
-    Delay = ChatSpammer:CreateSlider({
-        Name = 'Delay',
-        Min = 0.1,
-        Max = 10,
-        Default = 1,
-        Decimal = 10,
-        Suffix = function(val) return val == 1 and 'second' or 'seconds' end
-    })
-    Hide = ChatSpammer:CreateToggle({
-        Name = 'Hide Flood Message',
-        Default = true
-    })
-
-    vape:Clean(function()
-        for _, item in ipairs(hideConnections) do
-            pcall(function()
-                if type(item) == "table" and item.conn and item.oldFunc then
-                    item.conn.Function = item.oldFunc
-                else
-                    item:Disconnect()
-                end
-            end)
-        end
-        table.clear(hideConnections)
-    end)
+	local ChatSpammer
+	local Lines
+	local Mode
+	local Delay
+	local Hide
+	local oldchat
+	
+	ChatSpammer = vape.Categories.Utility:CreateModule({
+		Name = 'ChatSpammer',
+		Function = function(callback)
+			if callback then
+				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+					if Hide.Enabled and coreGui:FindFirstChild('ExperienceChat') then
+						ChatSpammer:Clean(coreGui.ExperienceChat:FindFirstChild('RCTScrollContentView', true).ChildAdded:Connect(function(msg)
+							if msg.Name:sub(1, 2) == '0-' and msg.ContentText == 'You must wait before sending another message.' then
+								msg.Visible = false
+							end
+						end))
+					end
+				elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
+					if Hide.Enabled then
+						oldchat = hookfunction(getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnNewSystemMessage.OnClientEvent)[1].Function, function(data, ...)
+							if data.Message:find('ChatFloodDetector') then return end
+							return oldchat(data, ...)
+						end)
+					end
+				else
+					notif('ChatSpammer', 'unsupported chat', 5, 'warning')
+					ChatSpammer:Toggle()
+					return
+				end
+				
+				local ind = 1
+				repeat
+					local message = (#Lines.ListEnabled > 0 and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'vxpe on top')
+					if Mode.Value == 'Order' and #Lines.ListEnabled > 0 then
+						message = Lines.ListEnabled[ind] or Lines.ListEnabled[1]
+						ind = (ind % #Lines.ListEnabled) + 1
+					end
+	
+					if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+						textChatService.ChatInputBarConfiguration.TargetTextChannel:SendAsync(message)
+					else
+						replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, 'All')
+					end
+	
+					task.wait(Delay.Value)
+				until not ChatSpammer.Enabled
+			else
+				if oldchat then
+					hookfunction(getconnections(replicatedStorage.DefaultChatSystemChatEvents.OnNewSystemMessage.OnClientEvent)[1].Function, oldchat)
+				end
+			end
+		end,
+		Tooltip = 'Automatically types in chat'
+	})
+	Lines = ChatSpammer:CreateTextList({Name = 'Lines'})
+	Mode = ChatSpammer:CreateDropdown({
+		Name = 'Mode',
+		List = {'Random', 'Order'}
+	})
+	Delay = ChatSpammer:CreateSlider({
+		Name = 'Delay',
+		Min = 0.1,
+		Max = 10,
+		Default = 1,
+		Decimal = 10,
+		Suffix = function(val)
+			return val == 1 and 'second' or 'seconds'
+		end
+	})
+	Hide = ChatSpammer:CreateToggle({
+		Name = 'Hide Flood Message',
+		Default = true,
+		Function = function()
+			if ChatSpammer.Enabled then
+				ChatSpammer:Toggle()
+				ChatSpammer:Toggle()
+			end
+		end
+	})
 end)
 	
 run(function()
