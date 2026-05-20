@@ -148,9 +148,9 @@ local function canClick()
 end
 
 for _, v in {
-    'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
+    'SilentAim', 'Reach', 'AntiFall', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot',
-    'KillAura', 'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
+    'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
     'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest'
 } do vape:Remove(v) end
 
@@ -330,30 +330,27 @@ run(function()
         label.Size = UDim2.new(1, 0, 1, 0)
         label.BackgroundTransparency = 1
         label.Text = "Rawr.xyz | " .. (role or "Team")
-        label.TextColor3 = Color3.fromRGB(255, 255, 255)
+        label.TextColor3 = Color3.new(1, 1, 1)
         label.Font = Enum.Font.GothamBold
         label.TextSize = 18
         label.TextStrokeTransparency = 0.2
         label.TextStrokeColor3 = Color3.new(0, 0, 0)
         label.Parent = billboard
 
-        local conn = runService.Heartbeat:Connect(function()
-            if billboard and billboard.Parent and teamDetectionEnabled then
-                local t = tick() * 0.8
-                local factor = (math.sin(t) + 1) / 2
-                label.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(255, 255, 255), factor)
-            elseif conn then
-                conn:Disconnect()
-            end
-        end)
+        local grad = Instance.new("UIGradient")
+        grad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0))
+        })
+        grad.Parent = label
 
-        table.insert(activeBillboards, {billboard = billboard, conn = conn})
+        table.insert(activeBillboards, {billboard = billboard, conn = nil})
 
         char.Destroying:Connect(function()
             for i, data in ipairs(activeBillboards) do
                 if data.billboard == billboard then
                     data.billboard:Destroy()
-                    data.conn:Disconnect()
+                    if data.conn then data.conn:Disconnect() end
                     table.remove(activeBillboards, i)
                     break
                 end
@@ -431,7 +428,7 @@ run(function()
     vape:Clean(function()
         for _, data in ipairs(activeBillboards) do
             pcall(function() data.billboard:Destroy() end)
-            pcall(function() data.conn:Disconnect() end)
+            if data.conn then pcall(function() data.conn:Disconnect() end) end
         end
         table.clear(activeBillboards)
 
@@ -455,8 +452,8 @@ local function sendChatMessage(msg)
     if chatRemote then
         pcall(function()
             chatRemote:FireServer(msg, "All")
-        end)
-    end
+        end
+    end)
 end
 
 local function onPlayerChatted(player, message)
@@ -1654,258 +1651,6 @@ run(function()
     Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
     SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
     FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
-end)
-
-run(function()
-    local meleeEvent = replicatedStorageService:WaitForChild("meleeEvent")
-    local Killaura
-    local Targets
-    local CPS
-    local AttackRange
-    local AngleSlider
-    local Max
-    local BoxSwingColor
-    local BoxAttackColor
-    local ParticleTexture
-    local ParticleColor1
-    local ParticleColor2
-    local ParticleSize
-    local Face
-    local filterTeamKA
-    local TeamFilterKA
-    local Particles, Boxes = {}, {}
-    local AttackDelay = tick()
-    local renderStepConnection
-
-    local function passesTeamCheckKA(player)
-        if not filterTeamKA then return true end
-        return player and player.Team == filterTeamKA
-    end
-
-    local function meleeStep()
-        pcall(function()
-            if not entitylib or not entitylib.isAlive then return end
-            local rootPart = entitylib.character and entitylib.character.RootPart
-            if not rootPart then return end
-            local selfpos = rootPart.Position
-            local localfacing = rootPart.CFrame.LookVector * Vector3.new(1,0,1)
-
-            local allTargets = entitylib.AllTargets({
-                Range = AttackRange and AttackRange.Value or 13,
-                Wallcheck = Targets and Targets.Walls and Targets.Walls.Enabled or nil,
-                Part = 'RootPart',
-                Players = Targets and Targets.Players and Targets.Players.Enabled,
-                NPCs = Targets and Targets.NPCs and Targets.NPCs.Enabled,
-                Limit = Max and Max.Value or 10
-            })
-
-            local validTargets = {}
-            if allTargets then
-                for _, v in ipairs(allTargets) do
-                    if v and v.RootPart and v.RootPart.Position then
-                        if v.Player and not passesTeamCheckKA(v.Player) then
-                            -- skip
-                        else
-                            local delta = (v.RootPart.Position - selfpos)
-                            local deltaUnit = (delta * Vector3.new(1,0,1)).Unit
-                            local dot = localfacing:Dot(deltaUnit)
-                            if dot <= 1 and dot >= -1 then
-                                local angle = math.acos(dot)
-                                if angle <= math.rad((AngleSlider and AngleSlider.Value or 90) / 2) then
-                                    table.insert(validTargets, {
-                                        Entity = v,
-                                        Distance = delta.Magnitude,
-                                        Check = (delta.Magnitude <= (AttackRange and AttackRange.Value or 13)) and BoxAttackColor or BoxSwingColor
-                                    })
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-
-            -- Sort by Distance
-            table.sort(validTargets, function(a, b) return a.Distance < b.Distance end)
-
-            if Boxes then
-                for i, box in ipairs(Boxes) do
-                    if validTargets[i] and box then
-                        box.Adornee = validTargets[i].Entity.RootPart
-                        local chk = validTargets[i].Check
-                        if chk and chk.Hue then
-                            box.Color3 = Color3.fromHSV(chk.Hue, chk.Sat, chk.Value)
-                            box.Transparency = 1 - chk.Opacity
-                        end
-                        box.Visible = true
-                    elseif box then
-                        box.Adornee = nil
-                        box.Visible = false
-                    end
-                end
-            end
-
-            if Particles then
-                for i, part in ipairs(Particles) do
-                    if validTargets[i] and part then
-                        part.Position = validTargets[i].Entity.RootPart.Position
-                        part.Parent = gameCamera
-                    elseif part then
-                        part.Parent = nil
-                    end
-                end
-            end
-
-            if Face and Face.Enabled and #validTargets > 0 then
-                local root = validTargets[1].Entity.RootPart
-                if root and entitylib.character and entitylib.character.RootPart then
-                    local vec = root.Position * Vector3.new(1,0,1)
-                    entitylib.character.RootPart.CFrame = CFrame.lookAt(
-                        entitylib.character.RootPart.Position,
-                        Vector3.new(vec.X, entitylib.character.RootPart.Position.Y + 0.01, vec.Z)
-                    )
-                end
-            end
-
-            if #validTargets > 0 and AttackDelay < tick() then
-                local aps = CPS and CPS.GetRandomValue() or 1
-                if aps > 0 then
-                    AttackDelay = tick() + (1 / aps)
-                end
-                local target = validTargets[1].Entity
-                if targetinfo then targetinfo.Targets[target] = tick() + 1 end
-                safeCall('meleeEvent', function()
-                    meleeEvent:FireServer(target.Player, 1, 1)
-                end)
-            end
-        end)
-    end
-
-    Killaura = vape.Categories.Blatant:CreateModule({
-        Name = 'KillAura',
-        Function = function(callback)
-            if callback then
-                renderStepConnection = runService.RenderStepped:Connect(meleeStep)
-            else
-                if renderStepConnection then
-                    renderStepConnection:Disconnect()
-                    renderStepConnection = nil
-                end
-                if Boxes then
-                    for _, v in pairs(Boxes) do v:Destroy() end
-                    table.clear(Boxes)
-                end
-                if Particles then
-                    for _, v in pairs(Particles) do v:Destroy() end
-                    table.clear(Particles)
-                end
-            end
-        end,
-        Tooltip = 'Attack players around you without aiming at them.'
-    })
-
-    Targets = Killaura:CreateTargets({Players = true})
-    CPS = Killaura:CreateTwoSlider({ Name='Attacks per Second', Min=1, Max=15, DefaultMin=8, DefaultMax=12 })
-    AttackRange = Killaura:CreateSlider({ Name='Attack range', Min=1, Max=30, Default=13, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
-    AngleSlider = Killaura:CreateSlider({ Name='Max angle', Min=1, Max=360, Default=90 })
-    Max = Killaura:CreateSlider({ Name='Max targets', Min=1, Max=10, Default=10 })
-    TeamFilterKA = Killaura:CreateDropdown({
-        Name = 'Team Filter',
-        List = {'All', 'Criminals', 'Inmates', 'Guards', 'Neutral'},
-        Function = function(val)
-            if val == 'Criminals' then filterTeamKA = criminalsTeam
-            elseif val == 'Inmates' then filterTeamKA = inmatesTeam
-            elseif val == 'Guards' then filterTeamKA = guardsTeam
-            elseif val == 'Neutral' then filterTeamKA = neutralTeam
-            else filterTeamKA = nil end
-        end,
-        Tooltip = 'Only attack players on the selected team'
-    })
-    Killaura:CreateToggle({
-        Name = 'Show target',
-        Function = function(callback)
-            if BoxSwingColor then BoxSwingColor.Object.Visible = callback end
-            if BoxAttackColor then BoxAttackColor.Object.Visible = callback end
-            if callback then
-                for i = 1, 10 do
-                    local box = Instance.new('BoxHandleAdornment')
-                    box.Adornee = nil
-                    box.AlwaysOnTop = true
-                    box.Size = Vector3.new(3, 5, 3)
-                    box.CFrame = CFrame.new(0, -0.5, 0)
-                    box.ZIndex = 0
-                    box.Visible = false
-                    box.Parent = vape.gui
-                    Boxes[i] = box
-                end
-            else
-                if Boxes then
-                    for _, v in pairs(Boxes) do v:Destroy() end
-                    table.clear(Boxes)
-                end
-            end
-        end
-    })
-    BoxSwingColor = Killaura:CreateColorSlider({ Name='Target Color', Darker=true, DefaultHue=0.6, DefaultOpacity=0.5, Visible=false })
-    BoxAttackColor = Killaura:CreateColorSlider({ Name='Attack Color', Darker=true, DefaultOpacity=0.5, Visible=false })
-    Killaura:CreateToggle({
-        Name = 'Target particles',
-        Function = function(callback)
-            if ParticleTexture then ParticleTexture.Object.Visible = callback end
-            if ParticleColor1 then ParticleColor1.Object.Visible = callback end
-            if ParticleColor2 then ParticleColor2.Object.Visible = callback end
-            if ParticleSize then ParticleSize.Object.Visible = callback end
-            if callback then
-                for i = 1, 10 do
-                    local part = Instance.new('Part')
-                    part.Size = Vector3.new(2, 4, 2)
-                    part.Anchored = true
-                    part.CanCollide = false
-                    part.Transparency = 1
-                    part.CanQuery = false
-                    part.Parent = Killaura.Enabled and gameCamera or nil
-                    local particles = Instance.new('ParticleEmitter')
-                    particles.Brightness = 1.5
-                    particles.Size = NumberSequence.new(ParticleSize and ParticleSize.Value or 0.2)
-                    particles.Shape = Enum.ParticleEmitterShape.Sphere
-                    particles.Texture = ParticleTexture and ParticleTexture.Value or 'rbxassetid://14736249347'
-                    particles.Transparency = NumberSequence.new(0)
-                    particles.Lifetime = NumberRange.new(0.4)
-                    particles.Speed = NumberRange.new(16)
-                    particles.Rate = 128
-                    particles.Drag = 16
-                    particles.ShapePartial = 1
-                    particles.Color = ColorSequence.new({
-                        ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1 and ParticleColor1.Hue or 0, ParticleColor1 and ParticleColor1.Sat or 1, ParticleColor1 and ParticleColor1.Value or 1)),
-                        ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2 and ParticleColor2.Hue or 0.6, ParticleColor2 and ParticleColor2.Sat or 1, ParticleColor2 and ParticleColor2.Value or 1))
-                    })
-                    particles.Parent = part
-                    Particles[i] = part
-                end
-            else
-                if Particles then
-                    for _, v in pairs(Particles) do v:Destroy() end
-                    table.clear(Particles)
-                end
-            end
-        end
-    })
-    ParticleTexture = Killaura:CreateTextBox({ Name='Texture', Default='rbxassetid://14736249347', Function=function() for _,v in pairs(Particles) do v.ParticleEmitter.Texture = ParticleTexture.Value end end, Darker=true, Visible=false })
-    ParticleColor1 = Killaura:CreateColorSlider({ Name='Color Begin', Function=function(h,s,v) for _,part in pairs(Particles) do part.ParticleEmitter.Color = ColorSequence.new{ ColorSequenceKeypoint.new(0, Color3.fromHSV(h,s,v)), ColorSequenceKeypoint.new(1, Color3.fromHSV(ParticleColor2.Hue, ParticleColor2.Sat, ParticleColor2.Value)) } end end, Darker=true, Visible=false })
-    ParticleColor2 = Killaura:CreateColorSlider({ Name='Color End', Function=function(h,s,v) for _,part in pairs(Particles) do part.ParticleEmitter.Color = ColorSequence.new{ ColorSequenceKeypoint.new(0, Color3.fromHSV(ParticleColor1.Hue, ParticleColor1.Sat, ParticleColor1.Value)), ColorSequenceKeypoint.new(1, Color3.fromHSV(h,s,v)) } end end, Darker=true, Visible=false })
-    ParticleSize = Killaura:CreateSlider({ Name='Size', Min=0, Max=1, Default=0.2, Decimal=100, Function=function(val) for _,v in pairs(Particles) do v.ParticleEmitter.Size = NumberSequence.new(val) end end, Darker=true, Visible=false })
-    Face = Killaura:CreateToggle({ Name='Face target' })
-
-    vape:Clean(function()
-        if renderStepConnection then renderStepConnection:Disconnect() end
-        if Boxes then
-            for _, v in pairs(Boxes) do v:Destroy() end
-            table.clear(Boxes)
-        end
-        if Particles then
-            for _, v in pairs(Particles) do v:Destroy() end
-            table.clear(Particles)
-        end
-    end)
 end)
                                                                                                                                                                     
 run(function()
