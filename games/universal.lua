@@ -587,7 +587,6 @@ run(function()
             whitelist.data = suc and type(res) == 'table' and res or whitelist.data
             whitelist.localprio = whitelist:get(lplr)
 
-            -- ===== FIXED UNPACK ISSUE =====
             for _, v in whitelist.data.WhitelistedUsers do
                 if v.tags then
                     for _, tag in v.tags do
@@ -596,12 +595,11 @@ run(function()
                                 tag.color = Color3.new(tag.color[1], tag.color[2], tag.color[3])
                             end)
                         else
-                            tag.color = Color3.new(1, 1, 1) -- default white if missing
+                            tag.color = Color3.new(1, 1, 1)
                         end
                     end
                 end
             end
-            -- ===== END FIX =====
 
             if not whitelist.connection then
                 whitelist.connection = playersService.PlayerAdded:Connect(function(v)
