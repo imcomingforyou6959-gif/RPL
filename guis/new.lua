@@ -5334,9 +5334,10 @@ function mainapi:CreateNotification(title, text, duration, type)
 		progress.Position = UDim2.new(0, 3, 1, -4)
 		progress.ZIndex = 5
 		progress.BackgroundColor3 =
-			type == 'alert' and Color3.fromRGB(250, 50, 56)
-			or type == 'warning' and Color3.fromRGB(236, 129, 43)
-			or Color3.fromRGB(220, 220, 220)
+    	type == 'alert' and Color3.fromRGB(250, 50, 56)
+    	or type == 'warning' and Color3.fromRGB(236, 129, 43)
+    	or type == 'success' and Color3.fromRGB(50, 200, 80)
+    	or Color3.fromRGB(220, 220, 220)
 		progress.BorderSizePixel = 0
 		progress.Parent = notification
 		if tween.Tween then
