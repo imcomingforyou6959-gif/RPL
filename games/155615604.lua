@@ -272,9 +272,25 @@ run(function()
 
         local args = {...}
 
+        local function drawCustomTracer(targetPart)
+            if not GunTracers then return end
+            local cam = workspace.CurrentCamera
+            local muzzle = cam.CFrame.Position + cam.CFrame.LookVector * 1.5
+            if GunTracers.createBullet then
+                GunTracers.createBullet(muzzle, targetPart.Position)
+            end
+        end
+
         if t.sa and t.sa.redirect then
             local ok, err = pcall(t.sa.redirect, args)
-            if not ok then
+            if ok and args[1] and typeof(args[1]) == "table" then
+                for _, hit in ipairs(args[1]) do
+                    local part = hit[3]
+                    if typeof(part) == "Instance" then
+                        drawCustomTracer(part)
+                    end
+                end
+            else
                 return old(self, ...)
             end
         end
