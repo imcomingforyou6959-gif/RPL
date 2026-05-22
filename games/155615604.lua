@@ -187,7 +187,8 @@ local t = {
     bt = {m = false, q = false, p = Vector3.new()},
     sa = {hooks = {}, toggle = nil},
     hn = {e = false},
-    ka = {}
+    ka = {},
+    mb = { enabled = false, redirect = nil }
 }
 
 run(function()
@@ -296,26 +297,16 @@ run(function()
 
         local args = {...}
 
-        local function drawCustomTracer(targetPart)
-            if not GunTracers then return end
-            local cam = workspace.CurrentCamera
-            local muzzle = cam.CFrame.Position + cam.CFrame.LookVector * 1.5
-            if GunTracers.createBullet then
-                GunTracers.createBullet(muzzle, targetPart.Position)
+        if t.sa and t.sa.redirect then
+            local ok, err = pcall(t.sa.redirect, args)
+            if not ok then
+                return old(self, ...)
             end
         end
 
-        if t.sa and t.sa.redirect then
-            local ok, err = pcall(t.sa.redirect, args)
-            if ok and args[1] and typeof(args[1]) == "table" then
-                for _, hit in ipairs(args[1]) do
-                    local part = hit[3]
-                    if typeof(part) == "Instance" then
-                        drawCustomTracer(part)
-                    end
-                end
-            else
-                return old(self, ...)
+        if t.mb and t.mb.enabled and t.mb.redirect then
+            local ok, err = pcall(t.mb.redirect, args)
+            if not ok then
             end
         end
 
@@ -1537,6 +1528,174 @@ run(function()
     })
     Face = SilentAim:CreateToggle({ Name = 'Face target' })
     ShowTarget = SilentAim:CreateToggle({ Name = "Show Target Info" })
+end)
+                                                                                                                
+run(function()
+    local MagicBullet
+    local Mode
+    local OriginOffset
+    local CurveStrength
+    local RandomOffset
+    local ignoreWalls
+    local maxPenetration
+    local useLineOfSight
+
+    local function getWallsBetween(origin, target)
+        local direction = (target - origin).Unit
+        local distance = (target - origin).Magnitude
+        if distance <= 0.01 then return {} end
+
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Whitelist
+        rayParams.FilterDescendantsInstances = {workspace}
+
+        local result = workspace:Raycast(origin, direction * distance, rayParams)
+        if result then
+            return {{
+                part = result.Instance,
+                distance = (result.Position - origin).Magnitude,
+                normal = result.Normal
+            }}
+        end
+        return {}
+    end
+
+    local function magicBulletRedirect(args)
+        if not args or typeof(args[1]) ~= "table" then return end
+        local hits = args[1]
+
+        local mode = Mode and Mode.Value or "Through"
+        local originOff = OriginOffset and OriginOffset.Value or 0
+        local curveVal = CurveStrength and CurveStrength.Value or 5
+        local randOff = RandomOffset and RandomOffset.Value or 5
+        local wallsIgnored = ignoreWalls and ignoreWalls.Enabled or false
+        local penetration = maxPenetration and maxPenetration.Value or 0
+        local losCheck = useLineOfSight and useLineOfSight.Enabled or false
+
+        local rand = Random.new()
+
+        for _, hit in ipairs(hits) do
+            local origin = hit[1]
+            local endpoint = hit[2]
+            local targetPart = hit[3]
+
+            if losCheck then
+                local walls = getWallsBetween(origin, endpoint)
+                if #walls == 0 then
+                    goto continue
+                end
+            end
+
+            if mode == "Through" then
+                local dir = (endpoint - origin).Unit
+                hit[1] = origin + dir * originOff
+
+            elseif mode == "Curve" then
+                local dir = (endpoint - origin).Unit
+                local perp = Vector3.new(-dir.Z, 0, dir.X).Unit
+                hit[2] = endpoint + perp * curveVal
+
+            elseif mode == "Random" then
+                local offset = Vector3.new(
+                    (rand:NextNumber() - 0.5) * randOff * 2,
+                    (rand:NextNumber() - 0.5) * randOff * 2,
+                    (rand:NextNumber() - 0.5) * randOff * 2
+                )
+                hit[1] = origin + offset
+                hit[2] = endpoint + offset
+
+            elseif mode == "Smart" then
+                local walls = getWallsBetween(origin, endpoint)
+                local newOrigin = origin
+                for i = 1, math.min(#walls, penetration) do
+                    local wall = walls[i]
+                    local pushDist = wall.distance + 2
+                    newOrigin = newOrigin + (endpoint - newOrigin).Unit * pushDist
+                end
+                hit[1] = newOrigin
+            end
+
+            ::continue::
+        end
+    end
+
+    MagicBullet = vape.Categories.Combat:CreateModule({
+        Name = "Magic Bullet",
+        Function = function(callback)
+            t.mb.enabled = callback
+            if callback then
+                t.mb.redirect = magicBulletRedirect
+            else
+                t.mb.redirect = nil
+            end
+        end,
+        Tooltip = "Shoot through walls by altering bullet path"
+    })
+
+    Mode = MagicBullet:CreateDropdown({
+        Name = "Mode",
+        List = {"Through", "Curve", "Random", "Smart"},
+        Default = "Through",
+        Tooltip = [[
+Through - Direct penetration
+Curve - Arc trajectory
+Random - Unpredictable offsets
+Smart - Auto‑detect walls & push origin]]
+    })
+
+    OriginOffset = MagicBullet:CreateSlider({
+        Name = "Origin Offset (Through)", Min = 0, Max = 50, Default = 10,
+        Function = function() end,
+        Tooltip = "How far the bullet's origin is pushed forward"
+    })
+    CurveStrength = MagicBullet:CreateSlider({
+        Name = "Curve Strength", Min = 0, Max = 20, Default = 5,
+        Visible = false,
+        Function = function() end,
+        Tooltip = "How far the endpoint is bent"
+    })
+    RandomOffset = MagicBullet:CreateSlider({
+        Name = "Random Offset Max", Min = 1, Max = 20, Default = 5,
+        Visible = false,
+        Function = function() end,
+        Tooltip = "Maximum random offset distance"
+    })
+
+    Mode.Function = function(val)
+        OriginOffset.Object.Visible = (val == "Through")
+        CurveStrength.Object.Visible = (val == "Curve")
+        RandomOffset.Object.Visible = (val == "Random")
+        if maxPenetration then maxPenetration.Object.Visible = (val == "Smart") end
+    end
+
+    ignoreWalls = MagicBullet:CreateToggle({
+        Name = "Ignore Walls",
+        Default = true,
+        Tooltip = "Always wallbang"
+    })
+
+    maxPenetration = MagicBullet:CreateSlider({
+        Name = "Max Penetration",
+        Min = 1, Max = 5, Default = 1,
+        Visible = false,
+        Function = function() end,
+        Tooltip = "Number of walls to push through"
+    })
+    useLineOfSight = MagicBullet:CreateToggle({
+        Name = "Line of Sight Check",
+        Default = false,
+        Tooltip = "Only TP when target is behind a wall"
+    })
+
+    OriginOffset.Object.Visible = true
+    CurveStrength.Object.Visible = false
+    RandomOffset.Object.Visible = false
+    maxPenetration.Object.Visible = false
+
+    t.mb.redirect = nil
+    if MagicBullet.Enabled then
+        t.mb.redirect = magicBulletRedirect
+    end
 end)
                                                                                                                     
 run(function()
