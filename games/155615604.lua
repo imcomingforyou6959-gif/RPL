@@ -930,6 +930,91 @@ run(function()
 end)
 
 run(function()
+    local FuncReload = replicatedStorageService:WaitForChild("Remotes"):WaitForChild("FuncReload", 5)
+    if not FuncReload then
+        notif('Force Reload', 'FuncReload remote not found', 3, 'alert')
+        return
+    end
+
+    local forceReloadEnabled = false
+    local oldInvoke
+
+    local function hookReload()
+        if oldInvoke then return end
+        oldInvoke = hookfunction(FuncReload, "InvokeServer", function(self, ...)
+            if not forceReloadEnabled then
+                return oldInvoke(self, ...)
+            end
+
+            local char = lplr.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            if not tool then
+                return oldInvoke(self, ...)
+            end
+
+            local ammo = tool:GetAttribute("Local_CurrentAmmo")
+            local maxAmmo = tool:GetAttribute("MaxAmmo")
+            if ammo and maxAmmo and ammo >= maxAmmo then
+                return oldInvoke(self, ...)
+            end
+
+            tool:SetAttribute("Local_CurrentAmmo", maxAmmo)
+            tool:SetAttribute("Local_ReloadSession", 0)
+
+            if hud then
+                local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
+                if BottomRightFrame then
+                    local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
+                    if gunFrame then
+                        local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
+                        if bulletsLabel then
+                            local behavior = tool:GetAttribute("Behavior")
+                            if behavior == "Sniper" then
+                                bulletsLabel.Text = maxAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
+                            else
+                                bulletsLabel.Text = maxAmmo .. "/" .. maxAmmo
+                            end
+                        end
+                    end
+                end
+            end
+
+            return oldInvoke(self, ...)
+        end)
+    end
+
+    local ForceReload = vape.Categories.Combat:CreateModule({
+        Name = "Force Reload",
+        Function = function(callback)
+            forceReloadEnabled = callback
+            if callback then
+                hookReload()
+            end
+        end,
+        Tooltip = "Instantly reloads your weapon"
+    })
+
+    ForceReload:CreateButton({
+        Name = "Reload Now",
+        Function = function()
+            local char = lplr.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            if tool and FuncReload then
+                tool:SetAttribute("Local_CurrentAmmo", tool:GetAttribute("MaxAmmo"))
+                tool:SetAttribute("Local_ReloadSession", 0)
+                notif('Force Reload', 'Reloaded ' .. tool.Name, 1.5, 'success')
+            end
+        end
+    })
+
+    vape:Clean(function()
+        if oldInvoke then
+            hookfunction(FuncReload, "InvokeServer", oldInvoke)
+        end
+    end)
+end)
+                                        
+run(function()
     local crosshairEnabled = false
     local crosshairColor = Color3.fromRGB(128, 128, 128)
     local crosshairSpin = true
