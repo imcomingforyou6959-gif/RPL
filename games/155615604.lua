@@ -775,9 +775,12 @@ entitylib.start()
 run(function()
     local AutoReload
     local AutoSwitch
+    local ForceReloadToggle
     local reloadConnection
     local backpackConn
     local toolConns = {}
+    local forceReloadEnabled = false
+    local oldInvoke
 
     local OwnShotgun = false
     local OwnSniper = false
@@ -838,6 +841,59 @@ run(function()
         end
     end
 
+    local function doForceReload(tool)
+        local ammo = tool:GetAttribute("Local_CurrentAmmo")
+        local maxAmmo = tool:GetAttribute("MaxAmmo")
+        if not ammo or not maxAmmo or ammo >= maxAmmo then return end
+
+        tool:SetAttribute("Local_CurrentAmmo", maxAmmo)
+        tool:SetAttribute("Local_ReloadSession", 0)
+
+        if hud then
+            local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
+            if BottomRightFrame then
+                local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
+                if gunFrame then
+                    local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
+                    if bulletsLabel then
+                        local behavior = tool:GetAttribute("Behavior")
+                        if behavior == "Sniper" then
+                            bulletsLabel.Text = maxAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
+                        else
+                            bulletsLabel.Text = maxAmmo .. "/" .. maxAmmo
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local function setupForceReload()
+        if oldInvoke then return end
+        local FuncReload = nil
+        local gunRemotes = replicatedStorageService:FindFirstChild("GunRemotes")
+        if gunRemotes then
+            for _, obj in ipairs(gunRemotes:GetDescendants()) do
+                if obj:IsA("RemoteFunction") and obj.Name == "FuncReload" then
+                    FuncReload = obj
+                    break
+                end
+            end
+        end
+        if not FuncReload then return end
+
+        oldInvoke = hookfunction(FuncReload, "InvokeServer", function(self, ...)
+            if forceReloadEnabled then
+                local char = lplr.Character
+                local tool = char and char:FindFirstChildOfClass("Tool")
+                if tool and tool:GetAttribute("Local_CurrentAmmo") then
+                    doForceReload(tool)
+                end
+            end
+            return oldInvoke(self, ...)
+        end)
+    end
+
     local function itemAdded(v)
         if not v or not v:IsA("Tool") then return end
         local behavior = v:GetAttribute("Behavior")
@@ -855,7 +911,11 @@ run(function()
             if not entitylib.isAlive then return end
             local ammo = v:GetAttribute("Local_CurrentAmmo")
             if ammo and ammo <= 0 then
-                reload()
+                if forceReloadEnabled then
+                    doForceReload(v)
+                else
+                    reload()
+                end
                 if AutoSwitch and AutoSwitch.Enabled and v.Name ~= "Taser" then
                     local attempts = 0
                     repeat
@@ -927,120 +987,33 @@ run(function()
         Name = "AutoSwitch",
         Tooltip = "Auto switches to a gun with ammo. Forces you to always hold a gun."
     })
-end)
-
-run(function()
-    local remotesFolder = replicatedStorageService:FindFirstChild("GunRemotes")
-    if not remotesFolder then
-        notif('Force Reload', 'Remotes folder not found', 3, 'alert')
-        return
-    end
-
-    local FuncReload = nil
-    for _, obj in ipairs(remotesFolder:GetDescendants()) do
-        if obj:IsA("RemoteFunction") and obj.Name == "FuncReload" then
-            FuncReload = obj
-            break
-        end
-    end
-
-    if not FuncReload then
-        notif('Force Reload', 'FuncReload not found anywhere in Remotes', 3, 'alert')
-        return
-    end
-
-    local forceReloadEnabled = false
-    local oldInvoke
-
-    local function doReload(tool)
-        local ammo = tool:GetAttribute("Local_CurrentAmmo")
-        local maxAmmo = tool:GetAttribute("MaxAmmo")
-        if not ammo or not maxAmmo or ammo >= maxAmmo then return end
-
-        tool:SetAttribute("Local_CurrentAmmo", maxAmmo)
-        tool:SetAttribute("Local_ReloadSession", 0)
-
-        if hud then
-            local BottomRightFrame = hud:FindFirstChild("BottomRightFrame")
-            if BottomRightFrame then
-                local gunFrame = BottomRightFrame:FindFirstChild("GunFrame")
-                if gunFrame then
-                    local bulletsLabel = gunFrame:FindFirstChild("BulletsLabel")
-                    if bulletsLabel then
-                        local behavior = tool:GetAttribute("Behavior")
-                        if behavior == "Sniper" then
-                            bulletsLabel.Text = maxAmmo .. " | " .. (tool:GetAttribute("StoredAmmo") or 0)
-                        else
-                            bulletsLabel.Text = maxAmmo .. "/" .. maxAmmo
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    local function hookReload()
-        if oldInvoke then return end
-
-        local mt = getrawmetatable and getrawmetatable(FuncReload)
-        if mt then
-            local oldNamecall = mt.__namecall
-            setreadonly(mt, false)
-            mt.__namecall = newcclosure(function(self, ...)
-                local method = getnamecallmethod()
-                if method ~= "InvokeServer" then
-                    return oldNamecall(self, ...)
-                end
-                if forceReloadEnabled then
-                    local char = lplr.Character
-                    local tool = char and char:FindFirstChildOfClass("Tool")
-                    if tool then doReload(tool) end
-                end
-                return oldNamecall(self, ...)
-            end)
-            oldInvoke = oldNamecall
-        else
-            oldInvoke = hookfunction(FuncReload, "InvokeServer", function(self, ...)
-                if forceReloadEnabled then
-                    local char = lplr.Character
-                    local tool = char and char:FindFirstChildOfClass("Tool")
-                    if tool then doReload(tool) end
-                end
-                return oldInvoke(self, ...)
-            end)
-        end
-    end
-
-    local ForceReload = vape.Categories.Combat:CreateModule({
+    ForceReloadToggle = AutoReload:CreateToggle({
         Name = "Force Reload",
+        Tooltip = "Instantly reloads your weapon without animation",
         Function = function(callback)
             forceReloadEnabled = callback
             if callback then
-                hookReload()
-            end
-        end,
-        Tooltip = "Instantly reloads your weapon"
-    })
-
-    ForceReload:CreateButton({
-        Name = "Reload Now",
-        Function = function()
-            local char = lplr.Character
-            local tool = char and char:FindFirstChildOfClass("Tool")
-            if tool then
-                doReload(tool)
-                notif('Force Reload', 'Reloaded ' .. tool.Name, 1.5, 'success')
+                setupForceReload()
             end
         end
     })
 
     vape:Clean(function()
+        if reloadConnection then reloadConnection:Disconnect() end
+        if backpackConn then backpackConn:Disconnect() end
+        clearToolConns()
         if oldInvoke then
-            local mt = getrawmetatable and getrawmetatable(FuncReload)
-            if mt then
-                setreadonly(mt, false)
-                mt.__namecall = oldInvoke
-            else
+            local FuncReload = nil
+            local gunRemotes = replicatedStorageService:FindFirstChild("GunRemotes")
+            if gunRemotes then
+                for _, obj in ipairs(gunRemotes:GetDescendants()) do
+                    if obj:IsA("RemoteFunction") and obj.Name == "FuncReload" then
+                        FuncReload = obj
+                        break
+                    end
+                end
+            end
+            if FuncReload then
                 hookfunction(FuncReload, "InvokeServer", oldInvoke)
             end
         end
