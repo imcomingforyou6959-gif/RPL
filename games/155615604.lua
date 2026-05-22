@@ -1906,6 +1906,8 @@ run(function()
     local HideInFloor
     local hideEnabled = false
     local connections = {}
+    local originalHipHeight = 2
+    local floorOffset = -5
 
     local function enableHide()
         if not entitylib or not entitylib.isAlive then return end
@@ -1914,20 +1916,22 @@ run(function()
         local humanoid = char and char:FindFirstChildOfClass("Humanoid")
         if not root or not humanoid then return end
 
-        local originalHipHeight = humanoid.HipHeight
-        local originalRootCFrame = root.CFrame
+        originalHipHeight = humanoid.HipHeight
 
-        humanoid.HipHeight = -3
-        root.CFrame = originalRootCFrame * CFrame.Angles(math.rad(90), 0, 0)
+        humanoid.HipHeight = 0
+        root.CFrame = root.CFrame * CFrame.new(0, floorOffset, 0) * CFrame.Angles(math.rad(90), 0, 0)
 
         local heartbeatConn = runService.Heartbeat:Connect(function()
             if not hideEnabled then return end
             if not char or not char.Parent then return end
             local currentRoot = char:FindFirstChild("HumanoidRootPart")
-            if currentRoot then
+            local currentHumanoid = char:FindFirstChildOfClass("Humanoid")
+            if currentRoot and currentHumanoid then
                 local vel = currentRoot.Velocity
-                currentRoot.CFrame = CFrame.new(currentRoot.Position) * CFrame.Angles(math.rad(90), 0, 0)
-                currentRoot.Velocity = vel
+                local rotVel = currentRoot.RotVelocity
+                currentRoot.CFrame = CFrame.new(currentRoot.Position.X, currentRoot.Position.Y, currentRoot.Position.Z) * CFrame.Angles(math.rad(90), 0, 0)
+                currentRoot.Velocity = Vector3.new(vel.X, 0, vel.Z)
+                currentRoot.RotVelocity = Vector3.new(0, 0, 0)
             end
         end)
         table.insert(connections, heartbeatConn)
@@ -1946,8 +1950,10 @@ run(function()
         local char = entitylib.character.Character
         local humanoid = char and char:FindFirstChildOfClass("Humanoid")
         local root = char and char:FindFirstChild("HumanoidRootPart")
-        if humanoid then humanoid.HipHeight = 2 end
-        if root then root.CFrame = CFrame.new(root.Position) end
+        if humanoid then humanoid.HipHeight = originalHipHeight end
+        if root then
+            root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, 0, 0)
+        end
 
         for _, conn in ipairs(connections) do
             pcall(function() conn:Disconnect() end)
@@ -1968,7 +1974,16 @@ run(function()
         Tooltip = "Hides your character underground while still being able to move and shoot"
     })
 
-    localPlayer.CharacterAdded:Connect(function()
+    HideInFloor:CreateSlider({
+        Name = "Floor Offset",
+        Min = -20,
+        Max = -1,
+        Default = -5,
+        Function = function(v) floorOffset = v end,
+        Tooltip = "How far underground to hide"
+    })
+
+    lplr.CharacterAdded:Connect(function()
         if hideEnabled then
             task.wait(0.2)
             enableHide()
@@ -1980,7 +1995,6 @@ run(function()
         disableHide()
     end)
 end)
-
 run(function()
     local NameChanger = vape.Categories.Utility:CreateModule({
         Name = "Name Changer",
