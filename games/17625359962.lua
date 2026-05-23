@@ -1669,7 +1669,6 @@ run(function()
 end)
 
 run(function()
-    -- Global defaults
     if _G.wallbangBoundaryBypass == nil then _G.wallbangBoundaryBypass = true end
     if _G.wallbangPredictionTime == nil then _G.wallbangPredictionTime = 0.2 end
     if _G.wallbangPreset == nil then _G.wallbangPreset = "Above" end
@@ -1690,6 +1689,8 @@ run(function()
             local barrierAddedConn = nil
             local antiVoidConn = nil
             local barrierList = {}
+            local initAttempts = 0
+            local maxAttempts = 30
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -1704,16 +1705,6 @@ run(function()
                     end
                 end
                 return true
-            end
-
-            local function waitForGame()
-                for _ = 1, 60 do
-                    if isGameActive() and lplr.Character and getLocalRoot() then
-                        return true
-                    end
-                    task.wait(0.5)
-                end
-                return false
             end
 
             local function createVisual()
@@ -1871,15 +1862,14 @@ run(function()
 
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
+                initAttempts = initAttempts + 1
 
                 local __a1b2c3 = setmetatable({}, {
                     __index = function(_, __g7h8i9)
                         local __j0k1l2, __m3n4o5 = pcall(function()
                             return game:GetService(__g7h8i9)
                         end)
-                        if __m3n4o5 then
-                            return cloneref(__m3n4o5)
-                        end
+                        if __m3n4o5 then return cloneref(__m3n4o5) end
                         return nil
                     end
                 })
@@ -1945,7 +1935,7 @@ run(function()
                             end
                             if not self.__desync or self.__curr ~= __x6y7z8 then
                                 self:__desync_start(__x6y7z8)
-                                task.wait(0.1)
+                                task.wait(0.05)
                             end
                             if self.__task1 then
                                 task.cancel(self.__task1)
@@ -2073,24 +2063,17 @@ run(function()
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     return
                 end
-                if not waitForGame() then
-                    pendingTask = task.delay(5, attemptInit)
-                    return
-                end
-                for i = 1, 10 do
-                    if not isEnabled then
-                        if pendingTask then task.cancel(pendingTask); pendingTask = nil end
-                        return
-                    end
-                    task.wait(1)
-                end
                 if not isGameActive() or not lplr.Character or not getLocalRoot() then
-                    pendingTask = task.delay(5, attemptInit)
+                    if initAttempts < maxAttempts then
+                        pendingTask = task.delay(1, attemptInit)
+                    end
                     return
                 end
                 local success = pcall(initializeWallbang)
                 if not success or not shared.__s9t0u1 then
-                    pendingTask = task.delay(5, attemptInit)
+                    if initAttempts < maxAttempts then
+                        pendingTask = task.delay(1, attemptInit)
+                    end
                 else
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     createVisual()
@@ -2101,6 +2084,7 @@ run(function()
 
             if callback then
                 isEnabled = true
+                initAttempts = 0
                 attemptInit()
             else
                 isEnabled = false
