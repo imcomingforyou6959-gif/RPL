@@ -2398,7 +2398,7 @@ run(function()
         Name = "Team Check",
         Default = _G.autoFireTeamCheck,
         Function = function(v) _G.autoFireTeamCheck = v end,
-        Tooltip = "Only target enemies (respects teams)"
+        Tooltip = "Only target enemies"
     })
     AutoFireModule:CreateToggle({
         Name = "Visible Check",
@@ -2432,7 +2432,7 @@ run(function()
         Name = "Void Desync (Teleport above map)",
         Default = _G.autoFireVoidDesync,
         Function = function(v) _G.autoFireVoidDesync = v end,
-        Tooltip = "Teleports your desynced position rapidly between the four corners above the map"
+        Tooltip = "tp around the map shit idk"
     })
 
     updateWallbangRedir()
