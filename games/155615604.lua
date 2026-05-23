@@ -1320,16 +1320,17 @@ run(function()
         return ent, ent and ent[targetPart], origin
     end
 
-    local function getPredictedPosition(origin, targetPart, tool)
+       local function getPredictedPosition(origin, targetPart, tool)
         if not SolveTrajectory then return targetPart.Position end
         if not PredictionToggle or not PredictionToggle.Enabled then return targetPart.Position end
         if not tool then return targetPart.Position end
+        if not origin or not targetPart or not targetPart.Position then return targetPart.Position end
 
         local projSpeed = tool:GetAttribute("ProjectileSpeed") or tool:GetAttribute("BulletSpeed") or 1500
         local gravity = workspace.Gravity
-        local targetVel = Vector3.new()
+        local targetVel = Vector3.zero
         local rootPart = targetPart.Parent and targetPart.Parent:FindFirstChild("HumanoidRootPart")
-        if rootPart then
+        if rootPart and rootPart.Velocity then
             targetVel = rootPart.Velocity
         end
 
@@ -1339,11 +1340,10 @@ run(function()
         local fps = getFPS()
         local networkFactor = 1 + ping + (1 / math.max(fps, 1))
         local speedFactor = math.clamp(targetVel.Magnitude / 30, 0.5, 2)
-
         local predictedVel = targetVel * speedFactor * networkFactor
 
         local success, predicted = pcall(SolveTrajectory, origin, projSpeed, gravity, targetPart.Position, predictedVel)
-        if success and predicted then
+        if success and predicted and typeof(predicted) == "Vector3" then
             return predicted
         end
         return targetPart.Position
