@@ -1320,36 +1320,7 @@ run(function()
         return ent, ent and ent[targetPart], origin
     end
 
-       local function getPredictedPosition(origin, targetPart, tool)
-        if not SolveTrajectory then return targetPart.Position end
-        if not PredictionToggle or not PredictionToggle.Enabled then return targetPart.Position end
-        if not tool then return targetPart.Position end
-        if not origin or not targetPart or not targetPart.Position then return targetPart.Position end
-
-        local projSpeed = tool:GetAttribute("ProjectileSpeed") or tool:GetAttribute("BulletSpeed") or 1500
-        local gravity = workspace.Gravity
-        local targetVel = Vector3.zero
-        local rootPart = targetPart.Parent and targetPart.Parent:FindFirstChild("HumanoidRootPart")
-        if rootPart and rootPart.Velocity then
-            targetVel = rootPart.Velocity
-        end
-
-        if targetVel.Magnitude < 2 then return targetPart.Position end
-
-        local ping = getPing()
-        local fps = getFPS()
-        local networkFactor = 1 + ping + (1 / math.max(fps, 1))
-        local speedFactor = math.clamp(targetVel.Magnitude / 30, 0.5, 2)
-        local predictedVel = targetVel * speedFactor * networkFactor
-
-        local success, predicted = pcall(SolveTrajectory, origin, projSpeed, gravity, targetPart.Position, predictedVel)
-        if success and predicted and typeof(predicted) == "Vector3" then
-            return predicted
-        end
-        return targetPart.Position
-    end
-
-       local function silentAimRedirect(args)
+    local function silentAimRedirect(args)
         if not entitylib or not entitylib.isAlive then return end
         local ent, targetPart, origin = getTarget(entitylib.character.Head.Position, nil)
         if not ent or not targetPart or typeof(args[1]) ~= "table" then return end
@@ -1358,7 +1329,31 @@ run(function()
         if SilentAim and SilentAim.Enabled then
             local char = entitylib.character.Character
             local tool = char and char:FindFirstChildOfClass("Tool")
-            local predictedPos = getPredictedPosition(origin, targetPart, tool)
+
+            local predictedPos = targetPart.Position
+
+            if PredictionToggle and PredictionToggle.Enabled and SolveTrajectory and tool then
+                local projSpeed = tool:GetAttribute("ProjectileSpeed") or tool:GetAttribute("BulletSpeed") or 1500
+                local gravity = workspace.Gravity
+                local targetVel = Vector3.zero
+                local rootPart = targetPart.Parent and targetPart.Parent:FindFirstChild("HumanoidRootPart")
+                if rootPart and rootPart.Velocity then
+                    targetVel = rootPart.Velocity
+                end
+
+                if targetVel.Magnitude >= 2 then
+                    local ping = getPing()
+                    local fps = getFPS()
+                    local networkFactor = 1 + ping + (1 / math.max(fps, 1))
+                    local speedFactor = math.clamp(targetVel.Magnitude / 30, 0.5, 2)
+                    local predictedVel = targetVel * speedFactor * networkFactor
+
+                    local success, result = pcall(SolveTrajectory, origin, projSpeed, gravity, targetPart.Position, predictedVel)
+                    if success and result and typeof(result) == "Vector3" then
+                        predictedPos = result
+                    end
+                end
+            end
 
             for _, hit in ipairs(originalHits) do
                 if typeof(hit) == "table" then
@@ -1584,7 +1579,7 @@ run(function()
     PredictionToggle = SilentAim:CreateToggle({
         Name = "Prediction",
         Default = false,
-        Tooltip = "Automatically leads moving targets"
+        Tooltip = "Automatically leads moving targets based on speed, ping, and fps"
     })
 end)
                                                                                                                     
