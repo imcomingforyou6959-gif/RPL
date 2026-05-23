@@ -842,6 +842,7 @@ run(function()
 	local CircleObject
 	local RightClick
 	local ShowTarget
+	local EnemyOnlyToggle
 	local moveConst = Vector2.new(1, 0.77) * math.rad(0.5)
 	
 	local function wrapAngle(num)
@@ -849,6 +850,28 @@ run(function()
 		num -= num >= (math.pi / 2) and math.pi or 0
 		num += num < -(math.pi / 2) and math.pi or 0
 		return num
+	end
+
+		local function checkEnemy(player)
+		if not EnemyOnlyToggle or not EnemyOnlyToggle.Enabled then return true end
+		if player == lplr then return false end
+		
+		local myEnv = lplr:GetAttribute("EnvironmentID")
+		local myTeam = lplr:GetAttribute("TeamID")
+		local targetEnv = player:GetAttribute("EnvironmentID")
+		local targetTeam = player:GetAttribute("TeamID")
+		
+		if myEnv and myTeam and targetEnv and targetTeam then
+			if string.byte(myEnv or string.char(0)) ~= string.byte(targetEnv or string.char(0)) then return false end
+			if string.byte(myTeam or string.char(0)) == string.byte(targetTeam or string.char(0)) then return false end
+			return true
+		end
+		
+		if lplr.Team and player.Team then
+			return lplr.Team ~= player.Team
+		end
+		
+		return true
 	end
 	
 	AimAssist = vape.Categories.Combat:CreateModule({
@@ -876,21 +899,27 @@ run(function()
 						})
 	
 						if ent then
-							local facing = gameCamera.CFrame.LookVector
-							local new = (ent[Part.Value].Position - gameCamera.CFrame.Position).Unit
-							new = new == new and new or Vector3.zero
-	
-							if ShowTarget.Enabled then
-								targetinfo.Targets[ent] = tick() + 1
+							if ent.Player and not checkEnemy(ent.Player) then
+								ent = nil
 							end
 	
-							if new ~= Vector3.zero then
-								local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - math.atan2(new.X, new.Z))
-								local diffPitch = math.asin(facing.Y) - math.asin(new.Y)
-								local angle = Vector2.new(diffYaw, diffPitch) // (moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity)
+							if ent then
+								local facing = gameCamera.CFrame.LookVector
+								local new = (ent[Part.Value].Position - gameCamera.CFrame.Position).Unit
+								new = new == new and new or Vector3.zero
 	
-								angle *= math.min(Speed.Value * dt, 1)
-								mousemoverel(angle.X, angle.Y)
+								if ShowTarget.Enabled then
+									targetinfo.Targets[ent] = tick() + 1
+								end
+	
+								if new ~= Vector3.zero then
+									local diffYaw = wrapAngle(math.atan2(facing.X, facing.Z) - math.atan2(new.X, new.Z))
+									local diffPitch = math.asin(facing.Y) - math.asin(new.Y)
+									local angle = Vector2.new(diffYaw, diffPitch) // (moveConst * UserSettings():GetService('UserGameSettings').MouseSensitivity)
+	
+									angle *= math.min(Speed.Value * dt, 1)
+									mousemoverel(angle.X, angle.Y)
+								end
 							end
 						end
 					end
@@ -1004,6 +1033,11 @@ run(function()
 	})
 	ShowTarget = AimAssist:CreateToggle({
 		Name = 'Show target info'
+	})
+	EnemyOnlyToggle = AimAssist:CreateToggle({
+		Name = 'Team Check',
+		Default = true,
+		Tooltip = '<3'
 	})
 end)
 	
