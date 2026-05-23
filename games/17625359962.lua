@@ -200,7 +200,7 @@ run(function()
         return part, part and part.Position
     end
 
-    local function getClosestPlayerToMouse()
+    local function getClosestPlayerToMouse(fovRadius)
         local closest = nil
         local shortest = math.huge
         local mousePos = inputService:GetMouseLocation()
@@ -218,7 +218,7 @@ run(function()
                 local screenPos, onScreen = getScreenPosition(part)
                 if onScreen and screenPos.Z > 0 then
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if dist < shortest then
+                    if dist < shortest and dist <= fovRadius then
                         shortest = dist
                         closest = player
                     end
@@ -238,6 +238,7 @@ run(function()
     local aimPartSA = "Head"
     local smoothnessSA = 1
     local wallCheckSA = true
+    local fovRadiusSA = 100
     local ShowTargetSA = nil
     local CircleObject = nil
     local CircleColor, CircleTransparency, CircleFilled
@@ -306,10 +307,11 @@ run(function()
         Name = 'Silent Aim',
         Function = function(callback)
             silentAimEnabled = callback
+            if CircleObject then CircleObject.Visible = callback end
             if callback then
                 cameraLockConnection = runService.Heartbeat:Connect(function()
                     if not isLobbyVisible() then
-                        targetPlayer = getClosestPlayerToMouse()
+                        targetPlayer = getClosestPlayerToMouse(fovRadiusSA)
                         if targetPlayer and math.random(100) <= lockChance then
                             lockCameraToHead()
                         end
@@ -323,15 +325,16 @@ run(function()
                 visibilityCache = {}
             end
         end,
-        Tooltip = 'Redirects Bullets :3'
+        Tooltip = 'Snaps camera to nearest enemy inside FOV circle'
     })
 
-    SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to Redirect onto'})
-    SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='smoothness'})
-    SilentAim:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheckSA=v end, Tooltip='Only Redirect when visible'})
+    SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to aim at'})
+    SilentAim:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadiusSA=v; if CircleObject then CircleObject.Radius=v end end, Suffix='px', Tooltip='Max distance from crosshair in pixels'})
+    SilentAim:CreateSlider({Name='Smoothness', Min=1, Max=100, Default=100, Function=function(v) smoothnessSA=v/100 end, Suffix='%', Tooltip='Camera lock smoothness'})
+    SilentAim:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheckSA=v end, Tooltip='Only lock when target is visible'})
     SilentAim:CreateToggle({Name='Prediction', Default=false, Function=function(v) predictionEnabled=v end, Tooltip='Predict enemy movement'})
     SilentAim:CreateSlider({Name='Prediction Time (s)', Min=0.05, Max=0.5, Default=0.1, Decimal=100, Function=function(v) predictionTime=v end, Suffix='s', Tooltip='Time to predict ahead'})
-    SilentAim:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) lockChance=v end, Suffix='%', Tooltip='Chance to Redirect per check'})
+    SilentAim:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) lockChance=v end, Suffix='%', Tooltip='Chance to lock per check'})
     SilentAim:CreateSlider({Name='Click Interval', Min=1, Max=50, Default=10, Function=function(v) clickInterval=v/100 end, Suffix='s', Tooltip='Time between auto‑clicks'})
     ShowTargetSA = SilentAim:CreateToggle({Name='Show Target Info', Default=true})
     CircleColor = SilentAim:CreateColorSlider({Name='Circle Color', Darker=true, Visible=false, Function=function(h,s,v) if CircleObject then CircleObject.Color=Color3.fromHSV(h,s,v) end end})
@@ -343,7 +346,8 @@ run(function()
             CircleObject.Filled = CircleFilled and CircleFilled.Enabled
             CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, 1, 1)
             CircleObject.Position = vape.gui.AbsoluteSize/2
-            CircleObject.Radius = 150; CircleObject.NumSides = 100
+            CircleObject.Radius = fovRadiusSA
+            CircleObject.NumSides = 100
             CircleObject.Transparency = 1-(CircleTransparency and CircleTransparency.Value or 0.5)
             CircleObject.Visible = silentAimEnabled
         else
