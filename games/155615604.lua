@@ -43,11 +43,11 @@ local run = function(func, issue)
     pcall(func)
 end
 
-local blacklistUrl = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
+local blacklistu = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
 local function fetchBlacklist()
     local httpService = game:GetService("HttpService")
     local success, result = pcall(function()
-        return game:HttpGet(blacklistUrl)
+        return game:HttpGet(blacklistu)
     end)
     if not success then return nil end
     local ok, data = pcall(httpService.JSONDecode, httpService, result)
