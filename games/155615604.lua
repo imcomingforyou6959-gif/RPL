@@ -1207,7 +1207,6 @@ run(function()
     local ShowTarget
     local filterTeamSA
     local TeamFilterSA
-    local PredictionToggle
     local rand = Random.new()
     local delayCheck = tick()
     local GunTracers = require(replicatedStorageService:WaitForChild("SharedModules"):WaitForChild("GunTracers"))
@@ -1216,18 +1215,6 @@ run(function()
     local mouseClicked = false
     local renderStepConnection
     local watchdogConnection
-
-    local function getPing()
-        local ping = 0
-        pcall(function()
-            ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-        end)
-        return ping / 1000
-    end
-
-    local function getFPS()
-        return 1 / (runService.RenderStepped:Wait() or 0.016)
-    end
 
     local function tryShoot(origin, targetPart, tool)
         if not tool or not targetPart or not targetPart.Parent then return end
@@ -1319,51 +1306,13 @@ run(function()
 
         local originalHits = args[1]
         if SilentAim and SilentAim.Enabled then
-            local char = entitylib.character.Character
-            local tool = char and char:FindFirstChildOfClass("Tool")
-
-            local predictedPos = targetPart.Position
-
-            if PredictionToggle and PredictionToggle.Enabled and SolveTrajectory and tool then
-                local projSpeed = tool:GetAttribute("ProjectileSpeed") or tool:GetAttribute("BulletSpeed") or 1500
-                local gravity = workspace.Gravity
-                local targetVel = Vector3.zero
-                local rootPart = targetPart.Parent and targetPart.Parent:FindFirstChild("HumanoidRootPart")
-                if rootPart and rootPart.Velocity then
-                    targetVel = rootPart.Velocity
-                end
-
-                if targetVel.Magnitude >= 2 then
-                    local ping = getPing()
-                    local fps = getFPS()
-                    local networkFactor = 1 + ping + (1 / math.max(fps, 1))
-                    local speedFactor = math.clamp(targetVel.Magnitude / 30, 0.5, 2)
-                    local predictedVel = targetVel * speedFactor * networkFactor
-
-                    local success, result = pcall(SolveTrajectory, origin, projSpeed, gravity, targetPart.Position, predictedVel)
-                    if success and result and typeof(result) == "Vector3" then
-                        predictedPos = result
-                    end
-                end
-            end
-
             for _, hit in ipairs(originalHits) do
                 if typeof(hit) == "table" then
                     hit[1] = origin
-                    hit[2] = predictedPos
+                    hit[2] = targetPart.Position
                     hit[3] = targetPart
                 end
             end
-
-            pcall(function()
-                if t.hn.e and targetPart and targetPart.Parent then
-                    local partName = tostring(targetPart.Name) or "??"
-                    local parentName = tostring(targetPart.Parent.Name) or "??"
-                    if type(partName) == "string" and type(parentName) == "string" then
-                        notif('Rawr.xyz', 'attempted to hit ' .. parentName .. "'s " .. partName, 3)
-                    end
-                end
-            end)
         end
     end
 
@@ -1568,11 +1517,6 @@ run(function()
     })
     Face = SilentAim:CreateToggle({ Name = 'Face target' })
     ShowTarget = SilentAim:CreateToggle({ Name = "Show Target Info" })
-    PredictionToggle = SilentAim:CreateToggle({
-        Name = "Prediction",
-        Default = false,
-        Tooltip = "Automatically leads moving targets based on speed, ping, and fps"
-    })
 end)
                                                                                                                     
 run(function()
