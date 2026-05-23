@@ -2390,23 +2390,21 @@ run(function()
             return
         end
 
-        local inputFunc = clientItemModule.Input
+    local inputFunc = clientItemModule.Input
         oldInput = hookfunction(inputFunc, function(data)
             if gunModsEnabled and type(data) == "table" then
-                local info = rawget(data, "Info")
+                local info = data.Info
                 if type(info) == "table" then
-                    rawset(info, "ShootRecoil", recoilVal)
-                    rawset(info, "ShootSpread", spreadVal)
-                    rawset(info, "ProjectileSpeed", projSpeedVal)
-                    rawset(info, "ShootCooldown", shootCooldownVal)
-                    rawset(info, "QuickShotCooldown", quickShotCooldownVal)
+                    if info.ShootRecoil ~= nil then info.ShootRecoil = recoilVal end
+                    if info.ShootSpread ~= nil then info.ShootSpread = spreadVal end
+                    if info.ProjectileSpeed ~= nil then info.ProjectileSpeed = projSpeedVal end
+                    if info.ShootCooldown ~= nil then info.ShootCooldown = shootCooldownVal end
+                    if info.QuickShotCooldown ~= nil then info.QuickShotCooldown = quickShotCooldownVal end
                 end
             end
             return oldInput(data)
         end)
-        hookActive = true
-    end
-
+                                                                                                                                                                                                                                                                        
     local function cancelPending()
         if pendingTask then
             pcall(task.cancel, pendingTask)
