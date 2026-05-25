@@ -1145,7 +1145,7 @@ run(function()
     end
 
     local function applyAllViewModels()
-        local assets = replicatedStorageService:FindFirstChild("Assets")
+        local assets = ReplicatedStorage:FindFirstChild("Assets")
         if not assets then return end
         local temp = assets:FindFirstChild("Temp")
         if not temp then return end
@@ -1164,7 +1164,7 @@ run(function()
             local assets, temp, folder
             repeat
                 task.wait(1)
-                assets = replicatedStorageService:FindFirstChild("Assets")
+                assets = ReplicatedStorage:FindFirstChild("Assets")
                 if assets then
                     temp = assets:FindFirstChild("Temp")
                     if temp then
