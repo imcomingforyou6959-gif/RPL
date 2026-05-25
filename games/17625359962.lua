@@ -1020,7 +1020,7 @@ run(function()
     local localPlayer = Players.LocalPlayer
     local HttpService = game:GetService("HttpService")
 
-    local R15_PARTS = {
+    local r15prts = {
         "Head", "UpperTorso", "LowerTorso",
         "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
         "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg",
@@ -1039,7 +1039,6 @@ run(function()
     local selectedColor = Color3.new(1, 1, 1)
     local selectedTransparency = 0
 
-    -- (config save/load helpers same as before, omitted for brevity – keep them from your original)
     local function ensureFolders()
         if not isfolder("newvape") then makefolder("newvape") end
         if not isfolder("newvape/assets") then makefolder("newvape/assets") end
@@ -1082,7 +1081,7 @@ run(function()
     local function cacheOriginalProperties()
         local char = localPlayer.Character
         if not char then return end
-        for _, partName in ipairs(R15_PARTS) do
+        for _, partName in ipairs(r15prts) do
             local part = char:FindFirstChild(partName)
             if part and part:IsA("BasePart") then
                 originalProperties[partName] = {
@@ -1118,7 +1117,7 @@ run(function()
     end
 
     local function applyAll()
-        for _, partName in ipairs(R15_PARTS) do
+        for _, partName in ipairs(r15prts) do
             applyPart(partName, selectedMaterial, selectedColor, selectedTransparency)
         end
     end
@@ -1126,9 +1125,63 @@ run(function()
     local function restoreAll()
         local char = localPlayer.Character
         if not char then return end
-        for _, partName in ipairs(R15_PARTS) do
+        for _, partName in ipairs(r15prts) do
             restorePart(partName)
         end
+    end
+
+    local function applyToPart(part, material, color, transparency)
+        if not part or not part:IsA("BasePart") then return end
+        part.Material = Enum.Material[material] or part.Material
+        part.Color = color
+        part.Transparency = transparency or 0
+    end
+
+    local function colorViewModel(model)
+        if not model or not model:IsA("Model") then return end
+        for _, part in ipairs(model:GetDescendants()) do
+            applyToPart(part, selectedMaterial, selectedColor, selectedTransparency)
+        end
+    end
+
+    local function applyAllViewModels()
+        local assets = replicatedStorageService:FindFirstChild("Assets")
+        if not assets then return end
+        local temp = assets:FindFirstChild("Temp")
+        if not temp then return end
+        local viewModelsFolder = temp:FindFirstChild("ViewModels")
+        if not viewModelsFolder then return end
+
+        for _, model in ipairs(viewModelsFolder:GetChildren()) do
+            if model:IsA("Model") then
+                colorViewModel(model)
+            end
+        end
+    end
+
+    local function startViewModelHook()
+        task.spawn(function()
+            local assets, temp, folder
+            repeat
+                task.wait(1)
+                assets = replicatedStorageService:FindFirstChild("Assets")
+                if assets then
+                    temp = assets:FindFirstChild("Temp")
+                    if temp then
+                        folder = temp:FindFirstChild("ViewModels")
+                    end
+                end
+            until folder
+
+            applyAllViewModels()
+
+            folder.ChildAdded:Connect(function(model)
+                if model:IsA("Model") then
+                    task.wait(0.1)
+                    colorViewModel(model)
+                end
+            end)
+        end)
     end
 
     localPlayer.CharacterAdded:Connect(function(char)
@@ -1152,7 +1205,7 @@ run(function()
                 restoreAll()
             end
         end,
-        Tooltip = "Custom materials & colors on all body parts"
+        Tooltip = "Custom materials"
     })
 
     SelfVisuals:CreateDropdown({
@@ -1189,6 +1242,8 @@ run(function()
     if localPlayer.Character then
         applyAll()
     end
+
+    startViewModelHook()
 
     vape:Clean(function()
         restoreAll()
