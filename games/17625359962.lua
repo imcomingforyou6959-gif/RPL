@@ -1014,14 +1014,15 @@ run(function()
         Tooltip = "ESP for subspace"
     })
 end)
-
 run(function()
     local Players = game:GetService("Players")
     local localPlayer = Players.LocalPlayer
     local HttpService = game:GetService("HttpService")
 
-    local R15_PARTS = {
-        "Head", "UpperTorso", "LowerTorso",
+    local ALL_PARTS = {
+        "Head", "Torso",
+        "UpperTorso", "LowerTorso",
+        "Left Arm", "Right Arm", "Left Leg", "Right Leg",
         "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
         "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg",
         "LeftHand", "RightHand", "LeftFoot", "RightFoot"
@@ -1038,7 +1039,7 @@ run(function()
     local selectedMaterial = "Plastic"
     local selectedColor = Color3.new(1, 1, 1)
     local selectedTransparency = 0
-                                                                                                                                
+
     local function ensureFolders()
         if not isfolder("newvape") then makefolder("newvape") end
         if not isfolder("newvape/assets") then makefolder("newvape/assets") end
@@ -1081,7 +1082,7 @@ run(function()
     local function cacheOriginalProperties()
         local char = localPlayer.Character
         if not char then return end
-        for _, partName in ipairs(R15_PARTS) do
+        for _, partName in ipairs(ALL_PARTS) do
             local part = char:FindFirstChild(partName)
             if part and part:IsA("BasePart") then
                 originalProperties[partName] = {
@@ -1117,7 +1118,7 @@ run(function()
     end
 
     local function applyAll()
-        for _, partName in ipairs(R15_PARTS) do
+        for _, partName in ipairs(ALL_PARTS) do
             applyPart(partName, selectedMaterial, selectedColor, selectedTransparency)
         end
     end
@@ -1125,7 +1126,7 @@ run(function()
     local function restoreAll()
         local char = localPlayer.Character
         if not char then return end
-        for _, partName in ipairs(R15_PARTS) do
+        for _, partName in ipairs(ALL_PARTS) do
             restorePart(partName)
         end
     end
@@ -1144,48 +1145,49 @@ run(function()
         end
     end
 
-    local function applyAllViewModels()
-        local assets = replicatedStorageService:FindFirstChild("Assets")
-        if not assets then return end
-        local temp = assets:FindFirstChild("Temp")
-        if not temp then return end
-        local viewModelsFolder = temp:FindFirstChild("ViewModels")
-        if not viewModelsFolder then return end
+    local function hookWorkspaceViewModels()
+        local myName = localPlayer.Name
+        workspace.ChildAdded:Connect(function(child)
+            if not child:IsA("Model") then return end
+            if child.Name:sub(1, #myName) == myName and child.Name:find(" - ") then
+                task.wait(0.15)
+                colorViewModel(child)
+            end
+        end)
 
-        for _, model in ipairs(viewModelsFolder:GetChildren()) do
-            if model:IsA("Model") then
-                colorViewModel(model)
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child:IsA("Model") and child.Name:sub(1, #myName) == myName and child.Name:find(" - ") then
+                task.wait(0.1)
+                colorViewModel(child)
             end
         end
     end
 
-    local function startViewModelHook()
-        task.spawn(function()
-            local assets, temp, folder
-            repeat
-                task.wait(1)
-                assets = replicatedStorageService:FindFirstChild("Assets")
-                if assets then
-                    temp = assets:FindFirstChild("Temp")
-                    if temp then
-                        folder = temp:FindFirstChild("ViewModels")
-                    end
-                end
-            until folder
+    local function hookStorageViewModels()
+        local assets = replicatedStorageService:FindFirstChild("Assets")
+        if not assets then return end
+        local temp = assets:FindFirstChild("Temp")
+        if not temp then return end
+        local folder = temp:FindFirstChild("ViewModels")
+        if not folder then return end
 
-            applyAllViewModels()
+        for _, model in ipairs(folder:GetChildren()) do
+            if model:IsA("Model") then
+                task.wait(0.1)
+                colorViewModel(model)
+            end
+        end
 
-            folder.ChildAdded:Connect(function(model)
-                if model:IsA("Model") then
-                    task.wait(0.1)
-                    colorViewModel(model)
-                end
-            end)
+        folder.ChildAdded:Connect(function(model)
+            if model:IsA("Model") then
+                task.wait(0.1)
+                colorViewModel(model)
+            end
         end)
     end
-
+                                                                                                                                
     localPlayer.CharacterAdded:Connect(function(char)
-        task.wait(0.1)
+        task.wait(0.2)
         originalProperties = {}
         cacheOriginalProperties()
         applyAll()
@@ -1205,7 +1207,7 @@ run(function()
                 restoreAll()
             end
         end,
-        Tooltip = "Custom materials & colors on all body parts"
+        Tooltip = "Custom materials & colors on your character and viewmodel"
     })
 
     SelfVisuals:CreateDropdown({
@@ -1242,7 +1244,9 @@ run(function()
     if localPlayer.Character then
         applyAll()
     end
-    startViewModelHook()
+
+    task.spawn(hookStorageViewModels)
+    task.spawn(hookWorkspaceViewModels)
 
     vape:Clean(function()
         restoreAll()
