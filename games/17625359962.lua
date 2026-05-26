@@ -1014,6 +1014,7 @@ run(function()
         Tooltip = "ESP for subspace"
     })
 end)
+                                                                                                                        
 run(function()
     local Players = game:GetService("Players")
     local localPlayer = Players.LocalPlayer
@@ -1145,22 +1146,51 @@ run(function()
         end
     end
 
+    local function applyToPart(part, material, color, transparency)
+        if not part or not part:IsA("BasePart") then return end
+        part.Material = Enum.Material[material] or part.Material
+        part.Color = color
+        part.Transparency = transparency or 0
+    end
+
+    local function colorViewModel(model)
+        if not model or not model:IsA("Model") then return end
+        for _, part in ipairs(model:GetDescendants()) do
+            applyToPart(part, selectedMaterial, selectedColor, selectedTransparency)
+        end
+    end
+
     local function hookWorkspaceViewModels()
         local myName = localPlayer.Name
+
+        local function scanFirstPerson()
+            local firstPerson = workspace:FindFirstChild("ViewModels")
+            if not firstPerson then return end
+            firstPerson = firstPerson:FindFirstChild("FirstPerson")
+            if not firstPerson then return end
+
+            for _, model in ipairs(firstPerson:GetChildren()) do
+                if model:IsA("Model") then
+                    colorViewModel(model)
+                end
+            end
+
+            firstPerson.ChildAdded:Connect(function(model)
+                if model:IsA("Model") then
+                    task.wait(0.1)
+                    colorViewModel(model)
+                end
+            end)
+        end
+
         workspace.ChildAdded:Connect(function(child)
-            if not child:IsA("Model") then return end
-            if child.Name:sub(1, #myName) == myName and child.Name:find(" - ") then
+            if child:IsA("Model") and child.Name:sub(1, #myName) == myName and child.Name:find(" - ") then
                 task.wait(0.15)
                 colorViewModel(child)
             end
         end)
 
-        for _, child in ipairs(workspace:GetChildren()) do
-            if child:IsA("Model") and child.Name:sub(1, #myName) == myName and child.Name:find(" - ") then
-                task.wait(0.1)
-                colorViewModel(child)
-            end
-        end
+        scanFirstPerson()
     end
 
     local function hookStorageViewModels()
@@ -2522,6 +2552,66 @@ run(function()
     })
 end)
                                                                                                                                                                                                                                                                                     
+run(function()
+    local tracerColor = Color3.fromRGB(255, 255, 255)
+    local enabled = false
+    local conn = nil
+
+    local function applyColor(obj)
+        if not obj:IsA("BasePart") then
+            for _, part in ipairs(obj:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Color = tracerColor
+                end
+            end
+            return
+        end
+        obj.Color = tracerColor
+    end
+
+    local TracersModule = vape.Categories.Utility:CreateModule({
+        Name = "Tracers",
+        Function = function(callback)
+            enabled = callback
+            if callback then
+                conn = workspace.ChildAdded:Connect(function(child)
+                    if child.Name == "TracerEffect" then
+                        task.wait(0.01)
+                        applyColor(child)
+                    end
+                end)
+
+                for _, child in ipairs(workspace:GetChildren()) do
+                    if child.Name == "TracerEffect" then
+                        applyColor(child)
+                    end
+                end
+            else
+                if conn then conn:Disconnect(); conn = nil end
+            end
+        end,
+        Tooltip = "Change the colour of bullet tracer effects"
+    })
+
+    TracersModule:CreateColorSlider({
+        Name = "Tracer Color",
+        Function = function(h, s, v)
+            tracerColor = Color3.fromHSV(h, s, v)
+            if enabled then
+                for _, child in ipairs(workspace:GetChildren()) do
+                    if child.Name == "TracerEffect" then
+                        applyColor(child)
+                    end
+                end
+            end
+        end
+    })
+
+    vape:Clean(function()
+        if conn then conn:Disconnect() end
+    end)
+end)
+                                                                                                                                                                                                                                               
 run(function()
     if hookmetamethod and getnamecallmethod then
         local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
