@@ -418,20 +418,10 @@ run(function()
 
     local enabled = false
     local gameReady = false
-    local cacheCleanupTick = 0
-    local CACHE_CLEANUP_INTERVAL = 30
 
     local aimPart = "Head"
     local fovRadius = 100
     local wallCheck = true
-    local hitChance = 100
-    local predictionEnabled = false
-    local predictionTime = 0.1
-
-    local CircleObject = nil
-    local CircleColor, CircleTransparency, CircleFilled
-
-    local rand = Random.new()
 
     local function isGameActive()
         local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -448,6 +438,27 @@ run(function()
         return false
     end
 
+    local function checkEnemy(player)
+        if player == lplr then return false end
+        
+        local myEnv = lplr:GetAttribute("EnvironmentID")
+        local myTeam = lplr:GetAttribute("TeamID")
+        local targetEnv = player:GetAttribute("EnvironmentID")
+        local targetTeam = player:GetAttribute("TeamID")
+        
+        if myEnv and myTeam and targetEnv and targetTeam then
+            if string.byte(myEnv or string.char(0)) ~= string.byte(targetEnv or string.char(0)) then return false end
+            if string.byte(myTeam or string.char(0)) == string.byte(targetTeam or string.char(0)) then return false end
+            return true
+        end
+        
+        if lplr.Team and player.Team then
+            return lplr.Team ~= player.Team
+        end
+        
+        return true
+    end
+
     local function isVisible(part, targetChar)
         if not part then return false end
         local origin = gameCamera.CFrame.Position
@@ -457,13 +468,6 @@ run(function()
         rayParams.FilterDescendantsInstances = {lplr.Character, targetChar}
         local result = workspace:Raycast(origin, direction * (part.Position - origin).Magnitude, rayParams)
         return not result or result.Instance:IsDescendantOf(part.Parent)
-    end
-
-    local function getPredictedPosition(part)
-        if not part then return nil end
-        local vel = part.Velocity
-        if vel.Magnitude < 0.5 then return part.Position end
-        return part.Position + vel * predictionTime
     end
 
     local function getTargetPart(character)
@@ -484,9 +488,6 @@ run(function()
         else
             part = character:FindFirstChild("Head")
         end
-        if part and predictionEnabled then
-            return part, getPredictedPosition(part)
-        end
         return part, part and part.Position
     end
 
@@ -498,31 +499,32 @@ run(function()
 
         for _, player in ipairs(playersService:GetPlayers()) do
             if player == X.me then continue end
-            if not isEnemy(player) then continue end
+            if not checkEnemy(player) then continue end
             local char = player.Character
             if not char then continue end
             if not char:FindFirstChild("HumanoidRootPart") then continue end
             local part, pos = getTargetPart(char)
             if not part then continue end
-            local p, vis = X.cam:WorldToViewportPoint(part.Position)
-            if not vis then continue end
-            if wallCheck and not isVisible(part, char) then continue end
-            local d = (Vector2.new(cx, cy) - Vector2.new(p.X, p.Y)).Magnitude
-            if d < record then
-                record = d
+            if wallCheck then
+                local p, vis = X.cam:WorldToViewportPoint(part.Position)
+                if not vis then continue end
+                if not isVisible(part, char) then continue end
+                local d = (Vector2.new(cx, cy) - Vector2.new(p.X, p.Y)).Magnitude
+                if d < record then
+                    record = d
+                    winner = {part = part, pos = pos}
+                end
+            else
                 winner = {part = part, pos = pos}
+                break
             end
         end
         return winner
     end
 
-    -- Only hook Raycast once, toggle controls whether it redirects
     X.mod.Raycast = function(...)
         local args = {...}
         if not enabled or not gameReady then
-            return X.original(...)
-        end
-        if math.random(100) > hitChance then
             return X.original(...)
         end
         local target = getClosestPlayerToCrosshair()
@@ -531,17 +533,6 @@ run(function()
         end
         return X.original(table.unpack(args))
     end
-
-    -- Circle updater runs continuously while the circle exists
-    task.spawn(function()
-        while true do
-            if CircleObject then
-                CircleObject.Position = inputService:GetMouseLocation()
-                CircleObject.Radius = fovRadius
-            end
-            task.wait()
-        end
-    end)
 
     task.spawn(function()
         repeat
@@ -554,41 +545,16 @@ run(function()
         Name = 'Silent Aim V2',
         Function = function(callback)
             enabled = callback
-            if CircleObject then CircleObject.Visible = callback end
         end,
-        Tooltip = 'testin for coolness'
+        Tooltip = ':3'
     })
 
     SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
     SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v end, Suffix='px', Tooltip='Max distance from crosshair'})
     SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallCheck=v end, Tooltip='Only redirect when target is visible'})
-    SilentAimV2:CreateToggle({Name='Prediction', Default=false, Function=function(v) predictionEnabled=v end, Tooltip='Lead moving targets'})
-    SilentAimV2:CreateSlider({Name='Prediction Time (s)', Min=0.05, Max=0.5, Default=0.1, Decimal=100, Function=function(v) predictionTime=v end, Suffix='s', Tooltip='Time to predict ahead'})
-    SilentAimV2:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) hitChance=v end, Suffix='%', Tooltip='Chance to redirect'})
-    CircleColor = SilentAimV2:CreateColorSlider({Name='Circle Color', Darker=true, Visible=false, Function=function(h,s,v) if CircleObject then CircleObject.Color=Color3.fromHSV(h,s,v) end end})
-    CircleTransparency = SilentAimV2:CreateSlider({Name='Transparency', Min=0, Max=1, Decimal=10, Default=0.5, Darker=true, Visible=false, Function=function(v) if CircleObject then CircleObject.Transparency=1-v end end})
-    CircleFilled = SilentAimV2:CreateToggle({Name='Circle Filled', Darker=true, Visible=false, Function=function(c) if CircleObject then CircleObject.Filled=c end end})
-    SilentAimV2:CreateToggle({Name='Range Circle', Function=function(c)
-        if c then
-            CircleObject = Drawing.new('Circle')
-            CircleObject.Filled = CircleFilled and CircleFilled.Enabled
-            CircleObject.Color = Color3.fromHSV(CircleColor and CircleColor.Hue or 0, 1, 1)
-            CircleObject.Position = inputService:GetMouseLocation()
-            CircleObject.Radius = fovRadius
-            CircleObject.NumSides = 100
-            CircleObject.Transparency = 1-(CircleTransparency and CircleTransparency.Value or 0.5)
-            CircleObject.Visible = enabled
-        else
-            pcall(function() CircleObject:Remove() end); CircleObject = nil
-        end
-        if CircleColor then CircleColor.Object.Visible=c end
-        if CircleTransparency then CircleTransparency.Object.Visible=c end
-        if CircleFilled then CircleFilled.Object.Visible=c end
-    end})
 
     vape:Clean(function()
         X.mod.Raycast = X.original
-        if CircleObject then pcall(function() CircleObject:Remove() end) end
     end)
 end)
                                         
