@@ -395,9 +395,6 @@ run(function()
         return
     end
 
-    local UtilityModule = nil
-    local originalRaycast = nil
-    local hookActive = false
     local enabled = false
     local gameReady = false
 
@@ -407,12 +404,12 @@ run(function()
     local hitChance = 100
     local predictionEnabled = false
     local predictionTime = 0.1
-    local showTarget = true
 
     local CircleObject = nil
     local CircleColor, CircleTransparency, CircleFilled
 
     local rand = Random.new()
+    local originalRaycast = nil
 
     local function isGameActive()
         local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -431,8 +428,7 @@ run(function()
 
     local function getScreenPosition(part)
         if not part then return nil, false end
-        local pos, onScreen = gameCamera:WorldToViewportPoint(part.Position)
-        return pos, onScreen
+        return gameCamera:WorldToViewportPoint(part.Position)
     end
 
     local function isVisible(part, targetChar)
@@ -477,43 +473,35 @@ run(function()
         return part, part and part.Position
     end
 
-    local function getClosestPlayerToMouse()
+    local function getClosestPlayerToCrosshair()
         if not gameReady then return nil end
-        local closest = nil
-        local shortest = math.huge
-        local mousePos = inputService:GetMouseLocation()
+        local cx = gameCamera.ViewportSize.X / 2
+        local cy = gameCamera.ViewportSize.Y / 2
+        local winner, record = nil, fovRadius
 
         for _, player in ipairs(playersService:GetPlayers()) do
-            if player ~= lplr and isEnemy(player) then
-                local char = player.Character
-                if not char then continue end
-                local part, pos = getTargetPart(char)
-                if not part then continue end
-                local screenPos, onScreen = getScreenPosition(part)
-                if onScreen and screenPos.Z > 0 then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if dist < shortest and dist <= fovRadius then
-                        if not wallCheck or isVisible(part, char) then
-                            shortest = dist
-                            closest = {player = player, part = part, pos = pos}
-                        end
-                    end
-                end
+            if player == lplr then continue end
+            if not isEnemy(player) then continue end
+            local char = player.Character
+            if not char then continue end
+            local part, pos = getTargetPart(char)
+            if not part then continue end
+            local p, vis = gameCamera:WorldToViewportPoint(part.Position)
+            if not vis then continue end
+            if wallCheck and not isVisible(part, char) then continue end
+            local d = (Vector2.new(cx, cy) - Vector2.new(p.X, p.Y)).Magnitude
+            if d < record then
+                record = d
+                winner = {part = part, pos = pos}
             end
         end
-        return closest
+        return winner
     end
 
     local function setupHook()
-        if hookActive then return end
-        local ok, mod = pcall(function()
-            return require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
-        end)
-        if not ok or not mod or not mod.Raycast then
-            notif('Silent Aim V2', 'Could not hook Utility.Raycast.', 3, 'alert')
-            return
-        end
-        UtilityModule = mod
+        if originalRaycast then return end
+        local mod = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
+        if not mod or not mod.Raycast then return end
         originalRaycast = mod.Raycast
 
         mod.Raycast = function(...)
@@ -524,37 +512,34 @@ run(function()
             if math.random(100) > hitChance then
                 return originalRaycast(...)
             end
-
-            local target = getClosestPlayerToMouse()
+            local target = getClosestPlayerToCrosshair()
             if target and target.part and target.part.Parent then
                 args[3] = target.pos
             end
             return originalRaycast(table.unpack(args))
         end
-        hookActive = true
     end
 
     local function removeHook()
-        if UtilityModule and originalRaycast then
-            UtilityModule.Raycast = originalRaycast
+        if originalRaycast then
+            local mod = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
+            if mod then
+                mod.Raycast = originalRaycast
+            end
         end
-        hookActive = false
         originalRaycast = nil
-        UtilityModule = nil
     end
 
     task.spawn(function()
         repeat
             task.wait(0.5)
         until isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
-        local viewModelsFound = false
         for _ = 1, 30 do
             task.wait(0.5)
             local firstPerson = workspace:FindFirstChild("ViewModels")
             if firstPerson then
                 firstPerson = firstPerson:FindFirstChild("FirstPerson")
                 if firstPerson and #firstPerson:GetChildren() > 0 then
-                    viewModelsFound = true
                     break
                 end
             end
@@ -573,7 +558,7 @@ run(function()
                 removeHook()
             end
         end,
-        Tooltip = 'built for u <3'
+        Tooltip = 'Raycast redirect – silently moves your bullet to the target'
     })
 
     SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
@@ -582,7 +567,6 @@ run(function()
     SilentAimV2:CreateToggle({Name='Prediction', Default=false, Function=function(v) predictionEnabled=v end, Tooltip='Lead moving targets'})
     SilentAimV2:CreateSlider({Name='Prediction Time (s)', Min=0.05, Max=0.5, Default=0.1, Decimal=100, Function=function(v) predictionTime=v end, Suffix='s', Tooltip='Time to predict ahead'})
     SilentAimV2:CreateSlider({Name='Hit Chance', Min=0, Max=100, Default=100, Function=function(v) hitChance=v end, Suffix='%', Tooltip='Chance to redirect'})
-    SilentAimV2:CreateToggle({Name='Show Target Info', Default=true, Function=function(v) showTarget=v end})
     CircleColor = SilentAimV2:CreateColorSlider({Name='Circle Color', Darker=true, Visible=false, Function=function(h,s,v) if CircleObject then CircleObject.Color=Color3.fromHSV(h,s,v) end end})
     CircleTransparency = SilentAimV2:CreateSlider({Name='Transparency', Min=0, Max=1, Decimal=10, Default=0.5, Darker=true, Visible=false, Function=function(v) if CircleObject then CircleObject.Transparency=1-v end end})
     CircleFilled = SilentAimV2:CreateToggle({Name='Circle Filled', Darker=true, Visible=false, Function=function(c) if CircleObject then CircleObject.Filled=c end end})
