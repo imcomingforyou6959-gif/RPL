@@ -60,9 +60,6 @@ local coreGui = cloneref(game:GetService('CoreGui'))
 local guiService = cloneref(game:GetService('GuiService'))
 local tweenService = game:GetService('TweenService')
 
-local UtilityModule = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
-local originalRaycastGlobal = UtilityModule.Raycast
-
 local gameCamera = workspace.CurrentCamera
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
@@ -398,9 +395,29 @@ run(function()
         return
     end
 
+    local replicatedStorageService = cloneref(game:GetService('ReplicatedStorage'))
+    local UtilityModule = nil
+    local originalRaycastGlobal = nil
+    pcall(function()
+        UtilityModule = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
+        originalRaycastGlobal = UtilityModule.Raycast
+    end)
+    
+    if not UtilityModule or not originalRaycastGlobal then
+        notif('Silent Aim V2', 'Could not access Utility module.', 5, 'alert')
+        return
+    end
+
+    local X = {}
+    X.bone = "Head"
+    X.range = math.huge
+    X.mod = UtilityModule
+    X.original = originalRaycastGlobal
+    X.cam = gameCamera
+    X.me = lplr
+
     local enabled = false
     local gameReady = false
-    local hookActive = false
 
     local aimPart = "Head"
     local fovRadius = 100
@@ -473,18 +490,19 @@ run(function()
 
     local function getClosestPlayerToCrosshair()
         if not gameReady then return nil end
-        local cx = gameCamera.ViewportSize.X / 2
-        local cy = gameCamera.ViewportSize.Y / 2
+        local cx = X.cam.ViewportSize.X / 2
+        local cy = X.cam.ViewportSize.Y / 2
         local winner, record = nil, fovRadius
 
         for _, player in ipairs(playersService:GetPlayers()) do
-            if player == lplr then continue end
+            if player == X.me then continue end
             if not isEnemy(player) then continue end
             local char = player.Character
             if not char then continue end
+            if not char:FindFirstChild("HumanoidRootPart") then continue end
             local part, pos = getTargetPart(char)
             if not part then continue end
-            local p, vis = gameCamera:WorldToViewportPoint(part.Position)
+            local p, vis = X.cam:WorldToViewportPoint(part.Position)
             if not vis then continue end
             if wallCheck and not isVisible(part, char) then continue end
             local d = (Vector2.new(cx, cy) - Vector2.new(p.X, p.Y)).Magnitude
@@ -496,30 +514,19 @@ run(function()
         return winner
     end
 
-    local function applyHook()
-        if hookActive then return end
-        UtilityModule.Raycast = function(...)
-            local args = {...}
-            if not enabled or not gameReady then
-                return originalRaycastGlobal(...)
-            end
-            if math.random(100) > hitChance then
-                return originalRaycastGlobal(...)
-            end
-            local target = getClosestPlayerToCrosshair()
-            if target and target.part and target.part.Parent then
-                args[3] = target.pos
-            end
-            return originalRaycastGlobal(table.unpack(args))
+    X.mod.Raycast = function(...)
+        local args = {...}
+        if not enabled or not gameReady then
+            return X.original(...)
         end
-        hookActive = true
-    end
-
-    local function removeHook()
-        if UtilityModule then
-            UtilityModule.Raycast = originalRaycastGlobal
+        if math.random(100) > hitChance then
+            return X.original(...)
         end
-        hookActive = false
+        local target = getClosestPlayerToCrosshair()
+        if target and target.part and target.part.Parent then
+            args[3] = target.pos
+        end
+        return X.original(table.unpack(args))
     end
 
     task.spawn(function()
@@ -544,11 +551,6 @@ run(function()
         Function = function(callback)
             enabled = callback
             if CircleObject then CircleObject.Visible = callback end
-            if callback then
-                applyHook()
-            else
-                removeHook()
-            end
         end,
         Tooltip = 'Raycast redirect – silently moves your bullet to the target'
     })
@@ -581,7 +583,7 @@ run(function()
     end})
 
     vape:Clean(function()
-        removeHook()
+        X.mod.Raycast = X.original
         if CircleObject then pcall(function() CircleObject:Remove() end) end
     end)
 end)
