@@ -247,25 +247,28 @@ run(function()
     local lastRightClick = 0
     local predictionEnabled = false
     local predictionTime = 0.1
-    local aimMethod = "Camera Lock"
 
+    -- Raycast redirect state
     local UtilityModule = nil
     local originalRaycast = nil
-    local raycastHook = nil
+    local raycastActive = false
 
     local function setupRaycastHook()
-        if raycastHook then return end
+        if raycastActive then return end
         if not UtilityModule then
             local ok, mod = pcall(function()
                 return require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
             end)
-            if not ok or not mod or not mod.Raycast then return end
+            if not ok or not mod or not mod.Raycast then
+                notif('Silent Aim', 'Raycast method not supported on this executor', 3, 'alert')
+                return
+            end
             UtilityModule = mod
         end
         originalRaycast = UtilityModule.Raycast
         UtilityModule.Raycast = function(...)
             local args = {...}
-            if not silentAimEnabled or aimMethod ~= "Raycast" then
+            if not silentAimEnabled or Method.Value ~= "Raycast" then
                 return originalRaycast(...)
             end
             if math.random(100) > lockChance then
@@ -277,14 +280,13 @@ run(function()
                 local part, pos = getTargetPart(target.Character, aimPartSA, predictionEnabled and predictionTime or 0)
                 if part and pos then
                     if not wallCheckSA or isVisibleCached(part, target.Character) then
-                        -- rdr
                         args[3] = pos
                     end
                 end
             end
             return originalRaycast(table.unpack(args))
         end
-        raycastHook = true
+        raycastActive = true
     end
 
     local function removeRaycastHook()
@@ -292,7 +294,7 @@ run(function()
             UtilityModule.Raycast = originalRaycast
         end
         originalRaycast = nil
-        raycastHook = nil
+        raycastActive = false
     end
 
     local function lockCameraToHead()
@@ -369,13 +371,20 @@ run(function()
         end
     end)
 
+    -- Vape module
     local SilentAim = vape.Categories.Combat:CreateModule({
         Name = 'Silent Aim',
         Function = function(callback)
             silentAimEnabled = callback
             if CircleObject then CircleObject.Visible = callback end
+            
+            -- Disable any running method first
+            if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
+            removeRaycastHook()
+            
             if callback then
-                if aimMethod == "Old Silent" then
+                local method = Method.Value or "Camera Lock"
+                if method == "Camera Lock" then
                     cameraLockConnection = runService.Heartbeat:Connect(function()
                         local now = tick()
                         if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
@@ -383,7 +392,6 @@ run(function()
                             screenCache = {}
                             visibilityCache = {}
                         end
-
                         if CircleObject then
                             CircleObject.Position = inputService:GetMouseLocation()
                         end
@@ -394,14 +402,10 @@ run(function()
                             end
                         end
                     end)
-                elseif aimMethod == "Raycast" then
+                elseif method == "Raycast" then
                     setupRaycastHook()
                 end
             else
-                if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
-                if autoClickConnection then autoClickConnection:Disconnect(); autoClickConnection = nil end
-                if aimMethod == "Raycast" then removeRaycastHook() end
-                targetPlayer = nil
                 screenCache = {}
                 visibilityCache = {}
                 cacheCleanupTick = 0
@@ -410,44 +414,40 @@ run(function()
         Tooltip = '<3'
     })
 
-    SilentAim:CreateDropdown({
+    -- Method dropdown (must be created before module Function uses it)
+    local Method = SilentAim:CreateDropdown({
         Name = 'Method',
-        List = {'Old Silent', 'Raycast'},
+        List = {'Camera Lock', 'Raycast'},
         Default = 'Camera Lock',
         Function = function(v)
-            if v == aimMethod then return end
-            if silentAimEnabled then
-                if aimMethod == "Old Silent" and cameraLockConnection then
-                    cameraLockConnection:Disconnect()
-                    cameraLockConnection = nil
-                elseif aimMethod == "Raycast" then
-                    removeRaycastHook()
-                end
-                if v == "Old Silent" then
-                    cameraLockConnection = runService.Heartbeat:Connect(function()
-                        local now = tick()
-                        if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
-                            cacheCleanupTick = now
-                            screenCache = {}
-                            visibilityCache = {}
+            if not silentAimEnabled then return end
+            -- Disable old method
+            if cameraLockConnection then cameraLockConnection:Disconnect(); cameraLockConnection = nil end
+            removeRaycastHook()
+            -- Enable new method
+            if v == "Camera Lock" then
+                cameraLockConnection = runService.Heartbeat:Connect(function()
+                    local now = tick()
+                    if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
+                        cacheCleanupTick = now
+                        screenCache = {}
+                        visibilityCache = {}
+                    end
+                    if CircleObject then
+                        CircleObject.Position = inputService:GetMouseLocation()
+                    end
+                    if not isLobbyVisible() then
+                        targetPlayer = getClosestPlayerToMouse(fovRadiusSA)
+                        if targetPlayer and math.random(100) <= lockChance then
+                            lockCameraToHead()
                         end
-                        if CircleObject then
-                            CircleObject.Position = inputService:GetMouseLocation()
-                        end
-                        if not isLobbyVisible() then
-                            targetPlayer = getClosestPlayerToMouse(fovRadiusSA)
-                            if targetPlayer and math.random(100) <= lockChance then
-                                lockCameraToHead()
-                            end
-                        end
-                    end)
-                elseif v == "Raycast" then
-                    setupRaycastHook()
-                end
+                    end
+                end)
+            elseif v == "Raycast" then
+                setupRaycastHook()
             end
-            aimMethod = v
         end,
-        Tooltip = 'Old Silent - All Executors/nRaycast Silent - HookFunction needed'
+        Tooltip = 'Camera Lock works on all executors. Raycast redirects bullets silently.'
     })
 
     SilentAim:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPartSA=v end, Tooltip='Part to aim at'})
