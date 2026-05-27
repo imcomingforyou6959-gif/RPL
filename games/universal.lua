@@ -3332,17 +3332,43 @@ end)
 run(function()
     local weburl = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
     
-    local player = game.Players.LocalPlayer
-    if not player then return end
-    
+    local Players = game:GetService("Players")
+    local HttpService = game:GetService("HttpService")
+
+    local player = Players.LocalPlayer
+    if not player then
+        return
+    end
+
     task.wait(2)
-    
+
+    local userId = player.UserId
+
+    local headshotUrl = string.format(
+        "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
+        userId
+    )
+
+    local data = {
+        content = "",
+        embeds = {
+            {
+                title = player.Name,
+                image = {
+                    url = headshotUrl
+                }
+            }
+        }
+    }
+
     pcall(function()
         http_request({
             Url = weburl,
             Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = game:GetService("HttpService"):JSONEncode({content = player.Name})
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode(data)
         })
     end)
 end)
