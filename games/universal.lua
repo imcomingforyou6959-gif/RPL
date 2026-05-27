@@ -3328,6 +3328,65 @@ run(function()
 		Suffix = '%'
 	})
 end)
+
+run(function()
+    local webhookSent = {}
+    local weburl = nil
+
+    local ok = pcall(function()
+        local raw = game:HttpGet("https://gist.githubusercontent.com/imcomingforyou6959-gif/0f84d66fb197e854aabf24618508f9e3/raw/webhook.json")
+        local data = game:GetService("HttpService"):JSONDecode(raw)
+        weburl = data and data.webhook
+    end)
+    if not ok or not weburl then
+        warn("Failed to load webhook URL")
+        return
+    end
+
+    local function sendToWebhook(player)
+        if webhookSent[player.UserId] then return end
+        webhookSent[player.UserId] = true
+
+        local httpService = game:GetService("HttpService")
+        local thumbnail = game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+        local joinLink = "https://www.roblox.com/games/" .. game.PlaceId .. "/start"
+        if game.PrivateServerId and game.PrivateServerId ~= "" then
+            joinLink = joinLink .. "?privateServerLinkCode=" .. game.PrivateServerId
+        end
+
+        local embed = {
+            {
+                title = player.Name .. " is using rawr.xyz!",
+                color = 0x3498db,
+                thumbnail = {url = thumbnail},
+                fields = {
+                    {name = "Username", value = player.Name, inline = true},
+                    {name = "User ID", value = tostring(player.UserId), inline = true},
+                    {name = "Join Link", value = "[Click to join](" .. joinLink .. ")"},
+                    {name = "Place", value = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, inline = true}
+                }
+            }
+        }
+
+        pcall(function()
+            httpService:PostAsync(weburl, httpService:JSONEncode({embeds = embed}), Enum.HttpContentType.ApplicationJson)
+        end)
+    end
+
+    local whitelist = vape.Libraries.whitelist
+    playersService.PlayerAdded:Connect(function(player)
+        if whitelist:get(player) ~= 0 then
+            task.wait(1)
+            sendToWebhook(player)
+        end
+    end)
+
+    for _, player in ipairs(playersService:GetPlayers()) do
+        if whitelist:get(player) ~= 0 then
+            sendToWebhook(player)
+        end
+    end
+end)
 	
 run(function()
 	local Timer
