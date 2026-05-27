@@ -3332,50 +3332,19 @@ end)
 run(function()
     local weburl = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
     
-    local function sendToWebhook()
-        local player = game.Players.LocalPlayer
-        if not player then return end
-        
-        local success, thumbnail = pcall(function()
-            return game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-        end)
-        
-        local joinLink = "https://www.roblox.com/games/" .. game.PlaceId .. "/start"
-        
-        local placeName = "Unknown"
-        pcall(function()
-            placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-        end)
-        
-        local payload = {
-            embeds = {
-                {
-                    title = player.Name .. " joined a game",
-                    color = 0x3498db,
-                    thumbnail = {url = success and thumbnail or ""},
-                    fields = {
-                        {name = "Username", value = player.Name, inline = true},
-                        {name = "User ID", value = tostring(player.UserId), inline = true},
-                        {name = "Join Link", value = "[Click to join](" .. joinLink .. ")"},
-                        {name = "Place", value = placeName, inline = true},
-                        {name = "Time", value = os.date("%Y-%m-%d %H:%M:%S")}
-                    }
-                }
-            }
-        }
-        
-        pcall(function()
-            http_request({
-                Url = weburl,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = game:GetService("HttpService"):JSONEncode(payload)
-            })
-        end)
-    end
+    local player = game.Players.LocalPlayer
+    if not player then return end
     
     task.wait(2)
-    sendToWebhook()
+    
+    pcall(function()
+        http_request({
+            Url = weburl,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = game:GetService("HttpService"):JSONEncode({content = player.Name})
+        })
+    end)
 end)
 	
 run(function()
