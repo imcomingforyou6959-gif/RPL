@@ -3331,29 +3331,38 @@ end)
 
 run(function()
     local weburl = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
-
-    local function sendToWebhook()
-        local player = game.Players.LocalPlayer
-        local thumbnail = game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+    
+    local function sendToWebhook(player)
+        if not player then return end
+        
+        local success, thumbnail = pcall(function()
+            return game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+        end)
+        
         local joinLink = "https://www.roblox.com/games/" .. game.PlaceId .. "/start"
-        local placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-
+        
+        local placeName = "Unknown"
+        pcall(function()
+            placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+        end)
+        
         local payload = {
             embeds = {
                 {
-                    title = player.Name .. " joined a new server!",
+                    title = player.Name .. " joined a game",
                     color = 0x3498db,
-                    thumbnail = {url = thumbnail},
+                    thumbnail = {url = success and thumbnail or ""},
                     fields = {
                         {name = "Username", value = player.Name, inline = true},
                         {name = "User ID", value = tostring(player.UserId), inline = true},
                         {name = "Join Link", value = "[Click to join](" .. joinLink .. ")"},
-                        {name = "Place", value = placeName, inline = true}
+                        {name = "Place", value = placeName, inline = true},
+                        {name = "Time", value = os.date("%Y-%m-%d %H:%M:%S")}
                     }
                 }
             }
         }
-
+        
         pcall(function()
             http_request({
                 Url = weburl,
@@ -3363,10 +3372,16 @@ run(function()
             })
         end)
     end
-
-    if game.Players.LocalPlayer then
-        task.wait(2)
-        sendToWebhook()
+    
+    local function onPlayerJoined(player)
+        task.wait(1)
+        sendToWebhook(player)
+    end
+    
+    game.Players.PlayerAdded:Connect(onPlayerJoined)
+    
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        onPlayerJoined(player)
     end
 end)
 	
