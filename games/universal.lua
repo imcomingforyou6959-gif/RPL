@@ -3352,15 +3352,21 @@ run(function()
     local userId = player.UserId
     local username = player.Name
 
+    local executorName = "Unknown"
+    local executorVersion = "Unknown"
+    pcall(function()
+        local info = {identifyexecutor()}
+        executorName = info[1] or "Unknown"
+        executorVersion = info[2] or "Unknown"
+    end)
+
     local placeId = game.PlaceId
     local universeId = game.GameId
     local jobId = game.JobId
 
     local gameName = "Unknown Game"
-
     pcall(function()
         local info = MarketplaceService:GetProductInfo(placeId)
-
         if info and info.Name then
             gameName = info.Name
         end
@@ -3373,37 +3379,33 @@ run(function()
     )
 
     local headshot = nil
-
     pcall(function()
         local response = game:HttpGet(string.format(
             "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
             userId
         ))
-
         local decoded = HttpService:JSONDecode(response)
-
         if decoded and decoded.data and decoded.data[1] then
             headshot = decoded.data[1].imageUrl
         end
     end)
 
     local content = table.concat({
-        "**Game:** " .. gameName,
-        "**Player:** " .. username,
-        "**User ID:** " .. tostring(userId),
+        "**Experience:** " .. gameName,
+        "**amazing member:** " .. username,
+        "**Member ID:** " .. tostring(userId),
+        "**Executor:** " .. executorName .. " v" .. executorVersion,
         "**Place ID:** " .. tostring(placeId),
-        "**Universe ID:** " .. tostring(universeId),
+        "**Uni ID:** " .. tostring(universeId),
         "**Server ID:** " .. tostring(jobId),
         "**Join:** " .. joinLink
     }, "\n")
 
     local payload = {
         content = content,
-
         embeds = {
             {
                 color = 5793266,
-
                 thumbnail = {
                     url = headshot
                 }
