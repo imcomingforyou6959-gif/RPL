@@ -3328,7 +3328,7 @@ run(function()
 		Suffix = '%'
 	})
 end)
-
+	
 run(function()
 	local Timer
 	local Value
@@ -7839,4 +7839,3 @@ run(function()
 	})
 	
 end)
-	
