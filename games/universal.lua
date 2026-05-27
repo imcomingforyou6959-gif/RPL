@@ -3329,7 +3329,10 @@ run(function()
 	})
 end)
 
-local Players = game:GetService("Players")
+run(function()
+    local webhook = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
+
+    local Players = game:GetService("Players")
     local HttpService = game:GetService("HttpService")
 
     local player = Players.LocalPlayer
