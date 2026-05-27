@@ -408,36 +408,21 @@ run(function()
         return
     end
 
-    local X = {}
-    X.bone = "Head"
-    X.range = math.huge
-    X.mod = UtilityModule
-    X.original = originalRaycastGlobal
-    X.cam = gameCamera
-    X.me = lplr
+    local cam = gameCamera
+    local me = lplr
+    local Targets
 
     local enabled = false
     local gameReady = false
-
     local aimPart = "Head"
     local fovRadius = 100
-    local visibleCheck = true
-    local wallchk = true
     local fovTrack = false
 
-    local circle = nil
-    local function createCircle()
-        if circle then return end
-        pcall(function()
-            circle = Drawing.new("Circle")
-            circle.Color = Color3.fromRGB(255, 0, 0)
-            circle.Thickness = 1.5
-            circle.Transparency = 0.7
-            circle.Radius = fovRadius
-            circle.Visible = false
-        end)
-    end
-    createCircle()
+    local CircleObject = nil
+    local circlePos = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+    local circleColor = {Hue=0, Saturation=1, Value=1}
+    local circleTransparency = 0.5
+    local circleFilled = false
 
     local function isAlive(player)
         local char = player.Character
@@ -447,7 +432,7 @@ run(function()
     end
 
     local function isGameActive()
-        local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
+        local mainGui = me.PlayerGui:FindFirstChild("MainGui")
         if mainGui then
             local mainFrame = mainGui:FindFirstChild("MainFrame")
             if mainFrame then
@@ -462,10 +447,9 @@ run(function()
     end
 
     local function checkEnemy(player)
-        if player == lplr then return false end
-
-        local myEnv = lplr:GetAttribute("EnvironmentID")
-        local myTeam = lplr:GetAttribute("TeamID")
+        if player == me then return false end
+        local myEnv = me:GetAttribute("EnvironmentID")
+        local myTeam = me:GetAttribute("TeamID")
         local targetEnv = player:GetAttribute("EnvironmentID")
         local targetTeam = player:GetAttribute("TeamID")
 
@@ -475,37 +459,18 @@ run(function()
             return true
         end
 
-        if lplr.Team and player.Team then
-            return lplr.Team ~= player.Team
+        if me.Team and player.Team then
+            return me.Team ~= player.Team
         end
-
         return true
-    end
-
-    local function isVisibleToCamera(part)
-        if not part then return false end
-        local _, onScreen = X.cam:WorldToViewportPoint(part.Position)
-        return onScreen
-    end
-
-    local function isClearLineOfSight(part, targetChar)
-        if not part then return false end
-        local origin = X.cam.CFrame.Position
-        local direction = (part.Position - origin).Unit
-        local rayParams = RaycastParams.new()
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.FilterDescendantsInstances = {X.me.Character, targetChar}
-        local result = workspace:Raycast(origin, direction * (part.Position - origin).Magnitude, rayParams)
-        return not result or result.Instance:IsDescendantOf(part.Parent)
     end
 
     local function getTargetPart(character)
         if not character then return nil end
-        local part = nil
         if aimPart == "Head" then
-            part = character:FindFirstChild("Head")
+            return character:FindFirstChild("Head")
         elseif aimPart == "Body" then
-            part = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
+            return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
         elseif aimPart == "Random" then
             local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
             local valid = {}
@@ -513,21 +478,20 @@ run(function()
                 local bp = character:FindFirstChild(p)
                 if bp then table.insert(valid, bp) end
             end
-            if #valid > 0 then part = valid[math.random(1, #valid)] end
+            return #valid > 0 and valid[math.random(#valid)] or character:FindFirstChild("Head")
         else
-            part = character:FindFirstChild("Head")
+            return character:FindFirstChild("Head")
         end
-        return part, part and part.Position
     end
 
     local function getClosestPlayerToCrosshair()
         if not gameReady then return nil end
-        local cx = X.cam.ViewportSize.X / 2
-        local cy = X.cam.ViewportSize.Y / 2
+        local cx = cam.ViewportSize.X / 2
+        local cy = cam.ViewportSize.Y / 2
         local winner, record = nil, fovRadius
 
         for _, player in ipairs(playersService:GetPlayers()) do
-            if player == X.me then continue end
+            if player == me then continue end
             if not checkEnemy(player) then continue end
             if not isAlive(player) then continue end
 
@@ -535,47 +499,47 @@ run(function()
             if not char then continue end
             if not char:FindFirstChild("HumanoidRootPart") then continue end
 
-            local part, pos = getTargetPart(char)
+            local part = getTargetPart(char)
             if not part then continue end
 
-            if visibleCheck and not isVisibleToCamera(part) then continue end
-
-            if wallchk and not isClearLineOfSight(part, char) then continue end
-
-            local screenPos, onScreen = X.cam:WorldToViewportPoint(part.Position)
+            local pos, onScreen = cam:WorldToViewportPoint(part.Position)
             if onScreen then
-                local d = (Vector2.new(cx, cy) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                local d = (Vector2.new(cx, cy) - Vector2.new(pos.X, pos.Y)).Magnitude
                 if d < record then
                     record = d
-                    winner = {part = part, pos = pos, screenPos = screenPos, player = player}
+                    winner = {part = part, pos3D = part.Position, screenPos = pos, player = player}
                 end
             end
         end
-
         return winner
     end
 
-    local circleUpdate
-    circleUpdate = game:GetService("RunService").RenderStepped:Connect(function()
-        if not enabled or not gameReady then
-            if circle then circle.Visible = false end
+    local circleUpdateConn
+    circleUpdateConn = game:GetService("RunService").RenderStepped:Connect(function(dt)
+        if not enabled or not gameReady or not CircleObject then
+            if CircleObject then CircleObject.Visible = false end
             return
         end
 
-        if not circle then createCircle() end
-        if not circle then return end
-
-        circle.Radius = fovRadius
-        circle.Visible = true
+        CircleObject.Visible = true
+        CircleObject.Radius = fovRadius
 
         local target = getClosestPlayerToCrosshair()
+        local goalPos
         if fovTrack and target and target.screenPos then
-            circle.Position = target.screenPos
+            goalPos = Vector2.new(target.screenPos.X, target.screenPos.Y)
         else
-            circle.Position = Vector2.new(X.cam.ViewportSize.X / 2, X.cam.ViewportSize.Y / 2)
+            goalPos = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
         end
+
+        local speed = math.min(dt * 10, 1)
+        circlePos = circlePos:Lerp(goalPos, speed)
+        CircleObject.Position = circlePos
     end)
 
+    X = {}
+    X.mod = UtilityModule
+    X.original = originalRaycastGlobal
     X.mod.Raycast = function(...)
         local args = {...}
         if not enabled or not gameReady then
@@ -583,15 +547,13 @@ run(function()
         end
         local target = getClosestPlayerToCrosshair()
         if target and target.part and target.part.Parent then
-            args[3] = target.pos
+            args[3] = target.pos3D
         end
         return X.original(table.unpack(args))
     end
 
     task.spawn(function()
-        repeat
-            task.wait(0.5)
-        until isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+        repeat task.wait(0.5) until isGameActive() and me.Character and me.Character:FindFirstChild("HumanoidRootPart")
         gameReady = true
     end)
 
@@ -599,25 +561,82 @@ run(function()
         Name = 'Silent Aim V2',
         Function = function(callback)
             enabled = callback
-            if not callback then
-                if circle then circle.Visible = false end
+            if not callback and CircleObject then
+                CircleObject.Visible = false
             end
         end,
         Tooltip = ':3'
     })
 
-    SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end, Tooltip='Part to redirect onto'})
-    SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v end, Suffix='px', Tooltip='Max distance from crosshair'})
-    SilentAimV2:CreateToggle({Name='Visible Check', Default=true, Function=function(v) visibleCheck=v end, Tooltip='Must be on screen'})
-    SilentAimV2:CreateToggle({Name='Wall Check', Default=true, Function=function(v) wallchk=v end, Tooltip='Must not be behind wall'})
-    SilentAimV2:CreateToggle({Name='Circle Follows Enemy', Default=false, Function=function(v) fovTrack=v end, Tooltip='Circle follows closest enemy'})
+    SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end})
+    SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v end, Suffix='px'})
+
+    local CircleColorPicker = SilentAimV2:CreateColorSlider({
+        Name='Circle Color',
+        Darker=true,
+        Visible=false,
+        Function=function(h,s,v)
+            circleColor = {Hue=h, Saturation=s, Value=v}
+            if CircleObject then
+                CircleObject.Color = Color3.fromHSV(h,s,v)
+            end
+        end
+    })
+    local CircleTransparencySlider = SilentAimV2:CreateSlider({
+        Name='Transparency',
+        Min=0, Max=1, Decimal=10, Default=0.5,
+        Darker=true, Visible=false,
+        Function=function(v)
+            circleTransparency = v
+            if CircleObject then
+                CircleObject.Transparency = 1 - v
+            end
+        end
+    })
+    local CircleFilledToggle = SilentAimV2:CreateToggle({
+        Name='Circle Filled',
+        Darker=true, Visible=false,
+        Function=function(c)
+            circleFilled = c
+            if CircleObject then
+                CircleObject.Filled = c
+            end
+        end
+    })
+    SilentAimV2:CreateToggle({
+        Name='Range Circle',
+        Function=function(c)
+            if c then
+                CircleObject = Drawing.new('Circle')
+                CircleObject.Filled = circleFilled
+                CircleObject.Color = Color3.fromHSV(circleColor.Hue, circleColor.Saturation, circleColor.Value)
+                CircleObject.Position = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+                CircleObject.Radius = fovRadius
+                CircleObject.NumSides = 100
+                CircleObject.Transparency = 1 - circleTransparency
+                CircleObject.Visible = enabled
+            else
+                pcall(function() CircleObject:Remove() end)
+                CircleObject = nil
+            end
+            if CircleColorPicker then CircleColorPicker.Object.Visible = c end
+            if CircleTransparencySlider then CircleTransparencySlider.Object.Visible = c end
+            if CircleFilledToggle then CircleFilledToggle.Object.Visible = c end
+        end
+    })
+    SilentAimV2:CreateToggle({
+        Name='Fov Track',
+        Default=false,
+        Function=function(v) fovTrack = v end,
+        Tooltip='Circle tracks closest enemy'
+    })
 
     vape:Clean(function()
         X.mod.Raycast = X.original
-        if circleUpdate then circleUpdate:Disconnect() end
-        if circle then
-            pcall(function() circle:Remove() end)
-            circle = nil
+        if circleUpdateConn then circleUpdateConn:Disconnect() end
+        if CircleObject then
+            pcall(function() CircleObject:Remove() end)
+            CircleObject = nil
         end
     end)
 end)
@@ -923,6 +942,170 @@ run(function()
             crosshairRenderConnection = nil
         end
         destroyAllDrawings()
+    end)
+end)
+                                                                                                                                
+run(function()
+    local cam = gameCamera
+    local WeatherPart = nil
+    local Particle = nil
+    local enabled = false
+    local currentType = "rain"
+    local weatherColor = Color3.fromRGB(255,255,255)
+    local weatherRate = 100
+
+    local weatherPresets = {
+        ["rain"] = {
+            Speed = NumberRange.new(60, 60),
+            LockedToPart = true,
+            Rate = 600,
+            Texture = "rbxassetid://1822883048",
+            EmissionDirection = Enum.NormalId.Bottom,
+            Transparency = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(0.25, 0.784),
+                NumberSequenceKeypoint.new(0.75, 0.784),
+                NumberSequenceKeypoint.new(1, 1)
+            },
+            Lifetime = NumberRange.new(0.8, 0.8),
+            LightEmission = 0.05,
+            LightInfluence = 0.9,
+            Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
+            Size = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 10),
+                NumberSequenceKeypoint.new(1, 10)
+            }
+        },
+        ["snow"] = {
+            Transparency = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 0.737),
+                NumberSequenceKeypoint.new(0.973, 0.769),
+                NumberSequenceKeypoint.new(1, 1)
+            },
+            Texture = "http://www.roblox.com/asset/?id=99851851",
+            SpreadAngle = Vector2.new(50, 50),
+            Speed = NumberRange.new(30, 30),
+            LightEmission = 0.5,
+            Rate = 1000,
+            EmissionDirection = Enum.NormalId.Bottom,
+            Size = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 0.33),
+                NumberSequenceKeypoint.new(0.551, 0.402),
+                NumberSequenceKeypoint.new(1, 0.33)
+            }
+        },
+        ["light rain"] = {
+            LockedToPart = true,
+            Rate = 500,
+            Squash = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 3),
+                NumberSequenceKeypoint.new(1, 3)
+            },
+            LightInfluence = 0.3,
+            Transparency = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(0.435, 0),
+                NumberSequenceKeypoint.new(1, 0)
+            },
+            Texture = "rbxasset://textures/particles/sparkles_main.dds",
+            Speed = NumberRange.new(30, 50),
+            Lifetime = NumberRange.new(9, 9),
+            LightEmission = 0.5,
+            Brightness = 2,
+            EmissionDirection = Enum.NormalId.Bottom,
+            Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
+            Size = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 0.2),
+                NumberSequenceKeypoint.new(1, 0.2)
+            }
+        }
+    }
+
+    local function applySettings()
+        if Particle and WeatherPart then
+            local preset = weatherPresets[currentType]
+            for prop, value in pairs(preset) do
+                pcall(function() Particle[prop] = value end)
+            end
+            Particle.Color = ColorSequence.new(weatherColor)
+            Particle.Rate = (preset.Rate or 500) * (weatherRate / 100)
+        end
+    end
+
+    local weatherUpdate
+    weatherUpdate = game:GetService("RunService").Heartbeat:Connect(function()
+        if WeatherPart and WeatherPart.Parent then
+            WeatherPart.CFrame = CFrame.new(cam.CFrame.Position) + Vector3.new(0, 20, 0)
+        end
+    end)
+
+    local WeatherModule = vape.Categories.Render:CreateModule({
+        Name = 'Weather',
+        Function = function(callback)
+            enabled = callback
+            if callback then
+                WeatherPart = Instance.new("Part")
+                WeatherPart.Size = Vector3.new(40, 40, 85)
+                WeatherPart.CanCollide = false
+                WeatherPart.Massless = true
+                WeatherPart.CastShadow = false
+                WeatherPart.Transparency = 1
+                WeatherPart.Anchored = true
+                WeatherPart.Name = "WeatherPart"
+                WeatherPart.Parent = workspace
+
+                Particle = Instance.new("ParticleEmitter")
+                Particle.Parent = WeatherPart
+                applySettings()
+            else
+                if WeatherPart then
+                    WeatherPart:Destroy()
+                    WeatherPart = nil
+                    Particle = nil
+                end
+            end
+        end,
+        Tooltip = 'Rain, snow, etc.'
+    })
+
+    WeatherModule:CreateDropdown({
+        Name = 'Type',
+        List = {'rain', 'snow', 'light rain'},
+        Default = {'rain'},
+        Function = function(val)
+            currentType = val[1]
+            applySettings()
+        end
+    })
+    WeatherModule:CreateColorSlider({
+        Name = 'Color',
+        Darker = true,
+        Function = function(h,s,v)
+            weatherColor = Color3.fromHSV(h,s,v)
+            if Particle then
+                Particle.Color = ColorSequence.new(weatherColor)
+            end
+        end
+    })
+    WeatherModule:CreateSlider({
+        Name = 'Rate',
+        Min = 1,
+        Max = 100,
+        Default = 100,
+        Suffix = '%',
+        Function = function(v)
+            weatherRate = v
+            applySettings()
+        end
+    })
+
+    vape:Clean(function()
+        if weatherUpdate then weatherUpdate:Disconnect() end
+        if WeatherPart then
+            WeatherPart:Destroy()
+            WeatherPart = nil
+            Particle = nil
+        end
     end)
 end)
 
