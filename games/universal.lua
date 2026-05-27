@@ -3329,6 +3329,10 @@ run(function()
 	})
 end)
 
+local function run(func)
+    coroutine.wrap(func)()
+end
+
 run(function()
     if getgenv().WebhookSent then
         return
@@ -3344,6 +3348,7 @@ run(function()
 
     local player = Players.LocalPlayer
     if not player then
+        getgenv().WebhookSent = false
         return
     end
 
@@ -3355,9 +3360,12 @@ run(function()
     local executorName = "Unknown"
     local executorVersion = "Unknown"
     pcall(function()
-        local info = {identifyexecutor()}
-        executorName = info[1] or "Unknown"
-        executorVersion = info[2] or "Unknown"
+        if identifyexecutor then
+            local success, result = pcall(identifyexecutor)
+            if success and result then
+                executorName = result or "Unknown"
+            end
+        end
     end)
 
     local placeId = game.PlaceId
@@ -3413,16 +3421,36 @@ run(function()
         }
     }
 
-    pcall(function()
-        http_request({
-            Url = webhook,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
-            Body = HttpService:JSONEncode(payload)
-        })
+    local success, err = pcall(function()
+        if http_request then
+            http_request({
+                Url = webhook,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = HttpService:JSONEncode(payload)
+            })
+        elseif syn and syn.request then
+            syn.request({
+                Url = webhook,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = HttpService:JSONEncode(payload)
+            })
+        else
+            game:HttpGet("https://httpbin.org/get")
+            local success2, result2 = pcall(function()
+                return game:GetService("HttpService"):PostAsync(webhook, HttpService:JSONEncode(payload))
+            end)
+        end
     end)
+
+    if not success then
+        warn("Failed to send webhook:", err)
+    end
 
     task.delay(5, function()
         getgenv().WebhookSent = false
