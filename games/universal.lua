@@ -3338,7 +3338,7 @@ run(function()
         weburl = data and data.webhook
     end)
     if not ok or not weburl then
-        warn("failed")
+        warn("Failed to load webhook URL")
         return
     end
 
@@ -3347,20 +3347,18 @@ run(function()
         local httpService = game:GetService("HttpService")
         local thumbnail = game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
         local joinLink = "https://www.roblox.com/games/" .. game.PlaceId .. "/start"
-        if game.PrivateServerId and game.PrivateServerId ~= "" then
-            joinLink = joinLink .. "?privateServerLinkCode=" .. game.PrivateServerId
-        end
+        local placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
 
         local embed = {
             {
-                title = player.Name .. " joined a server!",
+                title = player.Name .. " joined a new server!",
                 color = 0x3498db,
                 thumbnail = {url = thumbnail},
                 fields = {
                     {name = "Username", value = player.Name, inline = true},
                     {name = "User ID", value = tostring(player.UserId), inline = true},
                     {name = "Join Link", value = "[Click to join](" .. joinLink .. ")"},
-                    {name = "Place", value = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, inline = true}
+                    {name = "Place", value = placeName, inline = true}
                 }
             }
         }
