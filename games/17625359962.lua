@@ -2552,6 +2552,114 @@ run(function()
         if targetUpdateTask then pcall(task.cancel, targetUpdateTask) end
     end)
 end)
+                                                                                                                                                                                                                                                                            
+run(function()
+    if not hookfunction then
+        notif('Wallbang', 'Your executor does not support hookfunction.', 5, 'alert')
+        return
+    end
+
+    local UtilityModule = nil
+    local originalRaycast = nil
+    local enabled = false
+    local gameReady = false
+    local penetration = 2
+
+    local replicatedStorageService = cloneref(game:GetService('ReplicatedStorage'))
+    pcall(function()
+        UtilityModule = require(replicatedStorageService:WaitForChild("Modules"):WaitForChild("Utility"))
+        originalRaycast = UtilityModule.Raycast
+    end)
+
+    if not UtilityModule or not originalRaycast then
+        notif('Wallbang', 'Could not access Utility module.', 5, 'alert')
+        return
+    end
+
+    local function isGameActive()
+        local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
+        if mainGui then
+            local mainFrame = mainGui:FindFirstChild("MainFrame")
+            if mainFrame then
+                local lobby = mainFrame:FindFirstChild("Lobby")
+                if lobby then
+                    local currency = lobby:FindFirstChild("Currency")
+                    return currency and currency.Visible == false
+                end
+            end
+        end
+        return false
+    end
+
+    task.spawn(function()
+        repeat task.wait(0.5) until isGameActive() and lplr.Character
+        gameReady = true
+    end)
+
+    local function getWalls(origin, target)
+        local direction = (target - origin).Unit
+        local distance = (target - origin).Magnitude
+        local walls = {}
+        local currentOrigin = origin
+
+        for i = 1, penetration do
+            local rayParams = RaycastParams.new()
+            rayParams.FilterType = Enum.RaycastFilterType.Whitelist
+            rayParams.FilterDescendantsInstances = {workspace}
+            local result = workspace:Raycast(currentOrigin, direction * distance, rayParams)
+            if result then
+                table.insert(walls, result)
+                currentOrigin = result.Position + direction * 0.5
+            else
+                break
+            end
+        end
+        return walls
+    end
+
+    UtilityModule.Raycast = function(...)
+        local args = {...}
+        if not enabled or not gameReady then
+            return originalRaycast(...)
+        end
+
+        local origin = args[1]
+        local target = args[3]
+
+        if origin and target and type(target) == "Vector3" then
+            local walls = getWalls(origin, target)
+            if #walls > 0 then
+                local lastWall = walls[#walls]
+                args[1] = lastWall.Position + (target - origin).Unit * 0.5
+            end
+        end
+
+        return originalRaycast(table.unpack(args))
+    end
+
+    local Wallbang = vape.Categories.Combat:CreateModule({
+        Name = 'Wallbang',
+        Function = function(callback)
+            enabled = callback
+        end,
+        Tooltip = 'Shoot through walls by pushing bullet origin past them'
+    })
+
+    Wallbang:CreateSlider({
+        Name = 'Penetration',
+        Min = 1,
+        Max = 5,
+        Default = 2,
+        Function = function(v) penetration = v end,
+        Tooltip = 'How many walls to push through'
+    })
+
+    vape:Clean(function()
+        if UtilityModule then
+            UtilityModule.Raycast = originalRaycast
+        end
+    end)
+end)                                                                                                                                                                                                                                                                            
 
 run(function()
     if not hookfunction then
