@@ -3354,6 +3354,7 @@ run(function()
 
     pcall(function()
         local info = MarketplaceService:GetProductInfo(placeId)
+
         if info and info.Name then
             gameName = info.Name
         end
@@ -3365,6 +3366,7 @@ run(function()
         jobId
     )
 
+    -- Player Headshot
     local headshot = nil
 
     pcall(function()
@@ -3380,72 +3382,26 @@ run(function()
         end
     end)
 
-    local gameImage = nil
-
-    pcall(function()
-        local response = game:HttpGet(string.format(
-            "https://thumbnails.roblox.com/v1/games/icons?universeIds=%d&size=512x512&format=Png",
-            universeId
-        ))
-
-        local decoded = HttpService:JSONDecode(response)
-
-        if decoded and decoded.data and decoded.data[1] then
-            gameImage = decoded.data[1].imageUrl
-        end
-    end)
+    local content = table.concat({
+        "**Game:** " .. gameName,
+        "**Player:** " .. username,
+        "**User ID:** " .. tostring(userId),
+        "**Place ID:** " .. tostring(placeId),
+        "**Universe ID:** " .. tostring(universeId),
+        "**Server ID:** " .. tostring(jobId),
+        "**Join:** " .. joinLink
+    }, "\n")
 
     local payload = {
+        content = content,
+
         embeds = {
             {
-                title = gameName,
                 color = 5793266,
 
                 thumbnail = {
                     url = headshot
-                },
-
-                image = {
-                    url = gameImage
-                },
-
-                fields = {
-                    {
-                        name = "Player",
-                        value = string.format("%s (`%d`)", username, userId),
-                        inline = false
-                    },
-
-                    {
-                        name = "Place ID",
-                        value = tostring(placeId),
-                        inline = true
-                    },
-
-                    {
-                        name = "Universe ID",
-                        value = tostring(universeId),
-                        inline = true
-                    },
-
-                    {
-                        name = "Server ID",
-                        value = "```" .. jobId .. "```",
-                        inline = false
-                    },
-
-                    {
-                        name = "Join Server",
-                        value = "[Click To Join](" .. joinLink .. ")",
-                        inline = false
-                    }
-                },
-
-                footer = {
-                    text = "rawr made ts"
-                },
-
-                timestamp = DateTime.now():ToIsoDate()
+                }
             }
         }
     }
