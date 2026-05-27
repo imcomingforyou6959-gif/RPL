@@ -1,36 +1,71 @@
-repeat task.wait() until game:IsLoaded()
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
 if shared.vape then shared.vape:Uninject() end
 
--- test
-local function httpGet(url, binary)
-    local timeout = 10
+--
+local debugStep = 1
+local function step(desc)
+    warn("[Loader] Step "..debugStep..": "..desc)
+    debugStep = debugStep + 1
+end
+
+step("Start")
+
+--
+local function httpGet(url, timeout)
+    timeout = timeout or 10
+    local requestFunc = nil
+
+    --
     if syn and syn.request then
-        local response = syn.request({
-            Url = url,
-            Method = "GET",
-            Timeout = timeout,
-            Headers = {["Cache-Control"] = "no-cache"}
-        })
-        if response and response.Body then
-            return response.Body
-        else
-            error("HTTP request failed or timed out")
+        requestFunc = function(u)
+            return syn.request({Url = u, Method = "GET", Timeout = timeout})
         end
     elseif http_request then
-        local response = http_request({
-            Url = url,
-            Method = "GET",
-            Timeout = timeout
-        })
-        if response and response.Body then
-            return response.Body
-        else
-            error("HTTP request failed or timed out")
+        requestFunc = function(u)
+            return http_request({Url = u, Method = "GET", Timeout = timeout})
+        end
+    elseif request then
+        requestFunc = function(u)
+            return request({Url = u, Method = "GET", Timeout = timeout})
+        end
+    else
+        -- 
+        requestFunc = function(u)
+            return game:HttpGet(u)
         end
     end
-    -- test
-    return game:HttpGet(url, binary)
+
+    -- 
+    local result, err
+    local done = false
+    local thread = coroutine.create(function()
+        local ok, res = pcall(requestFunc, url)
+        result = res
+        err = not ok and res
+        done = true
+    end)
+    coroutine.resume(thread)
+
+    local start = tick()
+    while not done do
+        if tick() - start > timeout then
+            -- Attempt to kill the coroutine (works on many executors)
+            coroutine.close(thread)
+            error("HTTP request timed out after "..timeout.." seconds")
+        end
+        task.wait(0.1)
+    end
+
+    if err then
+        error(err)
+    end
+    return result
 end
+
+step("httpGet defined")
 
 if identifyexecutor then
     if table.find({'Argon', 'Wave'}, ({identifyexecutor()})[1]) then
@@ -60,6 +95,7 @@ local playersService = cloneref(game:GetService('Players'))
 
 local function downloadFile(path, func)
     if not isfile(path) then
+        step("Downloading "..path)
         local suc, res = pcall(function()
             return httpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/RPL/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
         end)
@@ -75,6 +111,7 @@ local function downloadFile(path, func)
 end
 
 local function downloadSounds()
+    step("Downloading sounds")
     local soundFiles = {
         "1nn.mp3", "67.mp3", "BatHit.mp3", "Beep.mp3", "Bonk.mp3", "Bow.mp3",
         "Bubble.mp3", "Bubble2.mp3", "CSGO.mp3", "Cod.mp3", "Fairy1.mp3",
@@ -102,6 +139,7 @@ local function downloadSounds()
 end
 
 local function finishLoading()
+    step("Finish loading")
     vape.Init = nil
     vape:Load()
     task.spawn(function()
@@ -142,6 +180,8 @@ local function finishLoading()
     end
 end
 
+step("Entering main block")
+
 if not isfile('newvape/profiles/gui.txt') then
     writefile('newvape/profiles/gui.txt', 'new')
 end
@@ -150,12 +190,16 @@ local gui = readfile('newvape/profiles/gui.txt')
 if not isfolder('newvape/assets/'..gui) then
     makefolder('newvape/assets/'..gui)
 end
+
+step("Loading GUI: "..gui)
 vape = loadstring(downloadFile('newvape/guis/'..gui..'.lua'), 'gui')()
 shared.vape = vape
 
+step("GUI loaded, downloading sounds")
 downloadSounds()
 
 if not shared.VapeIndependent then
+    step("Loading universal.lua")
     loadstring(downloadFile('newvape/games/universal.lua'), 'universal')()
     if isfile('newvape/games/'..game.PlaceId..'.lua') then
         loadstring(readfile('newvape/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(...)
@@ -169,8 +213,11 @@ if not shared.VapeIndependent then
             end
         end
     end
+    step("Calling finishLoading")
     finishLoading()
 else
     vape.Init = finishLoading
     return vape
 end
+
+step("Loader finished")
