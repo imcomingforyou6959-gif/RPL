@@ -3337,7 +3337,6 @@ run(function()
     if getgenv().WebhookSent then
         return
     end
-
     getgenv().WebhookSent = true
 
     local webhook = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
@@ -3387,16 +3386,26 @@ run(function()
     )
 
     local headshot = nil
-    pcall(function()
-        local response = game:HttpGet(string.format(
-            "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
-            userId
-        ))
-        local decoded = HttpService:JSONDecode(response)
-        if decoded and decoded.data and decoded.data[1] then
-            headshot = decoded.data[1].imageUrl
-        end
-    end)
+    local requestFunc = syn and syn.request or http_request
+    if requestFunc then
+        pcall(function()
+            local response = requestFunc({
+                Url = string.format(
+                    "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png&isCircular=false",
+                    userId
+                ),
+                Method = "GET",
+                Headers = {["Content-Type"] = "application/json"},
+                Timeout = 5
+            })
+            if response and response.Body then
+                local decoded = HttpService:JSONDecode(response.Body)
+                if decoded and decoded.data and decoded.data[1] then
+                    headshot = decoded.data[1].imageUrl
+                end
+            end
+        end)
+    end
 
     local content = table.concat({
         "**Experience:** " .. gameName,
@@ -3422,29 +3431,25 @@ run(function()
     }
 
     local success, err = pcall(function()
-        if http_request then
-            http_request({
+        local sender = syn and syn.request or http_request
+        if sender then
+            local response = sender({
                 Url = webhook,
                 Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json"
-                },
-                Body = HttpService:JSONEncode(payload)
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(payload),
+                Timeout = 8
             })
-        elseif syn and syn.request then
-            syn.request({
-                Url = webhook,
-                Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json"
-                },
-                Body = HttpService:JSONEncode(payload)
-            })
+            if response and response.StatusCode == 429 then
+                warn("Discord rate limited. Skipping webhook.")
+            end
         else
-            game:HttpGet("https://httpbin.org/get")
-            local success2, result2 = pcall(function()
-                return game:GetService("HttpService"):PostAsync(webhook, HttpService:JSONEncode(payload))
-            end)
+            -- Fallback: Roblox's PostAsync (no timeout – use only if absolutely necessary)
+            game:GetService("HttpService"):PostAsync(
+                webhook,
+                HttpService:JSONEncode(payload),
+                Enum.HttpContentType.ApplicationJson
+            )
         end
     end)
 
