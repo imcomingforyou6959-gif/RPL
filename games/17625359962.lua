@@ -410,26 +410,18 @@ run(function()
 
     local cam = gameCamera
     local me = lplr
-    local Targets
+    local inputService = game:GetService("UserInputService")
+    local runService = game:GetService("RunService")
 
     local enabled = false
+    local rightClicked = not RightClick or not RightClick.Enabled or inputService:IsMouseButtonPressed(1)
     local gameReady = false
-    local aimPart = "Head"
-    local fovRadius = 100
+
+    local Targets, Part, FOV, Speed, RightClick, ShowTarget, EnemyOnlyToggle
+    local circleColor, circleTransparency, circleFilled, circleVisible = {Hue=0, Saturation=1, Value=1}, 0.5, false, false
     local fovTrack = false
-
     local CircleObject = nil
-    local circlePos = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
-    local circleColor = {Hue=0, Saturation=1, Value=1}
-    local circleTransparency = 0.5
-    local circleFilled = false
-
-    local function isAlive(player)
-        local char = player.Character
-        if not char then return false end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        return hum and hum.Health > 0
-    end
+    local smoothPos = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
 
     local function isGameActive()
         local mainGui = me.PlayerGui:FindFirstChild("MainGui")
@@ -447,6 +439,7 @@ run(function()
     end
 
     local function checkEnemy(player)
+        if not EnemyOnlyToggle or not EnemyOnlyToggle.Enabled then return true end
         if player == me then return false end
         local myEnv = me:GetAttribute("EnvironmentID")
         local myTeam = me:GetAttribute("TeamID")
@@ -465,77 +458,24 @@ run(function()
         return true
     end
 
-    local function getTargetPart(character)
-        if not character then return nil end
-        if aimPart == "Head" then
-            return character:FindFirstChild("Head")
-        elseif aimPart == "Body" then
-            return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
-        elseif aimPart == "Random" then
-            local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
-            local valid = {}
-            for _, p in ipairs(parts) do
-                local bp = character:FindFirstChild(p)
-                if bp then table.insert(valid, bp) end
-            end
-            return #valid > 0 and valid[math.random(#valid)] or character:FindFirstChild("Head")
-        else
-            return character:FindFirstChild("Head")
-        end
-    end
-
-    local function getClosestPlayerToCrosshair()
+    local function getTarget()
         if not gameReady then return nil end
-        local cx = cam.ViewportSize.X / 2
-        local cy = cam.ViewportSize.Y / 2
-        local winner, record = nil, fovRadius
+        if RightClick and RightClick.Enabled and not rightClicked then return nil end
 
-        for _, player in ipairs(playersService:GetPlayers()) do
-            if player == me then continue end
-            if not checkEnemy(player) then continue end
-            if not isAlive(player) then continue end
+        local ent = entitylib.EntityMouse({
+            Range = FOV.Value,
+            Part = Part.Value,
+            Players = Targets.Players.Enabled,
+            NPCs = Targets.NPCs.Enabled,
+            Wallcheck = Targets.Walls.Enabled,
+            Origin = cam.CFrame.Position
+        })
 
-            local char = player.Character
-            if not char then continue end
-            if not char:FindFirstChild("HumanoidRootPart") then continue end
-
-            local part = getTargetPart(char)
-            if not part then continue end
-
-            local pos, onScreen = cam:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local d = (Vector2.new(cx, cy) - Vector2.new(pos.X, pos.Y)).Magnitude
-                if d < record then
-                    record = d
-                    winner = {part = part, pos3D = part.Position, screenPos = pos, player = player}
-                end
-            end
+        if ent and ent.Player and not checkEnemy(ent.Player) then
+            ent = nil
         end
-        return winner
+        return ent
     end
-
-    local circleUpdateConn
-    circleUpdateConn = game:GetService("RunService").RenderStepped:Connect(function(dt)
-        if not enabled or not gameReady or not CircleObject then
-            if CircleObject then CircleObject.Visible = false end
-            return
-        end
-
-        CircleObject.Visible = true
-        CircleObject.Radius = fovRadius
-
-        local target = getClosestPlayerToCrosshair()
-        local goalPos
-        if fovTrack and target and target.screenPos then
-            goalPos = Vector2.new(target.screenPos.X, target.screenPos.Y)
-        else
-            goalPos = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
-        end
-
-        local speed = math.min(dt * 10, 1)
-        circlePos = circlePos:Lerp(goalPos, speed)
-        CircleObject.Position = circlePos
-    end)
 
     X = {}
     X.mod = UtilityModule
@@ -545,11 +485,69 @@ run(function()
         if not enabled or not gameReady then
             return X.original(...)
         end
-        local target = getClosestPlayerToCrosshair()
-        if target and target.part and target.part.Parent then
-            args[3] = target.pos3D
+        local ent = getTarget()
+        if ent and ent[Part.Value] then
+            args[3] = ent[Part.Value].Position
         end
         return X.original(table.unpack(args))
+    end
+
+    local circleUpdate
+    circleUpdate = runService.RenderStepped:Connect(function(dt)
+        if not CircleObject then return end
+        CircleObject.Visible = enabled and circleVisible
+
+        if not enabled or not circleVisible then return end
+
+        CircleObject.Radius = FOV.Value
+        CircleObject.Color = Color3.fromHSV(circleColor.Hue, circleColor.Saturation, circleColor.Value)
+        CircleObject.Transparency = 1 - circleTransparency
+        CircleObject.Filled = circleFilled
+
+        local goalPos
+        local ent = getTarget()
+        if fovTrack and ent and ent[Part.Value] then
+            local pos, onScreen = cam:WorldToViewportPoint(ent[Part.Value].Position)
+            if onScreen then
+                goalPos = Vector2.new(pos.X, pos.Y)
+            else
+                goalPos = inputService:GetMouseLocation()
+            end
+        else
+            goalPos = inputService:GetMouseLocation()
+        end
+
+        smoothPos = smoothPos:Lerp(goalPos, math.min(dt * 8, 1))
+        CircleObject.Position = smoothPos
+    end)
+
+    local rightDown = false
+    if RightClick and RightClick.Enabled then
+        local inputConn
+        inputConn = inputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                rightClicked = true
+            end
+        end)
+        vape:Clean(function() inputConn:Disconnect() end)
+        local inputEndConn
+        inputEndConn = inputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                rightClicked = false
+            end
+        end)
+        vape:Clean(function() inputEndConn:Disconnect() end)
+    end
+
+    local targetInfoConn
+    if ShowTarget and ShowTarget.Enabled then
+        targetInfoConn = runService.RenderStepped:Connect(function()
+            if not enabled then return end
+            local ent = getTarget()
+            if ent and ent.Player then
+            end
+        end)
+        vape:Clean(function() if targetInfoConn then targetInfoConn:Disconnect() end end)
     end
 
     task.spawn(function()
@@ -565,75 +563,123 @@ run(function()
                 CircleObject.Visible = false
             end
         end,
-        Tooltip = ':3'
+        Tooltip = 'love for u'
     })
 
-    SilentAimV2:CreateDropdown({Name='Aim Part', List={'Head','Body','Random'}, Default='Head', Function=function(v) aimPart=v end})
-    SilentAimV2:CreateSlider({Name='FOV', Min=10, Max=500, Default=100, Function=function(v) fovRadius=v end, Suffix='px'})
+    Targets = SilentAimV2:CreateTargets({Players = true})
+    Part = SilentAimV2:CreateDropdown({
+        Name = 'Part',
+        List = {'RootPart', 'Head'}
+    })
+    FOV = SilentAimV2:CreateSlider({
+        Name = 'FOV',
+        Min = 0,
+        Max = 1000,
+        Default = 100,
+        Function = function(val)
+            if CircleObject then
+                CircleObject.Radius = val
+            end
+        end
+    })
+    Speed = SilentAimV2:CreateSlider({
+        Name = 'Speed',
+        Min = 0,
+        Max = 200,
+        Default = 15,
+        Tooltip = 'Circle tracking'
+    })
+    RightClick = SilentAimV2:CreateToggle({
+        Name = 'Require right click',
+        Function = function()
+            if SilentAimV2.Enabled then
+                SilentAimV2:Toggle()
+                SilentAimV2:Toggle()
+            end
+        end
+    })
+    ShowTarget = SilentAimV2:CreateToggle({
+        Name = 'Show target info'
+    })
+    EnemyOnlyToggle = SilentAimV2:CreateToggle({
+        Name = 'Team Check',
+        Default = true,
+        Tooltip = '<3'
+    })
 
-    local CircleColorPicker = SilentAimV2:CreateColorSlider({
-        Name='Circle Color',
-        Darker=true,
-        Visible=false,
-        Function=function(h,s,v)
-            circleColor = {Hue=h, Saturation=s, Value=v}
-            if CircleObject then
-                CircleObject.Color = Color3.fromHSV(h,s,v)
-            end
-        end
-    })
-    local CircleTransparencySlider = SilentAimV2:CreateSlider({
-        Name='Transparency',
-        Min=0, Max=1, Decimal=10, Default=0.5,
-        Darker=true, Visible=false,
-        Function=function(v)
-            circleTransparency = v
-            if CircleObject then
-                CircleObject.Transparency = 1 - v
-            end
-        end
-    })
-    local CircleFilledToggle = SilentAimV2:CreateToggle({
-        Name='Circle Filled',
-        Darker=true, Visible=false,
-        Function=function(c)
-            circleFilled = c
-            if CircleObject then
-                CircleObject.Filled = c
-            end
-        end
-    })
     SilentAimV2:CreateToggle({
-        Name='Range Circle',
-        Function=function(c)
+        Name = 'Range Circle',
+        Function = function(c)
+            circleVisible = c
             if c then
                 CircleObject = Drawing.new('Circle')
                 CircleObject.Filled = circleFilled
                 CircleObject.Color = Color3.fromHSV(circleColor.Hue, circleColor.Saturation, circleColor.Value)
-                CircleObject.Position = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
-                CircleObject.Radius = fovRadius
+                CircleObject.Position = inputService:GetMouseLocation()
+                CircleObject.Radius = FOV.Value
                 CircleObject.NumSides = 100
                 CircleObject.Transparency = 1 - circleTransparency
                 CircleObject.Visible = enabled
             else
-                pcall(function() CircleObject:Remove() end)
-                CircleObject = nil
+                pcall(function()
+                    if CircleObject then
+                        CircleObject:Remove()
+                        CircleObject = nil
+                    end
+                end)
             end
-            if CircleColorPicker then CircleColorPicker.Object.Visible = c end
-            if CircleTransparencySlider then CircleTransparencySlider.Object.Visible = c end
-            if CircleFilledToggle then CircleFilledToggle.Object.Visible = c end
+            if CircleColor then CircleColor.Object.Visible = c end
+            if CircleTransparency then CircleTransparency.Object.Visible = c end
+            if CircleFilled then CircleFilled.Object.Visible = c end
         end
     })
+    CircleColor = SilentAimV2:CreateColorSlider({
+        Name = 'Circle Color',
+        Function = function(h, s, v)
+            circleColor = {Hue=h, Saturation=s, Value=v}
+            if CircleObject then
+                CircleObject.Color = Color3.fromHSV(h, s, v)
+            end
+        end,
+        Darker = true,
+        Visible = false
+    })
+    CircleTransparency = SilentAimV2:CreateSlider({
+        Name = 'Transparency',
+        Min = 0,
+        Max = 1,
+        Decimal = 10,
+        Default = 0.5,
+        Function = function(v)
+            circleTransparency = v
+            if CircleObject then
+                CircleObject.Transparency = 1 - v
+            end
+        end,
+        Darker = true,
+        Visible = false
+    })
+    CircleFilled = SilentAimV2:CreateToggle({
+        Name = 'Circle Filled',
+        Function = function(c)
+            circleFilled = c
+            if CircleObject then
+                CircleObject.Filled = c
+            end
+        end,
+        Darker = true,
+        Visible = false
+    })
     SilentAimV2:CreateToggle({
-        Name='Fov Track',
-        Default=false,
-        Function=function(v) fovTrack = v end,
-        Tooltip='Circle tracks closest enemy'
+        Name = 'Fov Track',
+        Default = false,
+        Function = function(v) fovTrack = v end,
+        Tooltip = 'Circle follows closest enemy'
     })
 
     vape:Clean(function()
         X.mod.Raycast = X.original
-        if circleUpdateConn then circleUpdateConn:Disconnect() end
+        if circleUpdate then circleUpdate:Disconnect() end
         if CircleObject then
             pcall(function() CircleObject:Remove() end)
             CircleObject = nil
@@ -977,6 +1023,7 @@ run(function()
             }
         },
         ["snow"] = {
+            LockedToPart = true,
             Transparency = NumberSequence.new{
                 NumberSequenceKeypoint.new(0, 0.737),
                 NumberSequenceKeypoint.new(0.973, 0.769),
@@ -988,6 +1035,7 @@ run(function()
             LightEmission = 0.5,
             Rate = 1000,
             EmissionDirection = Enum.NormalId.Bottom,
+            Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
             Size = NumberSequence.new{
                 NumberSequenceKeypoint.new(0, 0.33),
                 NumberSequenceKeypoint.new(0.551, 0.402),
@@ -1021,14 +1069,20 @@ run(function()
         }
     }
 
-    local function applySettings()
-        if Particle and WeatherPart then
+    local function recreateParticle()
+        if Particle then
+            Particle:Destroy()
+            Particle = nil
+        end
+        if WeatherPart then
             local preset = weatherPresets[currentType]
+            Particle = Instance.new("ParticleEmitter")
             for prop, value in pairs(preset) do
                 pcall(function() Particle[prop] = value end)
             end
             Particle.Color = ColorSequence.new(weatherColor)
             Particle.Rate = (preset.Rate or 500) * (weatherRate / 100)
+            Particle.Parent = WeatherPart
         end
     end
 
@@ -1044,24 +1098,26 @@ run(function()
         Function = function(callback)
             enabled = callback
             if callback then
-                WeatherPart = Instance.new("Part")
-                WeatherPart.Size = Vector3.new(40, 40, 85)
-                WeatherPart.CanCollide = false
-                WeatherPart.Massless = true
-                WeatherPart.CastShadow = false
-                WeatherPart.Transparency = 1
-                WeatherPart.Anchored = true
-                WeatherPart.Name = "WeatherPart"
-                WeatherPart.Parent = workspace
-
-                Particle = Instance.new("ParticleEmitter")
-                Particle.Parent = WeatherPart
-                applySettings()
+                if not WeatherPart then
+                    WeatherPart = Instance.new("Part")
+                    WeatherPart.Size = Vector3.new(40, 40, 85)
+                    WeatherPart.CanCollide = false
+                    WeatherPart.Massless = true
+                    WeatherPart.CastShadow = false
+                    WeatherPart.Transparency = 1
+                    WeatherPart.Anchored = true
+                    WeatherPart.Name = "WeatherPart"
+                    WeatherPart.Parent = workspace
+                end
+                recreateParticle()
             else
+                if Particle then
+                    Particle:Destroy()
+                    Particle = nil
+                end
                 if WeatherPart then
                     WeatherPart:Destroy()
                     WeatherPart = nil
-                    Particle = nil
                 end
             end
         end,
@@ -1074,7 +1130,9 @@ run(function()
         Default = {'rain'},
         Function = function(val)
             currentType = val[1]
-            applySettings()
+            if enabled then
+                recreateParticle()
+            end
         end
     })
     WeatherModule:CreateColorSlider({
@@ -1095,17 +1153,17 @@ run(function()
         Suffix = '%',
         Function = function(v)
             weatherRate = v
-            applySettings()
+            if Particle then
+                local preset = weatherPresets[currentType]
+                Particle.Rate = (preset.Rate or 500) * (v / 100)
+            end
         end
     })
 
     vape:Clean(function()
         if weatherUpdate then weatherUpdate:Disconnect() end
-        if WeatherPart then
-            WeatherPart:Destroy()
-            WeatherPart = nil
-            Particle = nil
-        end
+        if Particle then Particle:Destroy() end
+        if WeatherPart then WeatherPart:Destroy() end
     end)
 end)
 
