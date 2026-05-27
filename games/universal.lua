@@ -3330,6 +3330,12 @@ run(function()
 end)
 
 run(function()
+    if getgenv().WebhookSent then
+        return
+    end
+
+    getgenv().WebhookSent = true
+
     local webhook = "https://discord.com/api/webhooks/1509060246864134184/og8Eb4WpwqNSVZOTPipYP0ir3T2LZx9qD0c44fHNh2l5w6Ivt77udxjwaYI21EVW6Q0x"
 
     local Players = game:GetService("Players")
@@ -3366,7 +3372,6 @@ run(function()
         jobId
     )
 
-    -- Player Headshot
     local headshot = nil
 
     pcall(function()
@@ -3415,6 +3420,10 @@ run(function()
             },
             Body = HttpService:JSONEncode(payload)
         })
+    end)
+
+    task.delay(5, function()
+        getgenv().WebhookSent = false
     end)
 end)
 	
