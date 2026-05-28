@@ -1502,7 +1502,7 @@ run(function()
 end)
 
 run(function()
-    local labels = {}
+    local highlights = {}
     local labelCount = 0
     local childAddedConn, childRemovedConn, renderConn, queueConn
     local pendingQueue = {}
@@ -1511,6 +1511,7 @@ run(function()
     local MAX_LABELS = 50
     local MAX_DIST = 300
     local displayName = "Subspace Tripmine"
+    local highlightColor = Color3.fromRGB(255, 80, 80)
 
     local function isTripminePart(part)
         if not part or not part:IsA("BasePart") then return false end
@@ -1525,36 +1526,31 @@ run(function()
         return false
     end
 
-    local function makeLabel(part)
-        if labels[part] then return end
+    local function makeHighlight(part)
+        if highlights[part] then return end
         if labelCount >= MAX_LABELS then return end
         if lplr.Character and part:IsDescendantOf(lplr.Character) then return end
         local cam = workspace.CurrentCamera
         if cam and (part.Position - cam.CFrame.Position).Magnitude > MAX_DIST then return end
 
-        local txt = Drawing.new("Text")
-        part:SetAttribute("Rivals_Trap", true)
-        part:SetAttribute("Rivals_TrapName", displayName)
-        txt.Text = displayName
-        txt.Size = 18
-        txt.Color = Color3.fromRGB(255, 120, 120)
-        txt.Center = true
-        txt.Outline = true
-        txt.Visible = false
-        labels[part] = txt
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "Rivals_TrapHighlight"
+        highlight.FillColor = highlightColor
+        highlight.OutlineColor = highlightColor
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0.3
+        highlight.Adornee = part
+        highlight.Parent = part
+        highlights[part] = highlight
         labelCount = labelCount + 1
     end
 
-    local function removeLabel(part)
-        local d = labels[part]
-        if not d then return end
-        if d.Remove then d:Remove() end
-        labels[part] = nil
+    local function removeHighlight(part)
+        local h = highlights[part]
+        if not h then return end
+        pcall(function() h:Destroy() end)
+        highlights[part] = nil
         labelCount = labelCount - 1
-        if part.SetAttribute then
-            part:SetAttribute("Rivals_Trap", nil)
-            part:SetAttribute("Rivals_TrapName", nil)
-        end
     end
 
     local function scanAndCreate()
@@ -1564,7 +1560,7 @@ run(function()
                 if labelCount >= MAX_LABELS then break end
                 local obj = descs[i]
                 if obj and obj:IsA("BasePart") and isTripminePart(obj) then
-                    if not pendingSet[obj] and not labels[obj] then
+                    if not pendingSet[obj] and not highlights[obj] then
                         pendingSet[obj] = true
                         pendingQueue[#pendingQueue + 1] = obj
                     end
@@ -1576,7 +1572,7 @@ run(function()
 
     local function onDescendantAdded(desc)
         if desc:IsA("BasePart") then
-            if isTripminePart(desc) and not pendingSet[desc] and not labels[desc] then
+            if isTripminePart(desc) and not pendingSet[desc] and not highlights[desc] then
                 pendingSet[desc] = true
                 pendingQueue[#pendingQueue + 1] = desc
             end
@@ -1584,7 +1580,7 @@ run(function()
             task.spawn(function()
                 for _, d in ipairs(desc:GetDescendants()) do
                     if labelCount >= MAX_LABELS then break end
-                    if d:IsA("BasePart") and isTripminePart(d) and not pendingSet[d] and not labels[d] then
+                    if d:IsA("BasePart") and isTripminePart(d) and not pendingSet[d] and not highlights[d] then
                         pendingSet[d] = true
                         pendingQueue[#pendingQueue + 1] = d
                     end
@@ -1595,10 +1591,10 @@ run(function()
 
     local function onDescendantRemoving(desc)
         if desc:IsA("BasePart") then
-            removeLabel(desc)
+            removeHighlight(desc)
         else
             for _, d in ipairs(desc:GetDescendants()) do
-                if d:IsA("BasePart") then removeLabel(d) end
+                if d:IsA("BasePart") then removeHighlight(d) end
             end
         end
     end
@@ -1623,7 +1619,7 @@ run(function()
                         -- skip
                     else
                         if isTripminePart(part) and not (camPos and (part.Position - camPos).Magnitude > MAX_DIST) then
-                            makeLabel(part)
+                            makeHighlight(part)
                         end
                     end
                     if labelCount >= MAX_LABELS then break end
@@ -1632,24 +1628,17 @@ run(function()
         end
         renderConn = runService.RenderStepped:Connect(function()
             local cam = workspace.CurrentCamera
-            if not cam then
-                for _, d in pairs(labels) do d.Visible = false end
-                return
-            end
+            if not cam then return end
             local camPos = cam.CFrame.Position
-            for part, draw in pairs(labels) do
+            for part, highlight in pairs(highlights) do
                 if not part or not part.Parent then
-                    removeLabel(part)
+                    removeHighlight(part)
                 else
-                    local p, onScreen = cam:WorldToViewportPoint(part.Position)
-                    if not onScreen or p.Z <= 0 or (part.Position - camPos).Magnitude > MAX_DIST then
-                        draw.Visible = false
+                    local dist = (part.Position - camPos).Magnitude
+                    if dist > MAX_DIST then
+                        highlight.Enabled = false
                     else
-                        local dist = (part.Position - camPos).Magnitude
-                        local ratio = math.clamp(50 / math.max(dist, 1), 0.125, 1)
-                        draw.Size = math.floor(math.clamp(math.floor(32 * ratio), 12, 32))
-                        draw.Position = Vector2.new(p.X, p.Y)
-                        draw.Visible = true
+                        highlight.Enabled = true
                     end
                 end
             end
@@ -1662,13 +1651,13 @@ run(function()
         if childRemovedConn then childRemovedConn:Disconnect(); childRemovedConn = nil end
         if queueConn then queueConn:Disconnect(); queueConn = nil end
         pendingQueue = {}
-        for p in pairs(labels) do removeLabel(p) end
-        labels = {}
+        for p in pairs(highlights) do removeHighlight(p) end
+        highlights = {}
         labelCount = 0
     end
 
     vape.Categories.Render:CreateModule({
-        Name = "Subspace Tripmine Detector",
+        Name = "Subspace Tripmine esp",
         Function = function(callback)
             if callback then
                 enable()
@@ -1676,7 +1665,7 @@ run(function()
                 disable()
             end
         end,
-        Tooltip = "ESP for subspace"
+        Tooltip = "Highlights subspace tripmines"
     })
 end)
                                                                                                                         
