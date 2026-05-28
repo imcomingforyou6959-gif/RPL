@@ -1945,6 +1945,297 @@ run(function()
         t.d.s = CFrame.new()
     end)
 end)
+                                                                                                                                        
+run(function()
+	local AntiRiotShield
+	
+	AntiRiotShield = vape.Categories.Blatant:CreateModule({
+		Name = 'Anti Riot',
+		Function = function(callback)
+			if callback then
+				repeat
+					for _, ent in entitylib.List do
+						local shield = ent.Character:FindFirstChild('RiotShieldPart')
+						if shield then
+							shield.CanQuery = false
+						end
+					end
+	
+					task.wait(0.05)
+				until not AntiRiotShield.Enabled
+			else
+				for _, ent in entitylib.List do
+					local shield = ent.Character:FindFirstChild('RiotShieldPart')
+					if shield then
+						shield.CanQuery = true
+					end
+				end
+			end
+		end,
+		Tooltip = 'Allow you to shoot through riot shields.'
+	})
+end)
+                                                                                                                                            
+run(function()
+	local AntiTaze
+	local old, connection
+	
+	local function EntityAdded(ent)
+		connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
+		if not (connection and connection.Function) then
+			repeat
+				connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
+				task.wait()
+			until connection and connection.Function or not AntiTaze.Enabled
+		end
+	
+		if connection and AntiTaze.Enabled then
+			old = hookfunction(connection.Function, function()
+				local char = lplr.Character
+				lplr:SetAttribute('BackpackEnabled', false)
+				if entitylib.isAlive then
+					entitylib.character.Humanoid:UnequipTools()
+				end
+	
+				task.wait(3.5)
+				if lplr.Character == char then
+					lplr:SetAttribute('BackpackEnabled', true)
+				end
+			end)
+		end
+	end
+	
+	AntiTaze = vape.Categories.Blatant:CreateModule({
+		Name = 'Anti Taze',
+		Function = function(callback)
+			if callback then
+				AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
+				if entitylib.isAlive then
+					task.spawn(EntityAdded, entitylib.character)
+				end
+			else
+				if old and connection.Function then
+					hookfunction(connection.Function, old)
+					old = nil
+				end
+			end
+		end,
+		Tooltip = 'Prevent you from getting tazed'
+	})
+end)
+                                                                                                                                                
+run(function()
+    local AutoReset
+
+    AutoReset = vape.Categories.Blatant:CreateModule({
+        Name = 'AutoReset',
+        Function = function(callback)
+            if callback then
+                AutoReset:Clean(lplr:GetPropertyChangedSignal('Team'):Connect(function()
+                    if lplr.Team == teams.Criminals then
+                        task.wait(0.2)
+                        if lplr.Character and lplr.Character:FindFirstChildOfClass("Humanoid") then
+                            lplr.Character:FindFirstChildOfClass("Humanoid").Health = 0
+                        end
+                    end
+                end))
+            end
+        end,
+        Tooltip = 'Automatically reset after becoming a criminal.'
+    })
+end)
+                                                                                                                                                    
+run(function()
+	local VehicleSpeed
+	local Speed
+	local old
+	local seats = {}
+	
+	VehicleSpeed = vape.Categories.Blatant:CreateModule({
+		Name = 'VehicleSpeed',
+		Function = function(callback)
+			if callback then
+				repeat
+					local seat = entitylib.isAlive and entitylib.character.Humanoid.SeatPart
+					if seat then
+						if seat ~= old then
+							if seat:IsDescendantOf(workspace.CarContainer) then
+								seats = seat.Parent.Parent:QueryDescendants('VehicleSeat')
+							end
+	
+							old = seat
+						end
+	
+						for _, v in seats do
+							v.MaxSpeed = Speed.Value
+							v.Torque = 4
+						end
+					end
+	
+					task.wait()
+				until not VehicleSpeed.Enabled
+			else
+				table.clear(seats)
+			end
+		end,
+		Tooltip = 'Increase vehicle speed'
+	})
+	Speed = VehicleSpeed:CreateSlider({
+		Name = 'Speed',
+		Min = 80,
+		Max = 200,
+		Default = 140
+	})
+end)
+                                                                                                                                                        
+run(function()
+	local C4ESP
+	local FillColor
+	local OutlineColor
+	local FillTransparency
+	local OutlineTransparency
+	local Reference = {}
+	local Folder = Instance.new('Folder')
+	Folder.Parent = vape.gui
+	
+	local function Added(obj)
+		local cham = Instance.new('Highlight')
+		cham.Adornee = obj
+		cham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		cham.FillColor = Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
+		cham.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
+		cham.FillTransparency = FillTransparency.Value
+		cham.OutlineTransparency = OutlineTransparency.Value
+		cham.Parent = Folder
+	
+		Reference[obj] = cham
+	end
+	
+	local function Removed(obj)
+		if Reference[obj] then
+			if vape.ThreadFix then
+				setthreadidentity(8)
+			end
+	
+			Reference[obj]:Destroy()
+			Reference[obj] = nil
+		end
+	end
+	
+	C4ESP = vape.Categories.Render:CreateModule({
+		Name = 'C4 ESP',
+		Function = function(callback)
+			if callback then
+				C4ESP:Clean(collectionService:GetInstanceAddedSignal('C4'):Connect(Added))
+				C4ESP:Clean(collectionService:GetInstanceRemovedSignal('C4'):Connect(Removed))
+	
+				for _, obj in collectionService:GetTagged('C4') do
+					task.spawn(Added, obj)
+				end
+			else
+				for _, v in Reference do
+					v:Destroy()
+				end
+				table.clear(Reference)
+			end
+		end,
+		Tooltip = 'Display all C4\'s placed'
+	})
+	FillColor = C4ESP:CreateColorSlider({
+		Name = 'Color',
+		Function = function(hue, sat, val)
+			for _, v in Reference do
+				v.FillColor = Color3.fromHSV(hue, sat, val)
+			end
+		end
+	})
+	OutlineColor = C4ESP:CreateColorSlider({
+		Name = 'Outline Color',
+		DefaultSat = 0,
+		Function = function(hue, sat, val)
+			for _, v in Reference do
+				v.OutlineColor = Color3.fromHSV(hue, sat, val)
+			end
+		end
+	})
+	FillTransparency = C4ESP:CreateSlider({
+		Name = 'Transparency',
+		Min = 0,
+		Max = 1,
+		Default = 0.5,
+		Function = function(val)
+			for _, v in Reference do
+				v.FillTransparency = val
+			end
+		end,
+		Decimal = 10
+	})
+	OutlineTransparency = C4ESP:CreateSlider({
+		Name = 'Outline Transparency',
+		Min = 0,
+		Max = 1,
+		Default = 0.5,
+		Function = function(val)
+			for _, v in Reference do
+				v.OutlineTransparency = val
+			end
+		end,
+		Decimal = 10
+	})
+end)
+                                                                                                                                                                            
+run(function()
+	local AutoHeal
+	local healItems = {
+		Breakfast = true,
+		Lunch = true,
+		Dinner = true
+	}
+	
+	AutoHeal = vape.Categories.Utility:CreateModule({
+		Name = 'AutoHeal',
+		Function = function(callback)
+			if callback then
+				repeat
+					local ent = entitylib.isAlive and entitylib.character
+					if ent and ent.Humanoid.Health <= 85 then
+						local healTool
+						local backpack = lplr:FindFirstChildWhichIsA('Backpack')
+						if backpack then
+							for _, v in backpack:GetChildren() do
+								if healItems[v.Name] then
+									healTool = v
+								end
+							end
+	
+							if healTool and (os.clock() - (healTool:GetAttribute('Client_LastConsumedAt') or 0)) >= 3 then
+								local equipped = ent.Character:FindFirstChildWhichIsA('Tool')
+								if equipped then
+									equipped.Parent = backpack
+								end
+	
+								healTool.Parent = ent.Character
+								healTool:SetAttribute('Quantity', healTool:GetAttribute('Quantity') - 1)
+								healTool:SetAttribute('Client_LastConsumedAt', os.clock())
+								notif('AutoHeal', 'Quantity: '..healTool:GetAttribute('Quantity'), 3)
+								replicatedStorage.Remotes.EatFood:FireServer()
+								healTool.Parent = backpack
+	
+								if equipped then
+									equipped.Parent = ent.Character
+								end
+							end
+						end
+					end
+	
+					task.wait(0.05)
+				until not AutoHeal.Enabled
+			end
+		end,
+		Tooltip = 'Automatically heal damage with consumables.'
+	})
+end)
+
                                                                                                                                                                                 
 run(function()
     local ArrestHighlight = replicatedStorageService:FindFirstChild("ArrestHighlight")
