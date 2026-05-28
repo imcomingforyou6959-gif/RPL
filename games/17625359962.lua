@@ -1705,6 +1705,7 @@ run(function()
     local selMat = "Plastic"
     local selCol = Color3.new(1, 1, 1)
     local selTrans = 0
+    local removeArms = false
 
     local function ensureFolders()
         if not isfolder("newvape") then makefolder("newvape") end
@@ -1727,7 +1728,8 @@ run(function()
         local data = {
             material = selMat,
             color = col2tbl(selCol),
-            transparency = selTrans
+            transparency = selTrans,
+            removeArms = removeArms
         }
         pcall(function() writefile(cfgPath, http:JSONEncode(data)) end)
     end
@@ -1742,6 +1744,7 @@ run(function()
             if data.material then selMat = data.material end
             if data.color then selCol = tbl2col(data.color) end
             if data.transparency then selTrans = data.transparency end
+            if data.removeArms ~= nil then removeArms = data.removeArms end
         end
     end
 
@@ -1801,9 +1804,13 @@ run(function()
         if not part or not part:IsA("BasePart") then return end
         local n = part.Name
         if n ~= "LeftArm" and n ~= "RightArm" then return end
-        part.Material = Enum.Material[selMat] or part.Material
-        part.Color = selCol
-        part.Transparency = selTrans
+        if removeArms then
+            part.Transparency = 1
+        else
+            part.Material = Enum.Material[selMat] or part.Material
+            part.Color = selCol
+            part.Transparency = selTrans
+        end
     end
 
     local function colorArmsInModel(model)
@@ -1834,7 +1841,6 @@ run(function()
                 processFirstPerson()
             end
         end)
-
         processFirstPerson()
     end
 
@@ -1890,6 +1896,17 @@ run(function()
             applyAll()
             save()
         end
+    })
+
+    SelfVisuals:CreateToggle({
+        Name = "Remove Arms",
+        Default = false,
+        Function = function(v)
+            removeArms = v
+            processFirstPerson()
+            save()
+        end,
+        Tooltip = "Makes viewmodel arms invisible"
     })
 
     load()
