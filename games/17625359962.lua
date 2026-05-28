@@ -1344,6 +1344,156 @@ run(function()
         end
     })
 end)
+                                                                                                                                                                        
+run(function()
+    local sky = game:GetService("Lighting")
+    local skyboxes = {
+        ["default"] = {
+            SkyboxBk = sky.SkyboxBk,
+            SkyboxDn = sky.SkyboxDn,
+            SkyboxFt = sky.SkyboxFt,
+            SkyboxLf = sky.SkyboxLf,
+            SkyboxRt = sky.SkyboxRt,
+            SkyboxUp = sky.SkyboxUp,
+            SunTextureId = sky.SunTextureId,
+            MoonTextureId = sky.MoonTextureId
+        },
+        ["stormy"] = {
+            SkyboxUp = "http://www.roblox.com/asset/?id=18703232671",
+            SkyboxBk = "http://www.roblox.com/asset/?id=18703245834",
+            SkyboxLf = "http://www.roblox.com/asset/?id=18703237556",
+            SkyboxDn = "http://www.roblox.com/asset/?id=18703243349",
+            SkyboxFt = "http://www.roblox.com/asset/?id=18703240532",
+            SkyboxRt = "http://www.roblox.com/asset/?id=18703235430",
+            SunTextureId = sky.SunTextureId,
+            MoonTextureId = sky.MoonTextureId
+        },
+        ["blue space"] = {
+            SkyboxLf = "rbxassetid://15536114370",
+            SkyboxUp = "rbxassetid://15536117282",
+            SkyboxRt = "rbxassetid://15536118762",
+            SkyboxFt = "rbxassetid://15536116141",
+            SkyboxDn = "rbxassetid://15536112543",
+            SkyboxBk = "rbxassetid://15536110634",
+            SunTextureId = sky.SunTextureId,
+            MoonTextureId = sky.MoonTextureId
+        },
+        ["pink"] = {
+            SkyboxUp = "rbxassetid://12216108877",
+            SkyboxLf = "rbxassetid://12216110170",
+            SkyboxRt = "rbxassetid://12216110471",
+            SkyboxFt = "rbxassetid://12216109489",
+            SkyboxBk = "rbxassetid://12216109205",
+            SkyboxDn = "rbxassetid://12216109875",
+            SunTextureId = sky.SunTextureId,
+            MoonTextureId = sky.MoonTextureId
+        },
+        ["black storm"] = {
+            SkyboxLf = "rbxassetid://15502507918",
+            SkyboxUp = "rbxassetid://15502511911",
+            SkyboxRt = "rbxassetid://15502509398",
+            SkyboxFt = "rbxassetid://15502510289",
+            SkyboxDn = "rbxassetid://15502508460",
+            SkyboxBk = "rbxassetid://15502511288",
+            SunTextureId = sky.SunTextureId,
+            MoonTextureId = sky.MoonTextureId
+        },
+        ["realistic"] = {
+            SkyboxUp = "rbxassetid://653719321",
+            SkyboxDn = "rbxassetid://653718790",
+            SkyboxLf = "rbxassetid://653719190",
+            SkyboxFt = "rbxassetid://653719067",
+            SkyboxRt = "rbxassetid://653718931",
+            SkyboxBk = "rbxassetid://653719502",
+            SunTextureId = sky.SunTextureId,
+            MoonTextureId = sky.MoonTextureId
+        }
+    }
+
+    local enabled = false
+    local currentSkybox = "black storm"
+    local defaultSkybox = {}
+
+    for _, face in ipairs({"SkyboxBk", "SkyboxDn", "SkyboxFt", "SkyboxLf", "SkyboxRt", "SkyboxUp"}) do
+        defaultSkybox[face] = sky[face]
+    end
+    defaultSkybox.SunTextureId = sky.SunTextureId
+    defaultSkybox.MoonTextureId = sky.MoonTextureId
+
+    local function ensureWorldFolder()
+        if not isfolder("newvape") then makefolder("newvape") end
+        if not isfolder("newvape/assets") then makefolder("newvape/assets") end
+        if not isfolder("newvape/assets/world") then makefolder("newvape/assets/world") end
+    end
+
+    local function applySkybox(name)
+        local ids = skyboxes[name]
+        if not ids then return end
+        sky.SkyboxBk = ids.SkyboxBk
+        sky.SkyboxDn = ids.SkyboxDn
+        sky.SkyboxFt = ids.SkyboxFt
+        sky.SkyboxLf = ids.SkyboxLf
+        sky.SkyboxRt = ids.SkyboxRt
+        sky.SkyboxUp = ids.SkyboxUp
+        sky.SunTextureId = ids.SunTextureId
+        sky.MoonTextureId = ids.MoonTextureId
+    end
+
+    local function restoreDefault()
+        sky.SkyboxBk = defaultSkybox.SkyboxBk
+        sky.SkyboxDn = defaultSkybox.SkyboxDn
+        sky.SkyboxFt = defaultSkybox.SkyboxFt
+        sky.SkyboxLf = defaultSkybox.SkyboxLf
+        sky.SkyboxRt = defaultSkybox.SkyboxRt
+        sky.SkyboxUp = defaultSkybox.SkyboxUp
+        sky.SunTextureId = defaultSkybox.SunTextureId
+        sky.MoonTextureId = defaultSkybox.MoonTextureId
+    end
+
+    local WorldChanger = vape.Categories.World:CreateModule({
+        Name = "World Changer",
+        Function = function(callback)
+            enabled = callback
+            if callback then
+                applySkybox(currentSkybox)
+            else
+                restoreDefault()
+            end
+        end,
+        Tooltip = "Change the skybox and world appearance"
+    })
+
+    local skyboxNames = {"black storm", "blue space", "realistic", "stormy", "pink"}
+    WorldChanger:CreateDropdown({
+        Name = "Skybox",
+        List = skyboxNames,
+        Default = "black storm",
+        Function = function(val)
+            currentSkybox = val
+            if not skyboxes[val] then
+                ensureWorldFolder()
+                local path = "newvape/assets/world/" .. val
+                if isfile(path) then
+                    local s, data = pcall(function()
+                        local asset = getcustomasset(path)
+                        return game:GetObjects(asset)[1]
+                    end)
+                    if s and data then
+                        skyboxes[val] = data
+                    end
+                end
+            end
+            if enabled then
+                applySkybox(val)
+            end
+        end,
+        Tooltip = "Select a skybox (supports .rbxm files in newvape/assets/world/)"
+    })
+
+    vape:Clean(function()
+        restoreDefault()
+    end)
+end)
 
 run(function()
     local Lighting = game:GetService("Lighting")
@@ -1358,7 +1508,6 @@ run(function()
 end)
 
 run(function()
-    -- Subspace Tripmine
     local labels = {}
     local labelCount = 0
     local childAddedConn, childRemovedConn, renderConn, queueConn
