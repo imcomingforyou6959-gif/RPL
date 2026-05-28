@@ -1433,34 +1433,28 @@ run(function()
     defaultSkybox.SunTextureId = sky.SunTextureId
     defaultSkybox.MoonTextureId = sky.MoonTextureId
 
-    local function ensureWorldFolder()
-        if not isfolder("newvape") then makefolder("newvape") end
-        if not isfolder("newvape/assets") then makefolder("newvape/assets") end
-        if not isfolder("newvape/assets/world") then makefolder("newvape/assets/world") end
-    end
-
     local function applySkybox(name)
         local ids = skyboxes[name]
         if not ids then return end
-        sky.SkyboxBk = ids.SkyboxBk
-        sky.SkyboxDn = ids.SkyboxDn
-        sky.SkyboxFt = ids.SkyboxFt
-        sky.SkyboxLf = ids.SkyboxLf
-        sky.SkyboxRt = ids.SkyboxRt
-        sky.SkyboxUp = ids.SkyboxUp
-        sky.SunTextureId = ids.SunTextureId
-        sky.MoonTextureId = ids.MoonTextureId
+        pcall(function() sky.SkyboxBk = ids.SkyboxBk end)
+        pcall(function() sky.SkyboxDn = ids.SkyboxDn end)
+        pcall(function() sky.SkyboxFt = ids.SkyboxFt end)
+        pcall(function() sky.SkyboxLf = ids.SkyboxLf end)
+        pcall(function() sky.SkyboxRt = ids.SkyboxRt end)
+        pcall(function() sky.SkyboxUp = ids.SkyboxUp end)
+        pcall(function() sky.SunTextureId = ids.SunTextureId end)
+        pcall(function() sky.MoonTextureId = ids.MoonTextureId end)
     end
 
     local function restoreDefault()
-        sky.SkyboxBk = defaultSkybox.SkyboxBk
-        sky.SkyboxDn = defaultSkybox.SkyboxDn
-        sky.SkyboxFt = defaultSkybox.SkyboxFt
-        sky.SkyboxLf = defaultSkybox.SkyboxLf
-        sky.SkyboxRt = defaultSkybox.SkyboxRt
-        sky.SkyboxUp = defaultSkybox.SkyboxUp
-        sky.SunTextureId = defaultSkybox.SunTextureId
-        sky.MoonTextureId = defaultSkybox.MoonTextureId
+        pcall(function() sky.SkyboxBk = defaultSkybox.SkyboxBk end)
+        pcall(function() sky.SkyboxDn = defaultSkybox.SkyboxDn end)
+        pcall(function() sky.SkyboxFt = defaultSkybox.SkyboxFt end)
+        pcall(function() sky.SkyboxLf = defaultSkybox.SkyboxLf end)
+        pcall(function() sky.SkyboxRt = defaultSkybox.SkyboxRt end)
+        pcall(function() sky.SkyboxUp = defaultSkybox.SkyboxUp end)
+        pcall(function() sky.SunTextureId = defaultSkybox.SunTextureId end)
+        pcall(function() sky.MoonTextureId = defaultSkybox.MoonTextureId end)
     end
 
     local WorldChanger = vape.Categories.World:CreateModule({
@@ -1483,24 +1477,11 @@ run(function()
         Default = "black storm",
         Function = function(val)
             currentSkybox = val
-            if not skyboxes[val] then
-                ensureWorldFolder()
-                local path = "newvape/assets/world/" .. val
-                if isfile and isfile(path) then
-                    local s, data = pcall(function()
-                        local asset = getcustomasset(path)
-                        return game:GetObjects(asset)[1]
-                    end)
-                    if s and data then
-                        skyboxes[val] = data
-                    end
-                end
-            end
             if enabled then
                 applySkybox(val)
             end
         end,
-        Tooltip = "Select a skybox (supports .rbxm files in newvape/assets/world/)"
+        Tooltip = "Select a skybox"
     })
 
     vape:Clean(function()
