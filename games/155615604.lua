@@ -567,7 +567,7 @@ run(function()
 				setthreadidentity(8)
 			end
 	
-			Strings[ent] = ent.Player and whitelist:tag(ent.Player, true, true)..(DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
+			Strings[ent] = ent.Player and (DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
 	
 			if Health.Enabled then
 				local healthColor = Color3.fromHSV(math.clamp(ent.Health / ent.MaxHealth, 0, 1) / 2.5, 0.89, 0.75)
@@ -578,7 +578,7 @@ run(function()
 				Strings[ent] = '<font color="rgb(85, 255, 85)">[</font><font color="rgb(255, 255, 255)">%s</font><font color="rgb(85, 255, 85)">]</font> '..Strings[ent]
 			end
 	
-			if ent.Player and ent.Player.Team == teams.Inmates then
+			if ent.Player and ent.Player.Team == inmatesTeam then
 				if ent.Character:GetAttribute('Hostile') then
 					Strings[ent] = '[💢] '..Strings[ent]
 				elseif ent.Character:GetAttribute('Trespassing') then
@@ -618,7 +618,7 @@ run(function()
 			nametag.Text.Size = 15 * Scale.Value
 			nametag.Text.Font = 0
 			nametag.Text.ZIndex = 2
-			Strings[ent] = ent.Player and whitelist:tag(ent.Player, true)..(DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
+			Strings[ent] = ent.Player and (DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
 	
 			if Health.Enabled then
 				Strings[ent] = Strings[ent]..' '..math.round(ent.Health)
@@ -628,7 +628,7 @@ run(function()
 				Strings[ent] = '[%s] '..Strings[ent]
 			end
 	
-			if ent.Player and ent.Player.Team == teams.Inmates then
+			if ent.Player and ent.Player.Team == inmatesTeam then
 				if ent.Character:GetAttribute('Hostile') then
 					Strings[ent] = '[Hostile] '..Strings[ent]
 				elseif ent.Character:GetAttribute('Trespassing') then
@@ -683,7 +683,7 @@ run(function()
 					setthreadidentity(8)
 				end
 				Sizes[ent] = nil
-				Strings[ent] = ent.Player and whitelist:tag(ent.Player, true, true)..(DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
+				Strings[ent] = ent.Player and (DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
 	
 				if Health.Enabled then
 					local color = Color3.fromHSV(math.clamp(ent.Health / ent.MaxHealth, 0, 1) / 2.5, 0.89, 0.75)
@@ -694,7 +694,7 @@ run(function()
 					Strings[ent] = '<font color="rgb(85, 255, 85)">[</font><font color="rgb(255, 255, 255)">%s</font><font color="rgb(85, 255, 85)">]</font> '..Strings[ent]
 				end
 	
-				if ent.Player and ent.Player.Team == teams.Inmates then
+				if ent.Player and ent.Player.Team == inmatesTeam then
 					if ent.Character:GetAttribute('Hostile') then
 						Strings[ent] = '[💢] '..Strings[ent]
 					elseif ent.Character:GetAttribute('Trespassing') then
@@ -714,13 +714,13 @@ run(function()
 					setthreadidentity(8)
 				end
 				Sizes[ent] = nil
-				Strings[ent] = ent.Player and whitelist:tag(ent.Player, true)..(DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
+				Strings[ent] = ent.Player and (DisplayName.Enabled and ent.Player.DisplayName or ent.Player.Name) or ent.Character.Name
 	
 				if Health.Enabled then
 					Strings[ent] = Strings[ent]..' '..math.round(ent.Health)
 				end
 	
-				if ent.Player and ent.Player.Team == teams.Inmates then
+				if ent.Player and ent.Player.Team == inmatesTeam then
 					if ent.Character:GetAttribute('Hostile') then
 						Strings[ent] = '[Hostile] '..Strings[ent]
 					elseif ent.Character:GetAttribute('Trespassing') then
@@ -2553,54 +2553,6 @@ run(function()
 			end
 		end,
 		Tooltip = 'Allow you to shoot through riot shields.'
-	})
-end)
-                                                                                                                                            
-run(function()
-	local AntiTaze
-	local old, connection
-	
-	local function EntityAdded(ent)
-		connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
-		if not (connection and connection.Function) then
-			repeat
-				connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
-				task.wait()
-			until connection and connection.Function or not AntiTaze.Enabled
-		end
-	
-		if connection and AntiTaze.Enabled then
-			old = hookfunction(connection.Function, function()
-				local char = lplr.Character
-				lplr:SetAttribute('BackpackEnabled', false)
-				if entitylib.isAlive then
-					entitylib.character.Humanoid:UnequipTools()
-				end
-	
-				task.wait(3.5)
-				if lplr.Character == char then
-					lplr:SetAttribute('BackpackEnabled', true)
-				end
-			end)
-		end
-	end
-	
-	AntiTaze = vape.Categories.Blatant:CreateModule({
-		Name = 'AntiTaze',
-		Function = function(callback)
-			if callback then
-				AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
-				if entitylib.isAlive then
-					task.spawn(EntityAdded, entitylib.character)
-				end
-			else
-				if old and connection.Function then
-					hookfunction(connection.Function, old)
-					old = nil
-				end
-			end
-		end,
-		Tooltip = 'Prevent you from getting tazed'
 	})
 end)
                                                                                                                                                 
