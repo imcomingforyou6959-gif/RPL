@@ -2286,7 +2286,6 @@ run(function()
 		Tooltip = 'Automatically heal damage with consumables.'
 	})
 end)
-
                                                                                                                                                                                 
 run(function()
     local ArrestHighlight = replicatedStorageService:FindFirstChild("ArrestHighlight")
