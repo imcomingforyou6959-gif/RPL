@@ -1380,7 +1380,11 @@ run(function()
                         local now = tick()
                         if now - cacheCleanupTick >= CACHE_CLEANUP_INTERVAL then
                             cacheCleanupTick = now
-                            t.bt = {m = false, q = false, p = Vector3.new()}
+                            if t and t.bt then
+    						t.bt.m = false
+    						t.bt.q = false
+    						t.bt.p = Vector3.new()
+							end
                         end
 
                         local origin = head.CFrame
@@ -1452,11 +1456,12 @@ run(function()
                         end
 
                         if ent and ent.Character and ent.Character:FindFirstChild("HumanoidRootPart") then
-                            t.bt.m = true
-                            t.bt.p = ent.HumanoidRootPart.Position
-                        end
-                    end)
-                end)
+							if t and t.bt then
+                            	t.bt.m = true
+                            	t.bt.p = ent.HumanoidRootPart.Position
+                        	end
+                    	end)
+                	end)
 
                 if watchdogConnection then watchdogConnection:Disconnect() end
                 watchdogConnection = runService.Heartbeat:Connect(function()
@@ -1484,7 +1489,7 @@ run(function()
                     mouse1release()
                     mouseClicked = false
                 end
-                t.sa = nil
+                if t then t.sa = nil end
                 cacheCleanupTick = 0
             end
         end,
