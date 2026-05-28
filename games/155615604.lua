@@ -2116,53 +2116,29 @@ run(function()
 end)
                                                                                                                                                         
 run(function()
-	local C4ESP
-	local FillColor
-	local OutlineColor
-	local FillTransparency
-	local OutlineTransparency
-	local Reference = {}
-	local Folder = Instance.new('Folder')
-	Folder.Parent = vape.gui
-	
-	local function Added(obj)
-		local cham = Instance.new('Highlight')
-		cham.Adornee = obj
-		cham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-		cham.FillColor = Color3.fromHSV(FillColor.Hue, FillColor.Sat, FillColor.Value)
-		cham.OutlineColor = Color3.fromHSV(OutlineColor.Hue, OutlineColor.Sat, OutlineColor.Value)
-		cham.FillTransparency = FillTransparency.Value
-		cham.OutlineTransparency = OutlineTransparency.Value
-		cham.Parent = Folder
-	
-		Reference[obj] = cham
-	end
-	
-	local function Removed(obj)
-		if Reference[obj] then
-			if vape.ThreadFix then
-				setthreadidentity(8)
-			end
-	
-			Reference[obj]:Destroy()
-			Reference[obj] = nil
-		end
-	end
-	
-run(function()
     local collectionService = game:GetService("CollectionService")
     local Reference = {}
+    local Folder = Instance.new('Folder')
+    Folder.Parent = vape.gui
+
+    local C4ESP
+    local FillColor
+    local OutlineColor
+    local FillTransparency
+    local OutlineTransparency
 
     local function Added(obj)
         if Reference[obj] then return end
-        local highlight = Instance.new("Highlight")
-        highlight.FillColor = Color3.fromHSV(FillColor and FillColor.Hue or 0, FillColor and FillColor.Sat or 1, FillColor and FillColor.Value or 1)
-        highlight.OutlineColor = Color3.fromHSV(OutlineColor and OutlineColor.Hue or 0, 0, 1)
-        highlight.FillTransparency = FillTransparency and FillTransparency.Value or 0.5
-        highlight.OutlineTransparency = OutlineTransparency and OutlineTransparency.Value or 0.5
-        highlight.Adornee = obj
-        highlight.Parent = obj
-        Reference[obj] = highlight
+        local cham = Instance.new('Highlight')
+        cham.Adornee = obj
+        cham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        cham.FillColor = Color3.fromHSV(FillColor and FillColor.Hue or 0, FillColor and FillColor.Sat or 1, FillColor and FillColor.Value or 1)
+        cham.OutlineColor = Color3.fromHSV(OutlineColor and OutlineColor.Hue or 0, 0, 1)
+        cham.FillTransparency = FillTransparency and FillTransparency.Value or 0.5
+        cham.OutlineTransparency = OutlineTransparency and OutlineTransparency.Value or 0.5
+        cham.Parent = Folder
+
+        Reference[obj] = cham
     end
 
     local function Removed(obj)
@@ -2172,7 +2148,7 @@ run(function()
         end
     end
 
-    local C4ESP = vape.Categories.Render:CreateModule({
+    C4ESP = vape.Categories.Render:CreateModule({
         Name = 'C4 ESP',
         Function = function(callback)
             if callback then
@@ -2192,7 +2168,7 @@ run(function()
         Tooltip = 'Display all C4\'s placed'
     })
 
-    local FillColor = C4ESP:CreateColorSlider({
+    FillColor = C4ESP:CreateColorSlider({
         Name = 'Color',
         Function = function(hue, sat, val)
             for _, v in pairs(Reference) do
@@ -2200,7 +2176,7 @@ run(function()
             end
         end
     })
-    local OutlineColor = C4ESP:CreateColorSlider({
+    OutlineColor = C4ESP:CreateColorSlider({
         Name = 'Outline Color',
         DefaultSat = 0,
         Function = function(hue, sat, val)
@@ -2209,7 +2185,7 @@ run(function()
             end
         end
     })
-    local FillTransparency = C4ESP:CreateSlider({
+    FillTransparency = C4ESP:CreateSlider({
         Name = 'Transparency',
         Min = 0,
         Max = 1,
@@ -2221,7 +2197,7 @@ run(function()
         end,
         Decimal = 10
     })
-    local OutlineTransparency = C4ESP:CreateSlider({
+    OutlineTransparency = C4ESP:CreateSlider({
         Name = 'Outline Transparency',
         Min = 0,
         Max = 1,
