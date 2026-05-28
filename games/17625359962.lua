@@ -102,6 +102,15 @@ end
 for _, v in {'SilentAim', 'Reach', 'AntiFall', 'Killaura', 'AntiRagdoll', 'Blink',
     'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot', 'Self Visuals'} do vape:Remove(v) end
 
+local t = {
+    d = {l = CFrame.new(), s = CFrame.new()},
+    bt = {m = false, q = false, p = Vector3.new()},
+    sa = {hooks = {}, toggle = nil},
+    hn = {e = false},
+    ka = {},
+    mb = { enabled = false, redirect = nil }
+}
+
 local function chid_to_id(chid)
     return string.byte(chid or string.char(0))
 end
