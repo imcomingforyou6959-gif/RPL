@@ -475,12 +475,13 @@ run(function()
         return not result or result.Instance:IsDescendantOf(part.Parent)
     end
 
-    local function updateTarget()
+        local function updateTarget()
         local now = tick()
         if now - lastTargetUpdate < TARGET_UPDATE_INTERVAL then return end
         lastTargetUpdate = now
 
-        local wallsEnabled = Targets.Walls.Enabled
+        local ignoreInvisible = Targets.Invisible.Enabled
+        local ignoreWalls = Targets.Walls.Enabled
         local useFOV = showCircle
 
         if useFOV then
@@ -489,7 +490,7 @@ run(function()
                 Part = aimPartName,
                 Players = Targets.Players.Enabled,
                 NPCs = Targets.NPCs.Enabled,
-                Wallcheck = wallsEnabled or nil,
+                Wallcheck = ignoreWalls or nil,
                 Origin = cam.CFrame.Position
             })
             if cachedTarget and cachedTarget.Player and not isValidTarget(cachedTarget.Player) then
@@ -508,18 +509,20 @@ run(function()
                 if not root then continue end
                 if ent.Player and not isValidTarget(ent.Player) then continue end
 
+                local part = ent[aimPartName]
+                if not part then continue end
+                                                                        
+                if ignoreInvisible then
+                    local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
+                    if not onScreen or screenPos.Z <= 0 then continue end
+                end
+
+                if ignoreWalls and not isVisible(part, ent.Character) then continue end
+
                 local dist = (root.Position - cameraPos).Magnitude
                 if dist < bestDist then
-                    if wallsEnabled then
-                        local part = ent[aimPartName]
-                        if part and isVisible(part, ent.Character) then
-                            bestDist = dist
-                            bestEnt = ent
-                        end
-                    else
-                        bestDist = dist
-                        bestEnt = ent
-                    end
+                    bestDist = dist
+                    bestEnt = ent
                 end
             end
             cachedTarget = bestEnt
