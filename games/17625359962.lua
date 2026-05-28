@@ -1116,6 +1116,104 @@ run(function()
         if WeatherPart then WeatherPart:Destroy() end
     end)
 end)
+                                                                                                                                            
+run(function()
+    local sounds = {
+        ["windy winter"] = "rbxassetid://6046340391",
+        ["light rain"] = "rbxassetid://18862087062",
+        ["thunderstorm"] = "rbxassetid://4305545740",
+        ["night"] = "rbxassetid://179507208",
+        ["day"] = "rbxassetid://6189453706"
+    }
+
+    local sound = nil
+    local enabled = false
+    local currentSoundId = sounds["night"]
+    local currentVolume = 25
+
+    local function destroySound()
+        if sound then
+            pcall(function() sound:Stop() end)
+            pcall(function() sound:Destroy() end)
+            sound = nil
+        end
+    end
+
+    local function createSound()
+        destroySound()
+        if not enabled then return end
+
+        sound = Instance.new("Sound")
+        sound.SoundId = currentSoundId
+        sound.Volume = currentVolume / 65
+        sound.Looped = true
+        sound.Name = "\0"
+        sound.Parent = game:GetService("CoreGui")
+        sound:Play()
+    end
+
+    local BackgroundNoise = vape.Categories.Utility:CreateModule({
+        Name = "Background Noise",
+        Function = function(callback)
+            enabled = callback
+            if callback then
+                createSound()
+            else
+                destroySound()
+            end
+        end,
+        Tooltip = "Ambient sounds like rain, wind, thunder, etc."
+    })
+
+    BackgroundNoise:CreateDropdown({
+        Name = "Sound",
+        List = {"windy winter", "thunderstorm", "light rain", "night", "day"},
+        Default = "night",
+        Function = function(val)
+            local newSound = sounds[val]
+            if not newSound then
+                local path = "newvape/assets" .. val
+                if isfile(path) then
+                    local s, data = pcall(getcustomasset, path)
+                    if s then
+                        sounds[val] = data
+                        newSound = data
+                    else
+                        notif("Background Noise", "Failed to load custom sound: " .. val, 3, "alert")
+                        return
+                    end
+                end
+            end
+            if newSound then
+                currentSoundId = newSound
+                if sound then
+                    sound.SoundId = newSound
+                    sound:Stop()
+                    sound:Play()
+                end
+            end
+        end,
+        Tooltip = "Select ambient sound"
+    })
+
+    BackgroundNoise:CreateSlider({
+        Name = "Volume",
+        Min = 0,
+        Max = 100,
+        Default = 25,
+        Suffix = "%",
+        Function = function(val)
+            currentVolume = val
+            if sound then
+                sound.Volume = val / 65
+            end
+        end
+    })
+
+    vape:Clean(function()
+        destroySound()
+    end)
+end)                                                                                                                                            
 
 run(function()
     local assetSounds = {
