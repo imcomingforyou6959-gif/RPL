@@ -428,7 +428,7 @@ run(function()
     local lastTargetUpdate = 0
     local TARGET_UPDATE_INTERVAL = 0.1
 
-    local Targets, PartDropdown, FOVSlider
+    local Targets
 
     local function isGameActive()
         local mainGui = me.PlayerGui:FindFirstChild("MainGui")
@@ -463,24 +463,66 @@ run(function()
         end
         return true
     end
-                                                            
+
+    local function isVisible(part, targetChar)
+        if not part then return false end
+        local origin = cam.CFrame.Position
+        local direction = (part.Position - origin).Unit
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.FilterDescendantsInstances = {me.Character, targetChar}
+        local result = workspace:Raycast(origin, direction * (part.Position - origin).Magnitude, rayParams)
+        return not result or result.Instance:IsDescendantOf(part.Parent)
+    end
+
     local function updateTarget()
         local now = tick()
         if now - lastTargetUpdate < TARGET_UPDATE_INTERVAL then return end
         lastTargetUpdate = now
 
-        if not Targets then return end
-        cachedTarget = entitylib.EntityMouse({
-            Range = fovRadius,
-            Part = aimPartName,
-            Players = Targets.Players.Enabled,
-            NPCs = Targets.NPCs.Enabled,
-            Wallcheck = Targets.Walls.Enabled,
-            Origin = cam.CFrame.Position
-        })
+        local wallsEnabled = Targets.Walls.Enabled
+        local useFOV = showCircle
 
-        if cachedTarget and cachedTarget.Player and not isValidTarget(cachedTarget.Player) then
-            cachedTarget = nil
+        if useFOV then
+            cachedTarget = entitylib.EntityMouse({
+                Range = fovRadius,
+                Part = aimPartName,
+                Players = Targets.Players.Enabled,
+                NPCs = Targets.NPCs.Enabled,
+                Wallcheck = wallsEnabled or nil,
+                Origin = cam.CFrame.Position
+            })
+            if cachedTarget and cachedTarget.Player and not isValidTarget(cachedTarget.Player) then
+                cachedTarget = nil
+            end
+        else
+            local bestDist = 5000
+            local bestEnt = nil
+            local cameraPos = cam.CFrame.Position
+
+            for _, ent in pairs(entitylib.List) do
+                if not ent.Targetable then continue end
+                if not Targets.Players.Enabled and ent.Player then continue end
+                if not Targets.NPCs.Enabled and ent.NPC then continue end
+                local root = ent.RootPart
+                if not root then continue end
+                if ent.Player and not isValidTarget(ent.Player) then continue end
+
+                local dist = (root.Position - cameraPos).Magnitude
+                if dist < bestDist then
+                    if wallsEnabled then
+                        local part = ent[aimPartName]
+                        if part and isVisible(part, ent.Character) then
+                            bestDist = dist
+                            bestEnt = ent
+                        end
+                    else
+                        bestDist = dist
+                        bestEnt = ent
+                    end
+                end
+            end
+            cachedTarget = bestEnt
         end
     end
 
@@ -526,13 +568,13 @@ run(function()
                 CircleObject.Visible = false
             end
         end,
-        Tooltip = 'Silently redirects bullets to chosen body part'
+        Tooltip = 'Raycast <3'
     })
 
     Targets = SilentAimV2:CreateTargets({Players = true})
-    PartDropdown = SilentAimV2:CreateDropdown({
+    SilentAimV2:CreateDropdown({
         Name = 'Hit Part',
-        List = {'Head', 'RootPart', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso'},
+        List = {'Head', 'HumanoidRootPart'},
         Default = 'Head',
         Function = function(v)
             aimPartName = v
@@ -540,15 +582,12 @@ run(function()
         end,
         Tooltip = 'Body part the bullet will hit'
     })
-    FOVSlider = SilentAimV2:CreateSlider({
+    SilentAimV2:CreateSlider({
         Name = 'FOV',
         Min = 10,
         Max = 1000,
         Default = 100,
-        Function = function(v)
-            fovRadius = v
-            if CircleObject then CircleObject.Radius = v end
-        end,
+        Function = function(v) fovRadius = v; if CircleObject then CircleObject.Radius = v end end,
         Suffix = 'px'
     })
 
