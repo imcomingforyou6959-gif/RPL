@@ -427,6 +427,8 @@ run(function()
     local cachedTarget = nil
     local lastTargetUpdate = 0
     local TARGET_UPDATE_INTERVAL = 0.1
+    local cacheCleanupTick = 0
+    local CACHE_CLEANUP_INTERVAL = 30
 
     local Targets
 
@@ -464,6 +466,12 @@ run(function()
         return true
     end
 
+    local function isAlive(ent)
+        if not ent then return false end
+        local hum = ent.Character and ent.Character:FindFirstChildOfClass("Humanoid")
+        return hum and hum.Health > 0
+    end
+
     local function isVisible(part, targetChar)
         if not part then return false end
         local origin = cam.CFrame.Position
@@ -475,7 +483,7 @@ run(function()
         return not result or result.Instance:IsDescendantOf(part.Parent)
     end
 
-        local function updateTarget()
+    local function updateTarget()
         local now = tick()
         if now - lastTargetUpdate < TARGET_UPDATE_INTERVAL then return end
         lastTargetUpdate = now
@@ -493,8 +501,11 @@ run(function()
                 Wallcheck = ignoreWalls or nil,
                 Origin = cam.CFrame.Position
             })
-            if cachedTarget and cachedTarget.Player and not isValidTarget(cachedTarget.Player) then
-                cachedTarget = nil
+            if cachedTarget then
+                if not isAlive(cachedTarget) then cachedTarget = nil end
+                if cachedTarget and cachedTarget.Player and not isValidTarget(cachedTarget.Player) then
+                    cachedTarget = nil
+                end
             end
         else
             local bestDist = 5000
@@ -505,13 +516,12 @@ run(function()
                 if not ent.Targetable then continue end
                 if not Targets.Players.Enabled and ent.Player then continue end
                 if not Targets.NPCs.Enabled and ent.NPC then continue end
-                local root = ent.RootPart
-                if not root then continue end
+                if not isAlive(ent) then continue end
                 if ent.Player and not isValidTarget(ent.Player) then continue end
 
                 local part = ent[aimPartName]
                 if not part then continue end
-                                                                        
+
                 if ignoreInvisible then
                     local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
                     if not onScreen or screenPos.Z <= 0 then continue end
@@ -519,7 +529,7 @@ run(function()
 
                 if ignoreWalls and not isVisible(part, ent.Character) then continue end
 
-                local dist = (root.Position - cameraPos).Magnitude
+                local dist = (ent.RootPart.Position - cameraPos).Magnitude
                 if dist < bestDist then
                     bestDist = dist
                     bestEnt = ent
@@ -539,7 +549,7 @@ run(function()
         end
 
         updateTarget()
-        if cachedTarget and cachedTarget[aimPartName] then
+        if cachedTarget and cachedTarget[aimPartName] and isAlive(cachedTarget) then
             args[3] = cachedTarget[aimPartName].Position
         end
         return X.original(table.unpack(args))
@@ -570,14 +580,17 @@ run(function()
             if not callback and CircleObject then
                 CircleObject.Visible = false
             end
+            if callback then
+                cacheCleanupTick = tick()
+            end
         end,
-        Tooltip = 'Raycast <3'
+        Tooltip = 'Raycast redirect'
     })
 
     Targets = SilentAimV2:CreateTargets({Players = true})
     SilentAimV2:CreateDropdown({
         Name = 'Hit Part',
-        List = {'Head', 'HumanoidRootPart'},
+        List = {'Head', 'RootPart', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso'},
         Default = 'Head',
         Function = function(v)
             aimPartName = v
