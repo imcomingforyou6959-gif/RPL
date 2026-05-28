@@ -2333,28 +2333,41 @@ run(function()
                     end
                     healTool.Parent = char
 
+                    local stoppedForDeath = false
                     repeat
+                        if not entitylib.isAlive or humanoid.Health <= 0 then
+                            stoppedForDeath = true
+                            break
+                        end
+
                         if mouse1press then mouse1press() end
                         task.wait(0.05)
                         if mouse1release then mouse1release() end
 
                         task.wait(1)
 
-                        currentHealth = humanoid.Health
+                        if entitylib.isAlive then
+                            currentHealth = humanoid.Health
+                        else
+                            stoppedForDeath = true
+                            break
+                        end
 
                         if not healTool.Parent or (healTool:GetAttribute('Quantity') or 0) <= 0 then
                             break
                         end
                     until currentHealth >= maxHealth or not entitylib.isAlive
 
-                    if healTool.Parent == char then
-                        healTool.Parent = backpack
-                    end
-                    if equipped and equipped.Parent == backpack then
-                        equipped.Parent = char
+                    if not stoppedForDeath then
+                        if healTool.Parent == char then
+                            healTool.Parent = backpack
+                        end
+                        if equipped and equipped.Parent == backpack then
+                            equipped.Parent = char
+                        end
+                        notif('AutoHeal', 'Finished eating ' .. healTool.Name, 2)
                     end
 
-                    notif('AutoHeal', 'Finished eating ' .. healTool.Name, 2)
                     task.wait(0.5)
                 until not AutoHeal.Enabled
             end
