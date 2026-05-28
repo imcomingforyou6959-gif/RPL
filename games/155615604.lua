@@ -1984,67 +1984,57 @@ end)
                                                                                                                                             
 run(function()
     local AntiTaze
-    local old = nil
-    local connection = nil
-    local hookActive = false
+    local oldFunction = nil
+    local hookTarget = nil
 
-    local function getTasedConnections()
+    local function hookTased()
         local gunRemotes = game:GetService("ReplicatedStorage"):FindFirstChild("GunRemotes")
-        if not gunRemotes then return nil end
+        if not gunRemotes then return end
         local tasedEvent = gunRemotes:FindFirstChild("PlayerTased")
-        if not tasedEvent then return nil end
-        return getconnections(tasedEvent.OnClientEvent)
-    end
+        if not tasedEvent then return end
 
-    local function EntityAdded(ent)
-        if hookActive then return end
+        for _, conn in ipairs(getconnections(tasedEvent.OnClientEvent)) do
+            if conn.Function and not conn.Function:FindFirstChild("AntiTazeHooked") then
+                hookTarget = conn
+                oldFunction = conn.Function
 
-        local conns = getTasedConnections()
-        if not conns or #conns == 0 then
-            repeat
-                task.wait()
-                if not AntiTaze.Enabled then return end
-                conns = getTasedConnections()
-            until conns and #conns > 0
+                local newFunction = function(...)
+                    local char = lplr.Character
+                    lplr:SetAttribute('BackpackEnabled', false)
+                    if entitylib.isAlive then
+                        entitylib.character.Humanoid:UnequipTools()
+                    end
+
+                    task.wait(3.5)
+                    if lplr.Character == char then
+                        lplr:SetAttribute('BackpackEnabled', true)
+                    end
+
+                    return oldFunction(...)
+                end
+
+                newFunction.AntiTazeHooked = true
+                conn.Function = newFunction
+                return
+            end
         end
-        if not AntiTaze.Enabled then return end
-
-        connection = conns[1]
-        if not connection or not connection.Function then return end
-
-        hookActive = true
-        old = hookfunction(connection.Function, function(...)
-            local char = lplr.Character
-            lplr:SetAttribute('BackpackEnabled', false)
-            if entitylib.isAlive then
-                entitylib.character.Humanoid:UnequipTools()
-            end
-
-            task.wait(3.5)
-            if lplr.Character == char then
-                lplr:SetAttribute('BackpackEnabled', true)
-            end
-
-            return old(...)
-        end)
     end
 
     AntiTaze = vape.Categories.Blatant:CreateModule({
         Name = 'Anti Taze',
         Function = function(callback)
             if callback then
-                hookActive = false
-                AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
-                if entitylib.isAlive then
-                    task.spawn(EntityAdded, entitylib.character)
-                end
+                hookTased()
+                AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(function()
+                    task.wait(0.5)
+                    hookTased()
+                end))
             else
-                if old and connection and connection.Function then
-                    hookfunction(connection.Function, old)
+                if hookTarget and oldFunction then
+                    hookTarget.Function = oldFunction
                 end
-                old = nil
-                connection = nil
-                hookActive = false
+                hookTarget = nil
+                oldFunction = nil
             end
         end,
         Tooltip = 'Prevent you from getting tazed'
@@ -2059,7 +2049,7 @@ run(function()
         Function = function(callback)
             if callback then
                 AutoReset:Clean(lplr:GetPropertyChangedSignal('Team'):Connect(function()
-                    if lplr.Team == teams.Criminals then
+                    if lplr.Team == criminalsTeam then
                         task.wait(0.2)
                         if lplr.Character and lplr.Character:FindFirstChildOfClass("Humanoid") then
                             lplr.Character:FindFirstChildOfClass("Humanoid").Health = 0
@@ -2212,55 +2202,77 @@ run(function()
 end)
                                                                                                                                                                             
 run(function()
-	local AutoHeal
-	local healItems = {
-		Breakfast = true,
-		Lunch = true,
-		Dinner = true
-	}
-	
-	AutoHeal = vape.Categories.Utility:CreateModule({
-		Name = 'AutoHeal',
-		Function = function(callback)
-			if callback then
-				repeat
-					local ent = entitylib.isAlive and entitylib.character
-					if ent and ent.Humanoid.Health <= 85 then
-						local healTool
-						local backpack = lplr:FindFirstChildWhichIsA('Backpack')
-						if backpack then
-							for _, v in backpack:GetChildren() do
-								if healItems[v.Name] then
-									healTool = v
-								end
-							end
-	
-							if healTool and (os.clock() - (healTool:GetAttribute('Client_LastConsumedAt') or 0)) >= 3 then
-								local equipped = ent.Character:FindFirstChildWhichIsA('Tool')
-								if equipped then
-									equipped.Parent = backpack
-								end
-	
-								healTool.Parent = ent.Character
-								healTool:SetAttribute('Quantity', healTool:GetAttribute('Quantity') - 1)
-								healTool:SetAttribute('Client_LastConsumedAt', os.clock())
-								notif('AutoHeal', 'Quantity: '..healTool:GetAttribute('Quantity'), 3)
-								replicatedStorage.Remotes.EatFood:FireServer()
-								healTool.Parent = backpack
-	
-								if equipped then
-									equipped.Parent = ent.Character
-								end
-							end
-						end
-					end
-	
-					task.wait(0.05)
-				until not AutoHeal.Enabled
-			end
-		end,
-		Tooltip = 'Automatically heal damage with consumables.'
-	})
+    local AutoHeal
+    local healItems = {
+        Breakfast = true,
+        Lunch = true,
+        Dinner = true
+    }
+
+    AutoHeal = vape.Categories.Utility:CreateModule({
+        Name = 'AutoHeal',
+        Function = function(callback)
+            if callback then
+                repeat
+                    if not entitylib.isAlive then
+                        task.wait(0.5)
+                        continue
+                    end
+
+                    local humanoid = entitylib.character.Humanoid
+                    if humanoid.Health > 85 then
+                        task.wait(0.5)
+                        continue
+                    end
+
+                    local char = entitylib.character.Character
+                    local backpack = lplr:FindFirstChildOfClass('Backpack')
+                    if not backpack then
+                        task.wait(0.5)
+                        continue
+                    end
+
+                    local healTool
+                    for _, tool in ipairs(backpack:GetChildren()) do
+                        if tool:IsA('Tool') and healItems[tool.Name] then
+                            local lastConsumed = tool:GetAttribute('Client_LastConsumedAt') or 0
+                            if os.clock() - lastConsumed >= 3 then
+                                healTool = tool
+                                break
+                            end
+                        end
+                    end
+
+                    if not healTool then
+                        task.wait(0.5)
+                        continue
+                    end
+																																																			
+                    local equipped = char:FindFirstChildOfClass('Tool')
+
+                    if equipped then
+                        equipped.Parent = backpack
+                    end
+                    healTool.Parent = char
+
+                    healTool:SetAttribute('Quantity', math.max((healTool:GetAttribute('Quantity') or 1) - 1, 0))
+                    healTool:SetAttribute('Client_LastConsumedAt', os.clock())
+                    replicatedStorage.Remotes.EatFood:FireServer()
+
+                    task.wait(0.1)
+
+                    healTool.Parent = backpack
+                    if equipped and equipped.Parent == backpack then
+                        equipped.Parent = char
+                    end
+
+                    notif('AutoHeal', 'Ate ' .. healTool.Name .. ' | Qty: ' .. healTool:GetAttribute('Quantity'), 2)
+                    task.wait(0.5)
+                until not AutoHeal.Enabled
+            end
+        end,
+        Tooltip = 'Automatically eat food when health is low.'
+    })
 end)
                                                                                                                                                                                 
 run(function()
