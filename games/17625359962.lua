@@ -428,6 +428,8 @@ run(function()
     local lastTargetUpdate = 0
     local TARGET_UPDATE_INTERVAL = 0.1
 
+    local Targets, PartDropdown, FOVSlider
+
     local function isGameActive()
         local mainGui = me.PlayerGui:FindFirstChild("MainGui")
         if mainGui then
@@ -461,18 +463,19 @@ run(function()
         end
         return true
     end
-
+                                                            
     local function updateTarget()
         local now = tick()
         if now - lastTargetUpdate < TARGET_UPDATE_INTERVAL then return end
         lastTargetUpdate = now
 
+        if not Targets then return end
         cachedTarget = entitylib.EntityMouse({
             Range = fovRadius,
             Part = aimPartName,
-            Players = true,
-            NPCs = false,
-            Wallcheck = false,
+            Players = Targets.Players.Enabled,
+            NPCs = Targets.NPCs.Enabled,
+            Wallcheck = Targets.Walls.Enabled,
             Origin = cam.CFrame.Position
         })
 
@@ -526,7 +529,8 @@ run(function()
         Tooltip = 'Silently redirects bullets to chosen body part'
     })
 
-    SilentAimV2:CreateDropdown({
+    Targets = SilentAimV2:CreateTargets({Players = true})
+    PartDropdown = SilentAimV2:CreateDropdown({
         Name = 'Hit Part',
         List = {'Head', 'RootPart', 'HumanoidRootPart', 'UpperTorso', 'LowerTorso'},
         Default = 'Head',
@@ -536,8 +540,7 @@ run(function()
         end,
         Tooltip = 'Body part the bullet will hit'
     })
-
-    SilentAimV2:CreateSlider({
+    FOVSlider = SilentAimV2:CreateSlider({
         Name = 'FOV',
         Min = 10,
         Max = 1000,
@@ -579,9 +582,7 @@ run(function()
         Name = 'Circle Color',
         Function = function(h,s,v)
             circleColor = {Hue=h, Saturation=s, Value=v}
-            if CircleObject then
-                CircleObject.Color = Color3.fromHSV(h,s,v)
-            end
+            if CircleObject then CircleObject.Color = Color3.fromHSV(h,s,v) end
         end,
         Darker = true,
         Visible = false
@@ -591,9 +592,7 @@ run(function()
         Min = 0, Max = 1, Decimal = 10, Default = 0.5,
         Function = function(v)
             circleTransparency = v
-            if CircleObject then
-                CircleObject.Transparency = 1 - v
-            end
+            if CircleObject then CircleObject.Transparency = 1 - v end
         end,
         Darker = true,
         Visible = false
