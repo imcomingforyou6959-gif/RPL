@@ -966,7 +966,7 @@ run(function()
     local Particle = nil
     local enabled = false
     local currentType = "rain"
-    local weatherColor = Color3.fromRGB(255,255,255)
+    local weatherColor = Color3.fromRGB(255, 255, 255)
     local weatherRate = 100
 
     local weatherPresets = {
@@ -976,28 +976,16 @@ run(function()
             Rate = 600,
             Texture = "rbxassetid://1822883048",
             EmissionDirection = Enum.NormalId.Bottom,
-            Transparency = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 1),
-                NumberSequenceKeypoint.new(0.25, 0.784),
-                NumberSequenceKeypoint.new(0.75, 0.784),
-                NumberSequenceKeypoint.new(1, 1)
-            },
+            Transparency = NumberSequence.new(0.4, 0.784, 0.784, 0.4),
             Lifetime = NumberRange.new(0.8, 0.8),
             LightEmission = 0.05,
             LightInfluence = 0.9,
             Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
-            Size = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 10),
-                NumberSequenceKeypoint.new(1, 10)
-            }
+            Size = NumberSequence.new(10)
         },
         ["snow"] = {
             LockedToPart = true,
-            Transparency = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 0.737),
-                NumberSequenceKeypoint.new(0.973, 0.769),
-                NumberSequenceKeypoint.new(1, 1)
-            },
+            Transparency = NumberSequence.new(0.737, 0.769, 1),
             Texture = "http://www.roblox.com/asset/?id=99851851",
             SpreadAngle = Vector2.new(50, 50),
             Speed = NumberRange.new(30, 30),
@@ -1005,25 +993,14 @@ run(function()
             Rate = 1000,
             EmissionDirection = Enum.NormalId.Bottom,
             Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
-            Size = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 0.33),
-                NumberSequenceKeypoint.new(0.551, 0.402),
-                NumberSequenceKeypoint.new(1, 0.33)
-            }
+            Size = NumberSequence.new(0.33, 0.402, 0.33)
         },
         ["light rain"] = {
             LockedToPart = true,
             Rate = 500,
-            Squash = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 3),
-                NumberSequenceKeypoint.new(1, 3)
-            },
+            Squash = NumberSequence.new(3, 3),
             LightInfluence = 0.3,
-            Transparency = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 0),
-                NumberSequenceKeypoint.new(0.435, 0),
-                NumberSequenceKeypoint.new(1, 0)
-            },
+            Transparency = NumberSequence.new(0, 0, 0),
             Texture = "rbxasset://textures/particles/sparkles_main.dds",
             Speed = NumberRange.new(30, 50),
             Lifetime = NumberRange.new(9, 9),
@@ -1031,10 +1008,7 @@ run(function()
             Brightness = 2,
             EmissionDirection = Enum.NormalId.Bottom,
             Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
-            Size = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 0.2),
-                NumberSequenceKeypoint.new(1, 0.2)
-            }
+            Size = NumberSequence.new(0.2, 0.2)
         }
     }
 
@@ -1045,12 +1019,14 @@ run(function()
         end
         if WeatherPart then
             local preset = weatherPresets[currentType]
+            if not preset then return end
             Particle = Instance.new("ParticleEmitter")
             for prop, value in pairs(preset) do
                 pcall(function() Particle[prop] = value end)
             end
             Particle.Color = ColorSequence.new(weatherColor)
-            Particle.Rate = (preset.Rate or 500) * (weatherRate / 100)
+            local baseRate = preset.Rate or 500
+            Particle.Rate = baseRate * (weatherRate / 100)
             Particle.Parent = WeatherPart
         end
     end
@@ -1096,9 +1072,9 @@ run(function()
     WeatherModule:CreateDropdown({
         Name = 'Type',
         List = {'rain', 'snow', 'light rain'},
-        Default = {'rain'},
+        Default = 'rain',
         Function = function(val)
-            currentType = val[1]
+            currentType = val
             if enabled then
                 recreateParticle()
             end
@@ -1107,8 +1083,8 @@ run(function()
     WeatherModule:CreateColorSlider({
         Name = 'Color',
         Darker = true,
-        Function = function(h,s,v)
-            weatherColor = Color3.fromHSV(h,s,v)
+        Function = function(h, s, v)
+            weatherColor = Color3.fromHSV(h, s, v)
             if Particle then
                 Particle.Color = ColorSequence.new(weatherColor)
             end
@@ -1124,7 +1100,9 @@ run(function()
             weatherRate = v
             if Particle then
                 local preset = weatherPresets[currentType]
-                Particle.Rate = (preset.Rate or 500) * (v / 100)
+                if preset then
+                    Particle.Rate = (preset.Rate or 500) * (v / 100)
+                end
             end
         end
     })
