@@ -1473,7 +1473,7 @@ run(function()
             if not skyboxes[val] then
                 ensureWorldFolder()
                 local path = "newvape/assets/world/" .. val
-                if isfile(path) then
+                if isfile and isfile(path) then
                     local s, data = pcall(function()
                         local asset = getcustomasset(path)
                         return game:GetObjects(asset)[1]
