@@ -2014,7 +2014,7 @@ run(function()
 	end
 	
 	AntiTaze = vape.Categories.Blatant:CreateModule({
-		Name = 'Anti Taze',
+		Name = 'AntiTaze',
 		Function = function(callback)
 			if callback then
 				AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
