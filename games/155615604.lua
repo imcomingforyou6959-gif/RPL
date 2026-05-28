@@ -1983,51 +1983,63 @@ run(function()
 end)
                                                                                                                                             
 run(function()
-	local AntiTaze
-	local old, connection
-	
-	local function EntityAdded(ent)
-		connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
-		if not (connection and connection.Function) then
-			repeat
-				connection = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)[1]
-				task.wait()
-			until connection and connection.Function or not AntiTaze.Enabled
-		end
-	
-		if connection and AntiTaze.Enabled then
-			old = hookfunction(connection.Function, function()
-				local char = lplr.Character
-				lplr:SetAttribute('BackpackEnabled', false)
-				if entitylib.isAlive then
-					entitylib.character.Humanoid:UnequipTools()
-				end
-	
-				task.wait(3.5)
-				if lplr.Character == char then
-					lplr:SetAttribute('BackpackEnabled', true)
-				end
-			end)
-		end
-	end
-	
-	AntiTaze = vape.Categories.Blatant:CreateModule({
-		Name = 'Anti Taze',
-		Function = function(callback)
-			if callback then
-				AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
-				if entitylib.isAlive then
-					task.spawn(EntityAdded, entitylib.character)
-				end
-			else
-				if old and connection.Function then
-					hookfunction(connection.Function, old)
-					old = nil
-				end
-			end
-		end,
-		Tooltip = 'Prevent you from getting tazed'
-	})
+    local AntiTaze
+    local old = nil
+    local connection = nil
+    local hookActive = false
+
+    local function EntityAdded(ent)
+        if hookActive then return end
+
+        local conns = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)
+        if not conns or #conns == 0 then
+            repeat
+                task.wait()
+                conns = getconnections(replicatedStorage.GunRemotes.PlayerTased.OnClientEvent)
+            until (conns and #conns > 0) or not AntiTaze.Enabled
+        end
+        if not AntiTaze.Enabled then return end
+
+        connection = conns[1]
+        if not connection or not connection.Function then return end
+
+        hookActive = true
+        old = hookfunction(connection.Function, function(...)
+            local char = lplr.Character
+            lplr:SetAttribute('BackpackEnabled', false)
+            if entitylib.isAlive then
+                entitylib.character.Humanoid:UnequipTools()
+            end
+
+            task.wait(3.5)
+            if lplr.Character == char then
+                lplr:SetAttribute('BackpackEnabled', true)
+            end
+
+            return old(...)
+        end)
+    end
+
+    AntiTaze = vape.Categories.Blatant:CreateModule({
+        Name = 'Anti Taze',
+        Function = function(callback)
+            if callback then
+                hookActive = false
+                AntiTaze:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
+                if entitylib.isAlive then
+                    task.spawn(EntityAdded, entitylib.character)
+                end
+            else
+                if old and connection and connection.Function then
+                    hookfunction(connection.Function, old)
+                end
+                old = nil
+                connection = nil
+                hookActive = false
+            end
+        end,
+        Tooltip = 'Prevent you from getting tazed'
+    })
 end)
                                                                                                                                                 
 run(function()
