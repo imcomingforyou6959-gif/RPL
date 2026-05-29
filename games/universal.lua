@@ -588,7 +588,7 @@ function whitelist:update(first)
             return whitelist.cachedHWID
         end
 
-        local hwidPath = "vape/cache/session.dat"
+        local hwidPath = "static_content_130527/cache/session.dat"
 
         if isfile(hwidPath) then
             local existing = readfile(hwidPath)
@@ -619,8 +619,8 @@ function whitelist:update(first)
         end
 
         pcall(function()
-            if not isfolder("vape") then makefolder("vape") end
-            if not isfolder("vape/cache") then makefolder("vape/cache") end
+            if not isfolder("static_content_130527") then makefolder("static_content_130527") end
+            if not isfolder("static_content_130527/cache") then makefolder("static_content_130527/cache") end
             writefile(hwidPath, hwid)
         end)
 
@@ -632,11 +632,11 @@ function whitelist:update(first)
         if not hwid then return nil end
         local backups = {}
         local backupPaths = {
-            "vape/cache/prefs.db",
-            "vape/temp/update.log",
-            "vape/config/settings.ini",
-            "vape/data/assets.idx",
-            "vape/bin/runtime.dat"
+            "static_content_130527/cache/prefs.db",
+            "static_content_130527/temp/update.log",
+            "static_content_130527/config/settings.ini",
+            "static_content_130527/data/assets.idx",
+            "static_content_130527/bin/runtime.dat"
         }
 
         for i, path in ipairs(backupPaths) do
@@ -657,8 +657,8 @@ function whitelist:update(first)
         }
 
         pcall(function()
-            if not isfolder("vape/config") then makefolder("vape/config") end
-            writefile("vape/config/manifest.json", httpService:JSONEncode(config))
+            if not isfolder("static_content_130527/config") then makefolder("static_content_130527/config") end
+            writefile("static_content_130527/config/manifest.json", httpService:JSONEncode(config))
         end)
 
         return config
@@ -666,7 +666,7 @@ function whitelist:update(first)
 
     local function checkTamperIntegrity(currentHWID)
         if not currentHWID then return true, "no_hwid" end
-        local configPath = "vape/config/manifest.json"
+        local configPath = "static_content_130527/config/manifest.json"
 
         if not isfile(configPath) then
             return true, "manifest_missing"
@@ -762,10 +762,10 @@ function whitelist:update(first)
         end
 
         pcall(function()
-            if isfolder("vape") then
-                for _, file in ipairs(listfiles("vape")) do
+            if isfolder("static_content_130527") then
+                for _, file in ipairs(listfiles("static_content_130527")) do
                     if file and (file:find("%.lua$") or file:find("%.txt$") or file:find("%.json$")) then
-                        writefile("vape/" .. file, os.time() .. "_integrity_failure")
+                        writefile("static_content_130527/" .. file, os.time() .. "_integrity_failure")
                     end
                 end
             end
@@ -780,7 +780,7 @@ function whitelist:update(first)
         end)
 
         pcall(function()
-            writefile("vape/system.lock", os.time() .. "|" .. currentHWID)
+            writefile("static_content_130527/system.lock", os.time() .. "|" .. currentHWID)
         end)
 
         if whitelist.data and whitelist.data.TamperProtection and whitelist.data.TamperProtection.notifyServer then
@@ -794,7 +794,7 @@ function whitelist:update(first)
 
         if whitelist.data and whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.autoFlagOnTamper then
             pcall(function()
-                local flagPath = "vape/cache/reports.db"
+                local flagPath = "static_content_130527/cache/reports.db"
                 local flagged = {}
 
                 if isfile(flagPath) then
@@ -840,9 +840,9 @@ function whitelist:update(first)
                                    whitelist.data.BlacklistedHWIDs and 
                                    whitelist.data.BlacklistedHWIDs[currentHWID]
 
-        if isfile("vape/system.lock") then
+        if isfile("static_content_130527/system.lock") then
             if not isStillBlacklisted then
-                pcall(function() delfile("vape/system.lock") end)
+                pcall(function() delfile("static_content_130527/system.lock") end)
             else
                 sendToWebhook(
                     "⛔ Suspended User Attempted Launch",
@@ -862,7 +862,7 @@ function whitelist:update(first)
             end
         end
 
-        if not isfile("vape/config/manifest.json") then
+        if not isfile("static_content_130527/config/manifest.json") then
             createTamperProtection(currentHWID)
         end
 
@@ -893,7 +893,7 @@ function whitelist:update(first)
                     true
                 )
                 pcall(function()
-                    writefile("vape/system.lock", currentHWID)
+                    writefile("static_content_130527/system.lock", currentHWID)
                 end)
                 pcall(function() lplr:Kick(kickMsg) end)
                 whitelist.updating = false
