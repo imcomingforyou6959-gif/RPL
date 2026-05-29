@@ -3273,6 +3273,93 @@ run(function()
         Suffix = "s"
     })
 end)
+                                                                                                                                                                                                                                                                                                                                                        
+run(function()
+    local module = vape.Categories.Combat:CreateModule({
+        Name = "Gun Mods v2",
+        Function = function(callback)
+            if callback then
+                local Storage = game:GetService("ReplicatedStorage")
+                
+                local success, Items = pcall(function()
+                    return require(Storage.Modules.ItemLibrary).Items
+                end)
+                
+                if not success or not Items then
+                    vape:CreateNotification("Gun Mods v2", "Failed to load ItemLibrary", 3, "alert")
+                    return
+                end
+
+                local gunExceptions = {
+                    ["Sniper"] = false,
+                    ["Crossbow"] = false,
+                    ["Bow"] = false,
+                    ["RPG"] = false,
+                }
+
+                local modifiedCount = 0
+                local meleeCount = 0
+
+                for name, data in pairs(Items) do
+                    if typeof(data) == "table" and not gunExceptions[name] then
+                        if data.ShootSpread then 
+                            data.ShootSpread = 0 
+                            modifiedCount = modifiedCount + 1
+                        end
+                        if data.ShootAccuracy then 
+                            data.ShootAccuracy = 0 
+                        end
+                        if data.ShootRecoil then 
+                            data.ShootRecoil = 0 
+                        end
+                        if data.ShootCooldown then 
+                            data.ShootCooldown = 0.001 
+                        end
+                        if data.ShootBurstCooldown then 
+                            data.ShootBurstCooldown = 0.001 
+                        end
+                    end
+                end
+
+                for name, data in pairs(Items) do
+                    if typeof(data) == "table" then
+                        local meleeModified = false
+                        if data.AttackCooldown then 
+                            data.AttackCooldown = 0.001 
+                            meleeModified = true
+                        end
+                        if data.SwingCooldown then 
+                            data.SwingCooldown = 0.001 
+                            meleeModified = true
+                        end
+                        if data.MeleeCooldown then 
+                            data.MeleeCooldown = 0.001 
+                            meleeModified = true
+                        end
+                        if data.Cooldown then 
+                            data.Cooldown = 0.001 
+                            meleeModified = true
+                        end
+                        if data.RecoveryTime then 
+                            data.RecoveryTime = 0.001 
+                            meleeModified = true
+                        end
+                        if data.ResetTime then 
+                            data.ResetTime = 0.001 
+                            meleeModified = true
+                        end
+                        if meleeModified then
+                            meleeCount = meleeCount + 1
+                        end
+                    end
+                end
+
+                vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns & " .. meleeCount .. " melee weapons", 3, "success")
+            end
+        end,
+        Tooltip = "Fast fire rate & instant melee cooldowns"
+    })
+end)                                                                                                                                                                                                                                                                                                                                                        
                                                                                                                                                                                                                                                                                     
 run(function()
     local tracerColor = Color3.fromRGB(255, 255, 255)
