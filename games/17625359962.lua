@@ -1692,7 +1692,7 @@ run(function()
 
     local cfgPath = "newvape/assets/self_visuals.json"
     local orig = {}
-    local removedArms = {}
+    local armCleanup = {}
     local selMat = "Plastic"
     local selCol = Color3.new(1, 1, 1)
     local selTrans = 0
@@ -1796,66 +1796,94 @@ run(function()
         end
     end
 
-    local function processFirstPerson()
-        if not removeArms then return end
-        
+    local function getViewModelArms()
+        local arms = {}
         local viewModels = workspace:FindFirstChild("ViewModels")
-        if not viewModels then return end
+        if not viewModels then return arms end
         
         local firstPerson = viewModels:FindFirstChild("FirstPerson")
-        if not firstPerson then return end
+        if not firstPerson then return arms end
 
         local myName = me.Name
         for _, model in ipairs(firstPerson:GetChildren()) do
             if not model:IsA("Model") then continue end
-            if model.Name:sub(1, #myName) ~= myName then continue end
+            if not model.Name:find(myName, 1, true) then continue end
             
-            for _, desc in ipairs(model:GetDescendants()) do
-                if not desc:IsA("BasePart") then continue end
-                local name = desc.Name
-                if name == "Left Arm" or name == "Right Arm" then
-                    if not removedArms[desc] then
-                        removedArms[desc] = {
-                            part = desc,
-                            parent = desc.Parent
-                        }
-                    end
-                    pcall(function()
-                        desc.Parent = nil
-                    end)
-                end
+            local leftArm = model:FindFirstChild("Left Arm")
+            local rightArm = model:FindFirstChild("Right Arm")
+            
+            if leftArm and leftArm:IsA("BasePart") then
+                table.insert(arms, leftArm)
             end
+            if rightArm and rightArm:IsA("BasePart") then
+                table.insert(arms, rightArm)
+            end
+        end
+        
+        return arms
+    end
+
+    local function clearArmChildren(arm)
+        if not arm or not arm:IsA("BasePart") then return end
+        for _, child in ipairs(arm:GetChildren()) do
+            if not armCleanup[arm] then
+                armCleanup[arm] = {}
+            end
+            table.insert(armCleanup[arm], child)
+            pcall(function() child.Parent = nil end)
+        end
+    end
+
+    local function applyArmVisuals(arm)
+        if not arm or not arm:IsA("BasePart") then return end
+        pcall(function()
+            if removeArms then
+                arm.Transparency = 1
+            else
+                arm.Material = Enum.Material[selMat] or Enum.Material.Plastic
+                arm.Color = selCol
+                arm.Transparency = selTrans
+            end
+        end)
+    end
+
+    local function restoreArmChildren(arm)
+        if not arm or not armCleanup[arm] then return end
+        for _, child in ipairs(armCleanup[arm]) do
+            pcall(function() child.Parent = arm end)
+        end
+        armCleanup[arm] = nil
+    end
+
+    local function processFirstPerson()
+        local arms = getViewModelArms()
+        for _, arm in ipairs(arms) do
+            clearArmChildren(arm)
+            applyArmVisuals(arm)
         end
     end
 
     local function restoreViewModelArms()
-        for part, data in pairs(removedArms) do
-            if not part then continue end
+        local arms = getViewModelArms()
+        for _, arm in ipairs(arms) do
+            restoreArmChildren(arm)
             pcall(function()
-                if data and data.parent then
-                    part.Parent = data.parent
-                elseif part then
-                    part:Destroy()
-                end
+                arm.Transparency = 0
             end)
         end
-        table.clear(removedArms)
+        table.clear(armCleanup)
     end
 
-    local function startArmRemoval()
+    local function startArmProcessing()
         if viewModelLoop then
             viewModelLoop:Disconnect()
             viewModelLoop = nil
         end
         
-        if removeArms then
+        processFirstPerson()
+        viewModelLoop = runService.Heartbeat:Connect(function()
             processFirstPerson()
-            viewModelLoop = runService.Heartbeat:Connect(function()
-                processFirstPerson()
-            end)
-        else
-            restoreViewModelArms()
-        end
+        end)
     end
 
     me.CharacterAdded:Connect(function(char)
@@ -1863,9 +1891,7 @@ run(function()
         table.clear(orig)
         cacheOrig()
         applyAll()
-        if removeArms then
-            startArmRemoval()
-        end
+        startArmProcessing()
     end)
 
     if me.Character then
@@ -1878,9 +1904,7 @@ run(function()
             if on then
                 cacheOrig()
                 applyAll()
-                if removeArms then
-                    startArmRemoval()
-                end
+                startArmProcessing()
             else
                 restoreAll()
                 restoreViewModelArms()
@@ -1900,6 +1924,7 @@ run(function()
         Function = function(v)
             selMat = v
             applyAll()
+            processFirstPerson()
             save()
         end
     })
@@ -1909,6 +1934,7 @@ run(function()
         Function = function(h, s, v)
             selCol = Color3.fromHSV(h, s, v)
             applyAll()
+            processFirstPerson()
             save()
         end
     })
@@ -1919,6 +1945,7 @@ run(function()
         Function = function(v)
             selTrans = v
             applyAll()
+            processFirstPerson()
             save()
         end
     })
@@ -1928,27 +1955,17 @@ run(function()
         Default = false,
         Function = function(v)
             removeArms = v
-            if v then
-                startArmRemoval()
-            else
-                restoreViewModelArms()
-                if viewModelLoop then
-                    viewModelLoop:Disconnect()
-                    viewModelLoop = nil
-                end
-            end
+            processFirstPerson()
             save()
         end,
-        Tooltip = "Completely removes viewmodel arms"
+        Tooltip = "Makes viewmodel arms"
     })
 
     load()
     if me.Character then
         applyAll()
     end
-    if removeArms then
-        startArmRemoval()
-    end
+    startArmProcessing()
 
     vape:Clean(function()
         restoreAll()
