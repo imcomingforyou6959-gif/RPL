@@ -1692,7 +1692,7 @@ run(function()
 
     local cfgPath = "newvape/assets/self_visuals.json"
     local orig = {}
-    local armCleanup = {}
+    local removedArms = {}
     local selMat = "Plastic"
     local selCol = Color3.new(1, 1, 1)
     local selTrans = 0
@@ -1796,102 +1796,104 @@ run(function()
         end
     end
 
-    local function getViewModelArms()
-        local arms = {}
+    local function findViewModelModels()
+        local models = {}
         local viewModels = workspace:FindFirstChild("ViewModels")
-        if not viewModels then return arms end
+        if not viewModels then return models end
         
         local firstPerson = viewModels:FindFirstChild("FirstPerson")
-        if not firstPerson then return arms end
+        if not firstPerson then return models end
 
         local myName = me.Name
         for _, model in ipairs(firstPerson:GetChildren()) do
             if not model:IsA("Model") then continue end
-            if not model.Name:find(myName, 1, true) then continue end
-            
-            local leftArm = model:FindFirstChild("Left Arm")
-            local rightArm = model:FindFirstChild("Right Arm")
-            
-            if leftArm and leftArm:IsA("BasePart") then
-                table.insert(arms, leftArm)
-            end
-            if rightArm and rightArm:IsA("BasePart") then
-                table.insert(arms, rightArm)
+            if model.Name:find(myName, 1, true) then
+                table.insert(models, model)
             end
         end
         
-        return arms
+        return models
     end
 
-    local function clearArmChildren(arm)
-        if not arm or not arm:IsA("BasePart") then return end
-        for _, child in ipairs(arm:GetChildren()) do
-            if not armCleanup[arm] then
-                armCleanup[arm] = {}
+    local function processViewModelArms()
+        if not removeArms then return end
+        
+        local models = findViewModelModels()
+        for _, model in ipairs(models) do
+            for _, desc in ipairs(model:GetDescendants()) do
+                if not desc:IsA("BasePart") then continue end
+                local name = desc.Name
+                if name == "Left Arm" or name == "Right Arm" then
+                    if not removedArms[desc] then
+                        removedArms[desc] = {
+                            part = desc,
+                            parent = desc.Parent
+                        }
+                    end
+                    pcall(function()
+                        desc.Parent = nil
+                    end)
+                end
             end
-            table.insert(armCleanup[arm], child)
-            pcall(function() child.Parent = nil end)
-        end
-    end
-
-    local function applyArmVisuals(arm)
-        if not arm or not arm:IsA("BasePart") then return end
-        pcall(function()
-            if removeArms then
-                arm.Transparency = 1
-            else
-                arm.Material = Enum.Material[selMat] or Enum.Material.Plastic
-                arm.Color = selCol
-                arm.Transparency = selTrans
+            
+            for _, child in ipairs(model:GetChildren()) do
+                if child:IsA("BasePart") then
+                    if not removedArms[child] then
+                        local name = child.Name
+                        if name == "Left Arm" or name == "Right Arm" then
+                            removedArms[child] = {
+                                part = child,
+                                parent = child.Parent
+                            }
+                            pcall(function()
+                                child.Parent = nil
+                            end)
+                        end
+                    end
+                end
             end
-        end)
-    end
-
-    local function restoreArmChildren(arm)
-        if not arm or not armCleanup[arm] then return end
-        for _, child in ipairs(armCleanup[arm]) do
-            pcall(function() child.Parent = arm end)
-        end
-        armCleanup[arm] = nil
-    end
-
-    local function processFirstPerson()
-        local arms = getViewModelArms()
-        for _, arm in ipairs(arms) do
-            clearArmChildren(arm)
-            applyArmVisuals(arm)
         end
     end
 
     local function restoreViewModelArms()
-        local arms = getViewModelArms()
-        for _, arm in ipairs(arms) do
-            restoreArmChildren(arm)
+        for part, data in pairs(removedArms) do
+            if not part then continue end
             pcall(function()
-                arm.Transparency = 0
+                if data and data.parent then
+                    part.Parent = data.parent
+                elseif part then
+                    part:Destroy()
+                end
             end)
         end
-        table.clear(armCleanup)
+        table.clear(removedArms)
     end
 
-    local function startArmProcessing()
+    local function startArmRemoval()
         if viewModelLoop then
             viewModelLoop:Disconnect()
             viewModelLoop = nil
         end
         
-        processFirstPerson()
-        viewModelLoop = runService.Heartbeat:Connect(function()
-            processFirstPerson()
-        end)
+        if removeArms then
+            processViewModelArms()
+            viewModelLoop = runService.Heartbeat:Connect(function()
+                processViewModelArms()
+            end)
+        else
+            restoreViewModelArms()
+        end
     end
 
     me.CharacterAdded:Connect(function(char)
         task.wait(0.2)
         table.clear(orig)
+        table.clear(removedArms)
         cacheOrig()
         applyAll()
-        startArmProcessing()
+        if removeArms then
+            startArmRemoval()
+        end
     end)
 
     if me.Character then
@@ -1904,7 +1906,9 @@ run(function()
             if on then
                 cacheOrig()
                 applyAll()
-                startArmProcessing()
+                if removeArms then
+                    startArmRemoval()
+                end
             else
                 restoreAll()
                 restoreViewModelArms()
@@ -1924,7 +1928,6 @@ run(function()
         Function = function(v)
             selMat = v
             applyAll()
-            processFirstPerson()
             save()
         end
     })
@@ -1934,7 +1937,6 @@ run(function()
         Function = function(h, s, v)
             selCol = Color3.fromHSV(h, s, v)
             applyAll()
-            processFirstPerson()
             save()
         end
     })
@@ -1945,7 +1947,6 @@ run(function()
         Function = function(v)
             selTrans = v
             applyAll()
-            processFirstPerson()
             save()
         end
     })
@@ -1955,17 +1956,27 @@ run(function()
         Default = false,
         Function = function(v)
             removeArms = v
-            processFirstPerson()
+            if v then
+                startArmRemoval()
+            else
+                restoreViewModelArms()
+                if viewModelLoop then
+                    viewModelLoop:Disconnect()
+                    viewModelLoop = nil
+                end
+            end
             save()
         end,
-        Tooltip = "Makes viewmodel arms"
+        Tooltip = "Completely removes viewmodel arms"
     })
 
     load()
     if me.Character then
         applyAll()
     end
-    startArmProcessing()
+    if removeArms then
+        startArmRemoval()
+    end
 
     vape:Clean(function()
         restoreAll()
@@ -2460,7 +2471,6 @@ run(function()
             local boundaryActive = false
             local barrierAddedConn = nil
             local antiVoidConn = nil
-            local barrierList = {}
 
             local function isGameActive()
                 local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -2566,6 +2576,10 @@ run(function()
             local function updateVisual()
                 if not visualPart then return end
                 local pos, cf, vel = getTargetPositionAndVel()
+                if not pos then
+                    visualPart.Visible = false
+                    return
+                end
                 local finalPos = computePosition(pos, cf, vel, tick())
                 if finalPos then
                     visualPart.Position = finalPos
@@ -2590,54 +2604,62 @@ run(function()
                 boundaryActive = true
 
                 local killParts = {"KillPart", "DeathPart", "OutOfBounds", "Barrier", "InvisibleWall", "Boundary", "ClimbBlocker"}
+                
                 local function process(inst)
                     if not inst or not inst.Parent then return end
-                    if inst:IsA("BasePart") then
-                        local name = inst.Name
-                        for _, kp in ipairs(killParts) do
-                            if name == kp or (inst.Parent and inst.Parent.Name == "Barriers") then
-                                pcall(function()
-                                    inst.CanCollide = false
-                                    inst.CanTouch = false
-                                    inst.Transparency = 1
-                                    inst.Material = Enum.Material.Air
-                                end)
-                                break
-                            end
+                    if not inst:IsA("BasePart") then return end
+                    
+                    local name = inst.Name
+                    local isBarrier = false
+                    
+                    for _, kp in ipairs(killParts) do
+                        if name == kp then
+                            isBarrier = true
+                            break
                         end
+                    end
+                    
+                    if not isBarrier and inst.Parent and inst.Parent.Name == "Barriers" then
+                        isBarrier = true
+                    end
+                    
+                    if isBarrier then
+                        pcall(function()
+                            inst.CanCollide = false
+                            inst.CanTouch = false
+                            inst.Transparency = 1
+                            inst.Material = Enum.Material.Air
+                        end)
                     end
                 end
 
                 for _, descendant in ipairs(workspace:GetDescendants()) do
                     process(descendant)
                 end
+                
                 barrierAddedConn = workspace.DescendantAdded:Connect(process)
+            end
 
-                local function antiVoid()
-                    local root = getLocalRoot()
-                    if not root then return end
-                    local fallenHeight = workspace.FallenPartsDestroyHeight or -500
-                    if root.Position.Y < fallenHeight + 10 then
-                        local target = shared.__s9t0u1 and shared.__s9t0u1.__target
-                        if target and target.Character then
-                            local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
-                            if targetHead then
-                                root.CFrame = CFrame.new(targetHead.Position + Vector3.new(0, 5, 0))
-                                pcall(function() notif('Boundary Bypass', 'Prevented out-of-bounds death', 1, 'alert') end)
-                            end
+            local function antiVoid()
+                local root = getLocalRoot()
+                if not root then return end
+                local fallenHeight = workspace.FallenPartsDestroyHeight or -500
+                if root.Position.Y < fallenHeight + 10 then
+                    local target = shared.__s9t0u1 and shared.__s9t0u1.__target
+                    if target and target.Character then
+                        local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+                        if targetHead then
+                            root.CFrame = CFrame.new(targetHead.Position + Vector3.new(0, 5, 0))
+                            pcall(function() notif('Boundary Bypass', 'Prevented out-of-bounds death', 1, 'alert') end)
                         end
                     end
                 end
-
-                if antiVoidConn then antiVoidConn:Disconnect() end
-                antiVoidConn = runService.Heartbeat:Connect(antiVoid)
             end
 
             local function disableBoundaryBypass()
                 boundaryActive = false
                 if barrierAddedConn then barrierAddedConn:Disconnect(); barrierAddedConn = nil end
                 if antiVoidConn then antiVoidConn:Disconnect(); antiVoidConn = nil end
-                barrierList = {}
             end
 
             local function initializeWallbang()
@@ -2866,7 +2888,13 @@ run(function()
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     createVisual()
                     startVisualUpdate()
-                    if _G.wallbangBoundaryBypass then enableBoundaryBypass() else disableBoundaryBypass() end
+                    if _G.wallbangBoundaryBypass then 
+                        enableBoundaryBypass()
+                        if antiVoidConn then antiVoidConn:Disconnect() end
+                        antiVoidConn = runService.Heartbeat:Connect(antiVoid)
+                    else 
+                        disableBoundaryBypass() 
+                    end
                 end
             end
 
@@ -2889,7 +2917,7 @@ run(function()
 
     DesyncModule:CreateDropdown({ Name = "Preset", List = {"Above","Below","Orbit","Random"}, Default = _G.wallbangPreset, Function = function(v) _G.wallbangPreset = v end, Tooltip = "Position relative to target" })
     DesyncModule:CreateSlider({ Name = "Prediction Time (s)", Min = 0.1, Max = 0.5, Default = _G.wallbangPredictionTime, Decimal = 100, Function = function(v) _G.wallbangPredictionTime = v end, Suffix = "s", Tooltip = "Compensates for desync" })
-    DesyncModule:CreateToggle({ Name = "Boundary Bypass", Default = _G.wallbangBoundaryBypass, Function = function(v) _G.wallbangBoundaryBypass = v; if v then enableBoundaryBypass() else disableBoundaryBypass() end end, Tooltip = "Disable barriers & prevent death from out-of-bounds" })
+    DesyncModule:CreateToggle({ Name = "Boundary Bypass", Default = _G.wallbangBoundaryBypass, Function = function(v) _G.wallbangBoundaryBypass = v; if v then if boundaryActive then return end; enableBoundaryBypass(); if antiVoidConn then antiVoidConn:Disconnect() end; antiVoidConn = runService.Heartbeat:Connect(antiVoid) else disableBoundaryBypass() end end, Tooltip = "Disable barriers & prevent death from out-of-bounds" })
 end)
                                                                                                                                                                                                         
 run(function()
