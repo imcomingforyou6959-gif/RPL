@@ -1692,7 +1692,7 @@ run(function()
 
     local cfgPath = "newvape/assets/self_visuals.json"
     local orig = {}
-    local armChildren = {}
+    local removedArms = {}
     local selMat = "Plastic"
     local selCol = Color3.new(1, 1, 1)
     local selTrans = 0
@@ -1815,38 +1815,19 @@ run(function()
         return models
     end
 
-    local function clearAndApplyArm(arm)
+    local function clearArmChildren(arm)
         if not arm or not arm:IsA("BasePart") then return end
-        
-        if not armChildren[arm] then
-            armChildren[arm] = {}
-            for _, child in ipairs(arm:GetChildren()) do
-                table.insert(armChildren[arm], child)
-                pcall(function() child.Parent = nil end)
-            end
-        end
-        
-        if removeArms then
-            pcall(function()
-                arm.Transparency = 1
-            end)
-        else
-            pcall(function()
-                arm.Material = Enum.Material[selMat] or Enum.Material.Plastic
-                arm.Color = selCol
-                arm.Transparency = selTrans
-            end)
+        for _, child in ipairs(arm:GetChildren()) do
+            pcall(function() child:Destroy() end)
         end
     end
 
-    local function restoreArm(arm)
-        if not arm or not armChildren[arm] then return end
-        for _, child in ipairs(armChildren[arm]) do
-            pcall(function() child.Parent = arm end)
-        end
-        armChildren[arm] = nil
+    local function applyArmVisuals(arm)
+        if not arm or not arm:IsA("BasePart") then return end
         pcall(function()
-            arm.Transparency = 0
+            arm.Material = Enum.Material[selMat] or Enum.Material.Plastic
+            arm.Color = selCol
+            arm.Transparency = selTrans
         end)
     end
 
@@ -1856,43 +1837,46 @@ run(function()
             local leftArm = model:FindFirstChild("LeftArm")
             local rightArm = model:FindFirstChild("RightArm")
             
-            if leftArm then
-                clearAndApplyArm(leftArm)
-            end
-            if rightArm then
-                clearAndApplyArm(rightArm)
+            if leftArm and leftArm:IsA("BasePart") then
+                clearArmChildren(leftArm)
+                if removeArms then
+                    if not removedArms[leftArm] then
+                        removedArms[leftArm] = {part = leftArm, parent = leftArm.Parent}
+                    end
+                    pcall(function() leftArm.Parent = nil end)
+                else
+                    applyArmVisuals(leftArm)
+                end
             end
             
-            for _, desc in ipairs(model:GetDescendants()) do
-                if desc:IsA("BasePart") then
-                    local name = desc.Name
-                    if name == "LeftArm" or name == "RightArm" then
-                        clearAndApplyArm(desc)
+            if rightArm and rightArm:IsA("BasePart") then
+                clearArmChildren(rightArm)
+                if removeArms then
+                    if not removedArms[rightArm] then
+                        removedArms[rightArm] = {part = rightArm, parent = rightArm.Parent}
                     end
+                    pcall(function() rightArm.Parent = nil end)
+                else
+                    applyArmVisuals(rightArm)
                 end
             end
         end
     end
 
     local function restoreViewModelArms()
-        local models = findViewModelModels()
-        for _, model in ipairs(models) do
-            local leftArm = model:FindFirstChild("LeftArm")
-            local rightArm = model:FindFirstChild("RightArm")
-            
-            if leftArm then restoreArm(leftArm) end
-            if rightArm then restoreArm(rightArm) end
-            
-            for _, desc in ipairs(model:GetDescendants()) do
-                if desc:IsA("BasePart") then
-                    local name = desc.Name
-                    if name == "LeftArm" or name == "RightArm" then
-                        restoreArm(desc)
-                    end
+        for arm, data in pairs(removedArms) do
+            if not arm then continue end
+            pcall(function()
+                if data and data.parent then
+                    arm.Parent = data.parent
+                    clearArmChildren(arm)
+                    applyArmVisuals(arm)
+                elseif arm then
+                    arm:Destroy()
                 end
-            end
+            end)
         end
-        table.clear(armChildren)
+        table.clear(removedArms)
     end
 
     local function startArmProcessing()
@@ -1910,7 +1894,7 @@ run(function()
     me.CharacterAdded:Connect(function(char)
         task.wait(0.2)
         table.clear(orig)
-        table.clear(armChildren)
+        table.clear(removedArms)
         cacheOrig()
         applyAll()
         startArmProcessing()
@@ -1936,7 +1920,8 @@ run(function()
                 end
             end
         end,
-        Tooltip = "materials & colors
+        Tooltip = "Custom materials & colors on body & viewmodel arms"
+    })
 
     SelfVisuals:CreateDropdown({
         Name = "Material",
@@ -1976,10 +1961,15 @@ run(function()
         Default = false,
         Function = function(v)
             removeArms = v
-            processViewModelArms()
+            if v then
+                processViewModelArms()
+            else
+                restoreViewModelArms()
+                startArmProcessing()
+            end
             save()
         end,
-        Tooltip = "removes viewmodels arms"
+        Tooltip = "Completely removes viewmodel arms"
     })
 
     load()
