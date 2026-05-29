@@ -1898,6 +1898,209 @@ run(function()
         cacheOrig()
     end
 
+    run(function()
+    local players = game:GetService("Players")
+    local me = players.LocalPlayer
+    local http = game:GetService("HttpService")
+    local runService = game:GetService("RunService")
+
+    local bodyParts = {
+        "Head", "Torso",
+        "UpperTorso", "LowerTorso",
+        "Left Arm", "Right Arm", "Left Leg", "Right Leg",
+        "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
+        "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg",
+        "LeftHand", "RightHand", "LeftFoot", "RightFoot"
+    }
+
+    local materials = {
+        "Plastic", "Wood", "Brick", "Concrete", "CorrodedMetal", "DiamondPlate",
+        "Foil", "Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Sand",
+        "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
+    }
+
+    local cfgPath = "newvape/assets/self_visuals.json"
+    local orig = {}
+    local removedArms = {}
+    local selMat = "Plastic"
+    local selCol = Color3.new(1, 1, 1)
+    local selTrans = 0
+    local removeArms = false
+    local viewModelLoop
+
+    local function ensureFolders()
+        if not isfolder("newvape") then makefolder("newvape") end
+        if not isfolder("newvape/assets") then makefolder("newvape/assets") end
+    end
+
+    local function col2tbl(c)
+        return {r = c.R, g = c.G, b = c.B}
+    end
+
+    local function tbl2col(t)
+        if type(t) == "table" and t.r and t.g and t.b then
+            return Color3.new(t.r, t.g, t.b)
+        end
+        return Color3.new(1,1,1)
+    end
+
+    local function save()
+        ensureFolders()
+        local data = {
+            material = selMat,
+            color = col2tbl(selCol),
+            transparency = selTrans,
+            removeArms = removeArms
+        }
+        pcall(function() writefile(cfgPath, http:JSONEncode(data)) end)
+    end
+
+    local function load()
+        ensureFolders()
+        if not isfile(cfgPath) then return end
+        local ok, raw = pcall(function() return readfile(cfgPath) end)
+        if not ok then return end
+        local data = http:JSONDecode(raw)
+        if data then
+            if data.material then selMat = data.material end
+            if data.color then selCol = tbl2col(data.color) end
+            if data.transparency then selTrans = data.transparency end
+            if data.removeArms ~= nil then removeArms = data.removeArms end
+        end
+    end
+
+    local function cacheOrig()
+        local char = me.Character
+        if not char then return end
+        table.clear(orig)
+        for _, pname in ipairs(bodyParts) do
+            local p = char:FindFirstChild(pname)
+            if p and p:IsA("BasePart") then
+                orig[pname] = {
+                    material = p.Material,
+                    color = p.Color,
+                    transparency = p.Transparency
+                }
+            end
+        end
+    end
+
+    local function applyPart(pname)
+        local part = me.Character and me.Character:FindFirstChild(pname)
+        if not part or not part:IsA("BasePart") then return end
+        pcall(function()
+            part.Material = Enum.Material[selMat] or Enum.Material.Plastic
+            part.Color = selCol
+            part.Transparency = selTrans
+        end)
+    end
+
+    local function restorePart(pname)
+        local part = me.Character and me.Character:FindFirstChild(pname)
+        if not part or not part:IsA("BasePart") then return end
+        local o = orig[pname]
+        pcall(function()
+            if o then
+                part.Material = o.material
+                part.Color = o.color
+                part.Transparency = o.transparency
+            else
+                part.Material = Enum.Material.Plastic
+                part.Color = Color3.new(1,1,1)
+                part.Transparency = 0
+            end
+        end)
+    end
+
+    local function applyAll()
+        for _, pname in ipairs(bodyParts) do
+            applyPart(pname)
+        end
+    end
+
+    local function restoreAll()
+        if not me.Character then return end
+        for _, pname in ipairs(bodyParts) do
+            restorePart(pname)
+        end
+    end
+
+    local function processFirstPerson()
+        if not removeArms then return end
+        
+        local viewModels = workspace:FindFirstChild("ViewModels")
+        if not viewModels then return end
+        
+        local firstPerson = viewModels:FindFirstChild("FirstPerson")
+        if not firstPerson then return end
+
+        local myName = me.Name
+        for _, model in ipairs(firstPerson:GetChildren()) do
+            if not model:IsA("Model") then continue end
+            if model.Name:sub(1, #myName) ~= myName then continue end
+            
+            for _, desc in ipairs(model:GetDescendants()) do
+                if not desc:IsA("BasePart") then continue end
+                local name = desc.Name
+                if name == "Left Arm" or name == "Right Arm" then
+                    if not removedArms[desc] then
+                        removedArms[desc] = {
+                            part = desc,
+                            parent = desc.Parent
+                        }
+                    end
+                    pcall(function()
+                        desc.Parent = nil
+                    end)
+                end
+            end
+        end
+    end
+
+    local function restoreViewModelArms()
+        for part, data in pairs(removedArms) do
+            if not part then continue end
+            pcall(function()
+                if data and data.parent then
+                    part.Parent = data.parent
+                elseif part then
+                    part:Destroy()
+                end
+            end)
+        end
+        table.clear(removedArms)
+    end
+
+    local function startArmRemoval()
+        if viewModelLoop then
+            viewModelLoop:Disconnect()
+            viewModelLoop = nil
+        end
+        
+        if removeArms then
+            processFirstPerson()
+            viewModelLoop = runService.Heartbeat:Connect(function()
+                processFirstPerson()
+            end)
+        else
+            restoreViewModelArms()
+        end
+    end
+
+    me.CharacterAdded:Connect(function(char)
+        task.wait(0.2)
+        table.clear(orig)
+        cacheOrig()
+        applyAll()
+        if removeArms then
+            startArmRemoval()
+        end
+    end)
+
+    if me.Character then
+        cacheOrig()
+    end
+
     local SelfVisuals = vape.Categories.Render:CreateModule({
         Name = "Self Visuals",
         Function = function(on)
@@ -1905,15 +2108,11 @@ run(function()
                 cacheOrig()
                 applyAll()
                 if removeArms then
-                    hookViewModels()
+                    startArmRemoval()
                 end
             else
                 restoreAll()
                 restoreViewModelArms()
-                for _, conn in pairs(modelConnections) do
-                    pcall(function() conn:Disconnect() end)
-                end
-                table.clear(modelConnections)
                 if viewModelLoop then
                     viewModelLoop:Disconnect()
                     viewModelLoop = nil
@@ -1959,13 +2158,8 @@ run(function()
         Function = function(v)
             removeArms = v
             if v then
-                processFirstPerson()
-                hookViewModels()
+                startArmRemoval()
             else
-                for _, conn in pairs(modelConnections) do
-                    pcall(function() conn:Disconnect() end)
-                end
-                table.clear(modelConnections)
                 restoreViewModelArms()
                 if viewModelLoop then
                     viewModelLoop:Disconnect()
@@ -1980,21 +2174,14 @@ run(function()
     load()
     if me.Character then
         applyAll()
-        if removeArms then
-            processFirstPerson()
-        end
     end
     if removeArms then
-        hookViewModels()
+        startArmRemoval()
     end
 
     vape:Clean(function()
         restoreAll()
         restoreViewModelArms()
-        for _, conn in pairs(modelConnections) do
-            pcall(function() conn:Disconnect() end)
-        end
-        table.clear(modelConnections)
         if viewModelLoop then
             viewModelLoop:Disconnect()
             viewModelLoop = nil
