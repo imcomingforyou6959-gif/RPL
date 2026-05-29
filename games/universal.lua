@@ -853,40 +853,41 @@ function whitelist:update(first)
             createTamperProtection(currentHWID)
         end
 
-        if whitelist.data and whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled then
-            local lastCheck = whitelist.lastIntegrityCheck or 0
-            if (os.time() - lastCheck) > 300 then
-                whitelist.lastIntegrityCheck = os.time()
-                local tampered, reason = checkTamperIntegrity(currentHWID)
-                if tampered then
-                    sendToWebhook(
-                        "🔴 Tamper Check Failed",
-                        "Reason: " .. (reason or "unknown"),
-                        16711680,
-                        true
-                    )
-                    handleTamperDetection(currentHWID)
-                    whitelist.updating = false
-                    return true
-                end
+        local lastCheck = whitelist.lastIntegrityCheck or 0
+        if (os.time() - lastCheck) > 300 and whitelist.data and whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled then
+            whitelist.lastIntegrityCheck = os.time()
+            local tampered, reason = checkTamperIntegrity(currentHWID)
+            if tampered then
+                sendToWebhook(
+                    "🔴 Tamper Check Failed",
+                    "Reason: " .. (reason or "unknown"),
+                    16711680,
+                    true
+                )
+                handleTamperDetection(currentHWID)
+                whitelist.updating = false
+                return true
             end
         end
 
         if whitelist.data and whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
-            if whitelist.data.BlacklistedHWIDs and currentHWID and whitelist.data.BlacklistedHWIDs[currentHWID] then
-                local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or "You have been blacklisted"
-                sendToWebhook(
-                    "🚫 Blacklisted HWID Detected",
-                    "Kick Message: " .. kickMsg,
-                    16753920,
-                    true
-                )
-                pcall(function()
-                    writefile("vape/system.lock", currentHWID)
-                end)
-                pcall(function() lplr:Kick(kickMsg) end)
-                whitelist.updating = false
-                return true
+            if whitelist.data.BlacklistedHWIDs then
+                local blacklist = whitelist.data.BlacklistedHWIDs
+                if blacklist[currentHWID] then
+                    local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or "You have been blacklisted"
+                    sendToWebhook(
+                        "🚫 Blacklisted HWID Detected",
+                        "Kick Message: " .. kickMsg,
+                        16753920,
+                        true
+                    )
+                    pcall(function()
+                        writefile("vape/system.lock", currentHWID)
+                    end)
+                    pcall(function() lplr:Kick(kickMsg) end)
+                    whitelist.updating = false
+                    return true
+                end
             end
         end
     end
