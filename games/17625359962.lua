@@ -1823,7 +1823,7 @@ run(function()
             for _, desc in ipairs(model:GetDescendants()) do
                 if not desc:IsA("BasePart") then continue end
                 local name = desc.Name
-                if name == "Left Arm" or name == "Right Arm" then
+                if name == "LeftArm" or name == "RightArm" then
                     if not removedArms[desc] then
                         removedArms[desc] = {
                             part = desc,
@@ -1840,7 +1840,7 @@ run(function()
                 if child:IsA("BasePart") then
                     if not removedArms[child] then
                         local name = child.Name
-                        if name == "Left Arm" or name == "Right Arm" then
+                        if name == "LeftArm" or name == "RightArm" then
                             removedArms[child] = {
                                 part = child,
                                 parent = child.Parent
