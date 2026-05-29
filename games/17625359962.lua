@@ -4033,4 +4033,4 @@ run(function()
 end)
 
 entitylib.start()
-print("Welcome, V4.5.7")
+print("Welcome, V4.5.8")
