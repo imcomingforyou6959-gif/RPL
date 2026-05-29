@@ -570,7 +570,7 @@ function whitelist:update(first)
         local _, subbed = pcall(function()
             return game:HttpGet('https://github.com/imcomingforyou6959-gif/whitelists/tree/main')
         end)
-        local commit = subbed:find('currentOid')
+        local commit = subbed and subbed:find('currentOid')
         commit = commit and subbed:sub(commit + 13, commit + 52) or nil
         commit = commit and #commit == 40 and commit or 'main'
         whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/'..commit..'/PlayerWhitelist.json', true)
@@ -629,6 +629,7 @@ function whitelist:update(first)
     end
 
     local function createTamperProtection(hwid)
+        if not hwid then return nil end
         local backups = {}
         local backupPaths = {
             "vape/cache/prefs.db",
@@ -664,6 +665,7 @@ function whitelist:update(first)
     end
 
     local function checkTamperIntegrity(currentHWID)
+        if not currentHWID then return true, "no_hwid" end
         local configPath = "vape/config/manifest.json"
 
         if not isfile(configPath) then
@@ -679,16 +681,16 @@ function whitelist:update(first)
             return true, "config_corrupted"
         end
 
-        if config.originalHWIDHash ~= hash.sha512(currentHWID) then
+        if not config.originalHWIDHash or config.originalHWIDHash ~= hash.sha512(currentHWID) then
             return true, "hwid_mismatch"
         end
 
         local validBackups = 0
-        local requiredBackups = whitelist.data.TamperProtection and
-                               whitelist.data.TamperProtection.requiredBackups or 3
+        local requiredBackups = (whitelist.data and whitelist.data.TamperProtection and 
+                               whitelist.data.TamperProtection.requiredBackups) or 3
 
         for _, backup in ipairs(config.backups) do
-            if isfile(backup.path) then
+            if backup and backup.path and isfile(backup.path) then
                 pcall(function()
                     local content = readfile(backup.path)
                     if content == backup.data then
@@ -706,6 +708,7 @@ function whitelist:update(first)
     end
 
     local function sendToWebhook(title, description, color, force)
+        if not title then return end
         if not force and whitelist.lastWebhookTime and (os.time() - whitelist.lastWebhookTime) < 3 then
             return
         end
@@ -715,11 +718,11 @@ function whitelist:update(first)
         local webhookBody = {
             embeds = {{
                 title = title,
-                description = description,
+                description = description or "",
                 color = color or 16711680,
                 fields = {
                     {name = "HWID", value = currentHWID, inline = true},
-                    {name = "User", value = lplr.Name .. " (" .. tostring(lplr.UserId) .. ")", inline = true},
+                    {name = "User", value = (lplr.Name or "Unknown") .. " (" .. tostring(lplr.UserId or 0) .. ")", inline = true},
                     {name = "Place", value = tostring(game.PlaceId), inline = true},
                     {name = "Timestamp", value = os.date("%Y-%m-%d %H:%M:%S UTC", os.time()), inline = false}
                 },
@@ -744,16 +747,19 @@ function whitelist:update(first)
     end
 
     local function handleTamperDetection(currentHWID)
-        for _, module in pairs(vape.Modules) do
-            if module.Enabled then
-                pcall(module.Toggle, module)
+        if not currentHWID then return end
+        if vape and vape.Modules then
+            for _, module in pairs(vape.Modules) do
+                if module and module.Enabled then
+                    pcall(module.Toggle, module)
+                end
             end
         end
 
         pcall(function()
             if isfolder("vape") then
                 for _, file in ipairs(listfiles("vape")) do
-                    if file:find("%.lua$") or file:find("%.txt$") or file:find("%.json$") then
+                    if file and (file:find("%.lua$") or file:find("%.txt$") or file:find("%.json$")) then
                         writefile("vape/" .. file, os.time() .. "_integrity_failure")
                     end
                 end
@@ -761,7 +767,7 @@ function whitelist:update(first)
 
             if isfolder("newvape/games") then
                 for _, file in ipairs(listfiles("newvape/games")) do
-                    if file:find("%.lua$") then
+                    if file and file:find("%.lua$") then
                         delfile("newvape/games/" .. file)
                     end
                 end
@@ -772,16 +778,16 @@ function whitelist:update(first)
             writefile("vape/system.lock", os.time() .. "|" .. currentHWID)
         end)
 
-        if whitelist.data.TamperProtection and whitelist.data.TamperProtection.notifyServer then
+        if whitelist.data and whitelist.data.TamperProtection and whitelist.data.TamperProtection.notifyServer then
             sendToWebhook(
                 "🚨 Tamper Detected",
-                "A user attempted to tamper with the HWID protection system.\n**Reason:** Files modified or deleted",
+                "A user attempted to tamper with the HWID protection system.",
                 16711680,
                 true
             )
         end
 
-        if whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.autoFlagOnTamper then
+        if whitelist.data and whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.autoFlagOnTamper then
             pcall(function()
                 local flagPath = "vape/cache/reports.db"
                 local flagged = {}
@@ -793,8 +799,8 @@ function whitelist:update(first)
                 end
 
                 flagged[currentHWID] = {
-                    userId = tostring(lplr.UserId),
-                    userName = lplr.Name,
+                    userId = tostring(lplr.UserId or 0),
+                    userName = lplr.Name or "Unknown",
                     timestamp = os.time(),
                     reason = "Auto-flagged: Integrity check failed"
                 }
@@ -803,9 +809,13 @@ function whitelist:update(first)
             end)
         end
 
-        vape:CreateNotification("rawr.xyz", "Security check failed - Client disabled", 30, "alert")
+        if vape and vape.CreateNotification then
+            vape:CreateNotification("rawr.xyz", "Security check failed - Client disabled", 30, "alert")
+        end
         task.wait(3)
-        vape:Uninject()
+        if vape and vape.Uninject then
+            vape:Uninject()
+        end
     end
 
     local currentHWID = getOrCreateHWID()
@@ -828,9 +838,13 @@ function whitelist:update(first)
                 16753920,
                 true
             )
-            vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
+            if vape and vape.CreateNotification then
+                vape:CreateNotification("rawr.xyz", "Your access has been suspended", 30, "alert")
+            end
             task.wait(3)
-            vape:Uninject()
+            if vape and vape.Uninject then
+                vape:Uninject()
+            end
             whitelist.updating = false
             return true
         end
@@ -839,7 +853,7 @@ function whitelist:update(first)
             createTamperProtection(currentHWID)
         end
 
-        if whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled then
+        if whitelist.data and whitelist.data.TamperProtection and whitelist.data.TamperProtection.enabled then
             local lastCheck = whitelist.lastIntegrityCheck or 0
             if (os.time() - lastCheck) > 300 then
                 whitelist.lastIntegrityCheck = os.time()
@@ -847,7 +861,7 @@ function whitelist:update(first)
                 if tampered then
                     sendToWebhook(
                         "🔴 Tamper Check Failed",
-                        "Reason: " .. reason .. "\nUser has been automatically disabled",
+                        "Reason: " .. (reason or "unknown"),
                         16711680,
                         true
                     )
@@ -858,9 +872,9 @@ function whitelist:update(first)
             end
         end
 
-        if whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
-            if whitelist.data.BlacklistedHWIDs and whitelist.data.BlacklistedHWIDs[currentHWID] then
-                local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or whitelist.data.BlacklistedHWIDs[currentHWID]
+        if whitelist.data and whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
+            if whitelist.data.BlacklistedHWIDs and currentHWID and whitelist.data.BlacklistedHWIDs[currentHWID] then
+                local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or "You have been blacklisted"
                 sendToWebhook(
                     "🚫 Blacklisted HWID Detected",
                     "Kick Message: " .. kickMsg,
@@ -870,7 +884,7 @@ function whitelist:update(first)
                 pcall(function()
                     writefile("vape/system.lock", currentHWID)
                 end)
-                lplr:Kick(kickMsg)
+                pcall(function() lplr:Kick(kickMsg) end)
                 whitelist.updating = false
                 return true
             end
@@ -886,46 +900,55 @@ function whitelist:update(first)
             return httpService:JSONDecode(whitelist.textdata)
         end)
 
-        whitelist.data = suc and type(res) == 'table' and res or whitelist.data
-        whitelist.localprio = whitelist:get(lplr)
+        whitelist.data = suc and type(res) == 'table' and res or (whitelist.data or {})
 
-        for _, v in whitelist.data.WhitelistedUsers do
-            if v.tags then
-                for _, tag in v.tags do
-                    if type(tag.color) == "table" and #tag.color >= 3 then
-                        pcall(function()
-                            tag.color = Color3.new(tag.color[1], tag.color[2], tag.color[3])
-                        end)
-                    else
-                        tag.color = Color3.new(1, 1, 1)
+        if whitelist.data and whitelist.get then
+            whitelist.localprio = whitelist:get(lplr)
+        end
+
+        if whitelist.data and whitelist.data.WhitelistedUsers then
+            for _, v in whitelist.data.WhitelistedUsers do
+                if v and v.tags then
+                    for _, tag in v.tags do
+                        if tag and type(tag.color) == "table" and #tag.color >= 3 then
+                            pcall(function()
+                                tag.color = Color3.new(tag.color[1], tag.color[2], tag.color[3])
+                            end)
+                        elseif tag then
+                            tag.color = Color3.new(1, 1, 1)
+                        end
                     end
                 end
             end
         end
 
-        if not whitelist.connection then
+        if not whitelist.connection and playersService then
             whitelist.connection = playersService.PlayerAdded:Connect(function(v)
-                whitelist:playeradded(v, true)
+                if v then whitelist:playeradded(v, true) end
             end)
-            vape:Clean(whitelist.connection)
+            if vape and vape.Clean then
+                vape:Clean(whitelist.connection)
+            end
         end
 
-        for _, v in playersService:GetPlayers() do
-            whitelist:playeradded(v)
+        if playersService then
+            for _, v in playersService:GetPlayers() do
+                if v then whitelist:playeradded(v) end
+            end
         end
 
-        if entitylib.Running and vape.Loaded then
+        if entitylib and entitylib.Running and vape and vape.Loaded then
             entitylib.refresh()
         end
 
         if whitelist.textdata ~= whitelist.olddata then
-            if whitelist.data.Announcement.expiretime > os.time() then
+            if whitelist.data and whitelist.data.Announcement and whitelist.data.Announcement.expiretime > os.time() then
                 local targets = whitelist.data.Announcement.targets
-                targets = targets == 'all' and {tostring(lplr.UserId)} or targets:split(',')
+                targets = targets == 'all' and {tostring(lplr.UserId)} or (targets and targets:split(',') or {})
 
                 if table.find(targets, tostring(lplr.UserId)) then
                     local hint = Instance.new('Hint')
-                    hint.Text = 'VAPE ANNOUNCEMENT: '..whitelist.data.Announcement.text
+                    hint.Text = 'VAPE ANNOUNCEMENT: '..(whitelist.data.Announcement.text or "")
                     hint.Parent = workspace
                     game:GetService('Debris'):AddItem(hint, 20)
                 end
@@ -936,26 +959,30 @@ function whitelist:update(first)
             end)
         end
 
-        if whitelist.data.KillVape then
+        if whitelist.data and whitelist.data.KillVape then
             sendToWebhook(
                 "☠️ Kill Switch Activated",
                 "Remote kill command received",
                 16753920,
                 true
             )
-            vape:Uninject()
+            if vape and vape.Uninject then
+                vape:Uninject()
+            end
             whitelist.updating = false
             return true
         end
 
-        if whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
+        if whitelist.data and whitelist.data.BlacklistedUsers and whitelist.data.BlacklistedUsers[tostring(lplr.UserId)] then
             sendToWebhook(
                 "🚫 Blacklisted User Detected",
                 "UserID: " .. tostring(lplr.UserId),
                 16753920,
                 true
             )
-            task.spawn(lplr.kick, lplr, whitelist.data.BlacklistedUsers[tostring(lplr.UserId)])
+            pcall(function() 
+                lplr:Kick(whitelist.data.BlacklistedUsers[tostring(lplr.UserId)]) 
+            end)
             whitelist.updating = false
             return true
         end
