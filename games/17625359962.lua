@@ -15,7 +15,7 @@
 --    ⠀⠀⠀⠀⠀⢻⡜⣧⠀⠀⢿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠮⣤⠤⠞⠀⠈⢀⡇⠀⠀⢰⠇⠀⠀⢸⡇⣿⠀⠀⠀⠀⠀
 --    ⠀⠀⠀⠀⠀⠀⠙⢿⣧⡀⠘⣿⣿⣦⣀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠈⠀⢄⡾⠀⢀⡴⣿⣿⠃⠀⠀⠀⠀⠀
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠙⢷⣦⣘⢿⠛⠛⠓⠢⣤⣀⣈⠑⠒⠒⠚⠀⠀⠀⠀⠀⣀⣠⣴⣾⠇⠀⣠⣾⣋⠔⣫⡾⠹⠁⠀⠀⠀⠀⠀⠀
---    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠓⠀⠀⣼⣿⣏⢻⣿⣟⠟⠛⠛⣻⣟⣻⣿⡿⣿⡿⠋⣀⣼⡿⣙⣦⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀
+--    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠓⠀⠀⣼⣿⣏⢻⣿⣟⠟⠛⠛⣻⣟⣻⣿⡿⣿⡿⠋⣀⣼⡿⣙⣦⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⣿⣏⣿⡇⠈⠑⠒⢹⣿⢧⣿⣯⣿⡿⠗⠋⠑⠞⠛⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⢾⣿⢷⣿⣯⣼⣶⢶⣦⣾⣿⣻⣞⣿⡟⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀hi :3 
 --    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⣟⣺⣿⢎⢿⣿⣽⣻⣾⢿⣽⣿⣷⡯⣳⠹⡜⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀@6x94 on discord⠀
@@ -3275,7 +3275,7 @@ run(function()
 end)
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
-    local module = vape.Categories.Combat:CreateModule({
+    local module = vape.Categories.Utility:CreateModule({
         Name = "Gun Mods V2",
         Function = function(callback)
             if callback then
@@ -3291,7 +3291,7 @@ run(function()
                 end
 
                 local gunExceptions = {
-                    ["Sniper"] = false,
+                    ["Sniper"] = true,
                     ["Crossbow"] = false,
                     ["Bow"] = false,
                     ["RPG"] = false,
@@ -3418,7 +3418,7 @@ run(function()
                 vape:CreateNotification("Fast Melee", "Modified " .. meleeCount .. " melee weapons", 3, "success")
             end
         end,
-        Tooltip = "Instant melee"
+        Tooltip = "Instant melee cooldowns with adjustable speed"
     })
 
     module:CreateSlider({
@@ -3433,80 +3433,8 @@ run(function()
         Suffix = "s",
         Tooltip = "Delay between melee swings"
     })
-
-    module:CreateSlider({
-        Name = "Attack Range",
-        Min = 5,
-        Max = 50,
-        Default = 5,
-        Decimal = 1,
-        Function = function(v)
-            _G.fastMeleeRange = v
-        end,
-        Tooltip = "Melee attack distance"
-    })
-end)                                                                                                                                                                                                                                                                                                                           
-                                                                                                                                                                                                                                                                                    
-run(function()
-    local tracerColor = Color3.fromRGB(255, 255, 255)
-    local enabled = false
-    local conn = nil
-
-    local function applyColor(obj)
-        if not obj:IsA("BasePart") then
-            for _, part in ipairs(obj:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Color = tracerColor
-                end
-            end
-            return
-        end
-        obj.Color = tracerColor
-    end
-
-    local TracersModule = vape.Categories.Utility:CreateModule({
-        Name = "Tracers",
-        Function = function(callback)
-            enabled = callback
-            if callback then
-                conn = workspace.ChildAdded:Connect(function(child)
-                    if child.Name == "TracerEffect" then
-                        task.wait(0.01)
-                        applyColor(child)
-                    end
-                end)
-
-                for _, child in ipairs(workspace:GetChildren()) do
-                    if child.Name == "TracerEffect" then
-                        applyColor(child)
-                    end
-                end
-            else
-                if conn then conn:Disconnect(); conn = nil end
-            end
-        end,
-        Tooltip = "Change the colour of bullet tracer effects"
-    })
-
-    TracersModule:CreateColorSlider({
-        Name = "Tracer Color",
-        Function = function(h, s, v)
-            tracerColor = Color3.fromHSV(h, s, v)
-            if enabled then
-                for _, child in ipairs(workspace:GetChildren()) do
-                    if child.Name == "TracerEffect" then
-                        applyColor(child)
-                    end
-                end
-            end
-        end
-    })
-
-    vape:Clean(function()
-        if conn then conn:Disconnect() end
-    end)
-end)
-                                                                                                                                                                                                                                               
+end)                                                                                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
 run(function()
     if hookmetamethod and getnamecallmethod then
         local SkinModule = vape.Categories.Utility:CreateModule({Name = "Skin Unlocker", Function = function(callback)
