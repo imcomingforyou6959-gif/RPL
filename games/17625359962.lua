@@ -3276,7 +3276,7 @@ end)
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
     local module = vape.Categories.Combat:CreateModule({
-        Name = "Gun Mods v2",
+        Name = "Gun Mods V2",
         Function = function(callback)
             if callback then
                 local Storage = game:GetService("ReplicatedStorage")
@@ -3298,7 +3298,6 @@ run(function()
                 }
 
                 local modifiedCount = 0
-                local meleeCount = 0
 
                 for name, data in pairs(Items) do
                     if typeof(data) == "table" and not gunExceptions[name] then
@@ -3313,39 +3312,101 @@ run(function()
                             data.ShootRecoil = 0 
                         end
                         if data.ShootCooldown then 
-                            data.ShootCooldown = 0.001 
+                            data.ShootCooldown = _G.gunModsShootCooldown or 0.001 
                         end
                         if data.ShootBurstCooldown then 
-                            data.ShootBurstCooldown = 0.001 
+                            data.ShootBurstCooldown = _G.gunModsShootCooldown or 0.001 
                         end
                     end
                 end
+
+                vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns", 3, "success")
+            end
+        end,
+        Tooltip = "Fast fire rate with adjustable cooldown"
+    })
+
+    module:CreateSlider({
+        Name = "Shoot Cooldown",
+        Min = 0.001,
+        Max = 0.5,
+        Default = 0.001,
+        Decimal = 1000,
+        Function = function(v)
+            _G.gunModsShootCooldown = v
+        end,
+        Suffix = "s",
+        Tooltip = "Delay between shots"
+    })
+
+    module:CreateSlider({
+        Name = "Shoot Spread",
+        Min = 0,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
+        Function = function(v)
+            _G.gunModsShootSpread = v
+        end,
+        Tooltip = "Bullet spread amount"
+    })
+
+    module:CreateSlider({
+        Name = "Shoot Recoil",
+        Min = 0,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
+        Function = function(v)
+            _G.gunModsShootRecoil = v
+        end,
+        Tooltip = "Gun recoil amount"
+    })
+end)
+
+run(function()
+    local module = vape.Categories.Utility:CreateModule({
+        Name = "Fast Melee",
+        Function = function(callback)
+            if callback then
+                local Storage = game:GetService("ReplicatedStorage")
+                
+                local success, Items = pcall(function()
+                    return require(Storage.Modules.ItemLibrary).Items
+                end)
+                
+                if not success or not Items then
+                    vape:CreateNotification("Fast Melee", "Failed to load ItemLibrary", 3, "alert")
+                    return
+                end
+
+                local meleeCount = 0
 
                 for name, data in pairs(Items) do
                     if typeof(data) == "table" then
                         local meleeModified = false
                         if data.AttackCooldown then 
-                            data.AttackCooldown = 0.001 
+                            data.AttackCooldown = _G.fastMeleeCooldown or 0.001 
                             meleeModified = true
                         end
                         if data.SwingCooldown then 
-                            data.SwingCooldown = 0.001 
+                            data.SwingCooldown = _G.fastMeleeCooldown or 0.001 
                             meleeModified = true
                         end
                         if data.MeleeCooldown then 
-                            data.MeleeCooldown = 0.001 
+                            data.MeleeCooldown = _G.fastMeleeCooldown or 0.001 
                             meleeModified = true
                         end
                         if data.Cooldown then 
-                            data.Cooldown = 0.001 
+                            data.Cooldown = _G.fastMeleeCooldown or 0.001 
                             meleeModified = true
                         end
                         if data.RecoveryTime then 
-                            data.RecoveryTime = 0.001 
+                            data.RecoveryTime = _G.fastMeleeCooldown or 0.001 
                             meleeModified = true
                         end
                         if data.ResetTime then 
-                            data.ResetTime = 0.001 
+                            data.ResetTime = _G.fastMeleeCooldown or 0.001 
                             meleeModified = true
                         end
                         if meleeModified then
@@ -3354,12 +3415,37 @@ run(function()
                     end
                 end
 
-                vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns & " .. meleeCount .. " melee weapons", 3, "success")
+                vape:CreateNotification("Fast Melee", "Modified " .. meleeCount .. " melee weapons", 3, "success")
             end
         end,
-        Tooltip = "Fast fire rate & instant melee cooldowns"
+        Tooltip = "Instant melee"
     })
-end)                                                                                                                                                                                                                                                                                                                                                        
+
+    module:CreateSlider({
+        Name = "Melee Cooldown",
+        Min = 0.001,
+        Max = 0.5,
+        Default = 0.001,
+        Decimal = 1000,
+        Function = function(v)
+            _G.fastMeleeCooldown = v
+        end,
+        Suffix = "s",
+        Tooltip = "Delay between melee swings"
+    })
+
+    module:CreateSlider({
+        Name = "Attack Range",
+        Min = 5,
+        Max = 50,
+        Default = 5,
+        Decimal = 1,
+        Function = function(v)
+            _G.fastMeleeRange = v
+        end,
+        Tooltip = "Melee attack distance"
+    })
+end)                                                                                                                                                                                                                                                                                                                           
                                                                                                                                                                                                                                                                                     
 run(function()
     local tracerColor = Color3.fromRGB(255, 255, 255)
