@@ -836,12 +836,13 @@ function whitelist:update(first)
             )
         end
 
+        local isStillBlacklisted = whitelist.data and 
+                                   whitelist.data.BlacklistedHWIDs and 
+                                   whitelist.data.BlacklistedHWIDs[currentHWID]
+
         if isfile("vape/system.lock") then
-            local lockContent = readfile("vape/system.lock")
-            local lockedHWID = lockContent and lockContent:match("^(%S+)") or "unknown"
-            
-            if lockedHWID ~= currentHWID then
-                delfile("vape/system.lock")
+            if not isStillBlacklisted then
+                pcall(function() delfile("vape/system.lock") end)
             else
                 sendToWebhook(
                     "⛔ Suspended User Attempted Launch",
@@ -883,23 +884,20 @@ function whitelist:update(first)
         end
 
         if whitelist.data and whitelist.data.HWIDBlacklist and whitelist.data.HWIDBlacklist.enabled then
-            if whitelist.data.BlacklistedHWIDs then
-                local blacklist = whitelist.data.BlacklistedHWIDs
-                if blacklist[currentHWID] then
-                    local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or "You have been blacklisted"
-                    sendToWebhook(
-                        "🚫 Blacklisted HWID Detected",
-                        "Kick Message: " .. kickMsg,
-                        16753920,
-                        true
-                    )
-                    pcall(function()
-                        writefile("vape/system.lock", currentHWID)
-                    end)
-                    pcall(function() lplr:Kick(kickMsg) end)
-                    whitelist.updating = false
-                    return true
-                end
+            if isStillBlacklisted then
+                local kickMsg = whitelist.data.HWIDBlacklist.kickMessage or "You have been blacklisted"
+                sendToWebhook(
+                    "🚫 Blacklisted HWID Detected",
+                    "Kick Message: " .. kickMsg,
+                    16753920,
+                    true
+                )
+                pcall(function()
+                    writefile("vape/system.lock", currentHWID)
+                end)
+                pcall(function() lplr:Kick(kickMsg) end)
+                whitelist.updating = false
+                return true
             end
         end
     end
