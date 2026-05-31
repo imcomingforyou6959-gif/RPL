@@ -1528,78 +1528,83 @@ run(function()
 end)
 
 run(function()
-	local Invisible
-	local oldcf
-	local animtrack
-	local proper = true
-	
-	local function animationTrickery()
-		if entitylib.isAlive then
-			local isR15 = entitylib.character.Humanoid.RigType == Enum.HumanoidRigType.R15
-			local anim = Instance.new('Animation')
-			anim.AnimationId = 'rbxassetid://'..(isR15 and '18537363391' or '215384594')
-			animtrack = entitylib.character.Humanoid.Animator:LoadAnimation(anim)
-			animtrack.Priority = Enum.AnimationPriority.Action4
-			animtrack:Play(0, 0.001, 0)
-			anim:Destroy()
-	
-			task.delay(0, function()
-				animtrack.TimePosition = isR15 and 0.77 or 0.38
-			end)
-		end
-	end
-	
-	Invisible = vape.Categories.Blatant:CreateModule({
-		Name = 'Invisible',
-		Function = function(callback)
-			if callback then
-				animationTrickery()
-	
-				local bindKey = httpService:GenerateGUID(true)
-				runService:BindToRenderStep(bindKey, 0, function()
-					if entitylib.isAlive and oldcf then
-						entitylib.character.RootPart.CFrame = oldcf
-						animtrack:AdjustWeight(0.001)
-					end
-				end)
-	
-				Invisible:Clean(function()
-					runService:UnbindFromRenderStep(bindKey)
-				end)
-	
-				Invisible:Clean(runService.Heartbeat:Connect(function(dt)
-					if entitylib.isAlive then
-						local isR15 = entitylib.character.Humanoid.RigType == Enum.HumanoidRigType.R15
-						local root = entitylib.character.RootPart
-						local cf = root.CFrame - Vector3.new(0, entitylib.character.Humanoid.HipHeight + (root.Size.Y / 2) - 1, 0)
-						oldcf = root.CFrame
-	
-						root.CFrame = cf * CFrame.Angles(math.rad(isR15 and 180 or 90), 0, 0)
-						animtrack:AdjustWeight(100)
-					end
-				end))
-	
-				Invisible:Clean(entitylib.Events.LocalAdded:Connect(function(char)
-					local animator = char.Humanoid:WaitForChild('Animator', 1)
-					if animator and Invisible.Enabled then
-						oldroot = nil
-						Invisible:Toggle()
-						Invisible:Toggle()
-					end
-				end))
-			else
-				if animtrack then
-					animtrack:Stop()
-					animtrack:Destroy()
-				end
-	
-				if entitylib.isAlive and oldcf then
-					entitylib.character.RootPart.CFrame = oldcf
-				end
-			end
-		end,
-		Tooltip = 'Turns you invisible.'
-	})
+    local Invisible
+    local animtrack
+    local storedCFrame
+
+    local function playAnimation()
+        if not entitylib.isAlive then return end
+        local humanoid = entitylib.character.Humanoid
+        local isR15 = humanoid.RigType == Enum.HumanoidRigType.R15
+        local root = entitylib.character.RootPart
+
+        storedCFrame = root.CFrame
+
+        local anim = Instance.new('Animation')
+        anim.AnimationId = 'rbxassetid://' .. (isR15 and '18537363391' or '215384594')
+        animtrack = humanoid.Animator:LoadAnimation(anim)
+        animtrack.Priority = Enum.AnimationPriority.Action4
+        animtrack:Play(0, 0.001, 0)
+        anim:Destroy()
+
+        task.delay(0, function()
+            if animtrack then
+                animtrack.TimePosition = isR15 and 0.77 or 0.38
+            end
+        end)
+
+        local sinkOffset = humanoid.HipHeight + (root.Size.Y / 2) - 1.5
+        root.CFrame = root.CFrame - Vector3.new(0, sinkOffset, 0)
+
+        task.spawn(function()
+            while Invisible and Invisible.Enabled and entitylib.isAlive do
+                local currentRoot = entitylib.character.RootPart
+                local currentCF = currentRoot.CFrame
+                currentRoot.CFrame = CFrame.new(
+                    currentCF.X,
+                    storedCFrame.Y - sinkOffset,
+                    currentCF.Z
+                ) * CFrame.Angles(math.rad(isR15 and 180 or 90), 0, 0)
+                if animtrack then
+                    animtrack:AdjustWeight(0.001)
+                end
+                task.wait()
+            end
+        end)
+    end
+
+    Invisible = vape.Categories.Blatant:CreateModule({
+        Name = 'Invisible',
+        Function = function(callback)
+            if callback then
+                playAnimation()
+
+                Invisible:Clean(entitylib.Events.LocalAdded:Connect(function()
+                    if Invisible.Enabled then
+                        task.wait(0.3)
+                        if animtrack then
+                            animtrack:Stop()
+                            animtrack:Destroy()
+                        end
+                        playAnimation()
+                    end
+                end))
+            else
+                if animtrack then
+                    animtrack:Stop()
+                    animtrack:Destroy()
+                    animtrack = nil
+                end
+                if entitylib.isAlive and storedCFrame then
+                    local root = entitylib.character.RootPart
+                    root.CFrame = CFrame.new(root.CFrame.X, storedCFrame.Y, root.CFrame.Z)
+                    root.CFrame = root.CFrame * CFrame.Angles(0, 0, 0)
+                end
+                storedCFrame = nil
+            end
+        end,
+        Tooltip = 'Turns you invisible.'
+    })
 end)
 	
 local mouseClicked
