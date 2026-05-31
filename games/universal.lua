@@ -1531,6 +1531,7 @@ run(function()
     local Invisible
     local animtrack
     local storedCFrame
+    local bindKey
 
     local function playAnimation()
         if not entitylib.isAlive then return end
@@ -1556,19 +1557,14 @@ run(function()
         local sinkOffset = humanoid.HipHeight + (root.Size.Y / 2) - 1.5
         root.CFrame = root.CFrame - Vector3.new(0, sinkOffset, 0)
 
-        task.spawn(function()
-            while Invisible and Invisible.Enabled and entitylib.isAlive do
-                local currentRoot = entitylib.character.RootPart
-                local currentCF = currentRoot.CFrame
-                currentRoot.CFrame = CFrame.new(
-                    currentCF.X,
-                    storedCFrame.Y - sinkOffset,
-                    currentCF.Z
-                ) * CFrame.Angles(math.rad(isR15 and 180 or 90), 0, 0)
-                if animtrack then
-                    animtrack:AdjustWeight(0.001)
-                end
-                task.wait()
+        bindKey = httpService:GenerateGUID(true)
+        runService:BindToRenderStep(bindKey, 1, function()
+            if not entitylib.isAlive then return end
+            local currentRoot = entitylib.character.RootPart
+            local cf = currentRoot.CFrame
+            currentRoot.CFrame = CFrame.new(cf.X, storedCFrame.Y - sinkOffset, cf.Z) * CFrame.Angles(math.rad(90), 0, 0)
+            if animtrack then
+                animtrack:AdjustWeight(0.001)
             end
         end)
     end
@@ -1581,15 +1577,24 @@ run(function()
 
                 Invisible:Clean(entitylib.Events.LocalAdded:Connect(function()
                     if Invisible.Enabled then
-                        task.wait(0.3)
                         if animtrack then
                             animtrack:Stop()
                             animtrack:Destroy()
+                            animtrack = nil
                         end
+                        if bindKey then
+                            runService:UnbindFromRenderStep(bindKey)
+                            bindKey = nil
+                        end
+                        task.wait(0.3)
                         playAnimation()
                     end
                 end))
             else
+                if bindKey then
+                    runService:UnbindFromRenderStep(bindKey)
+                    bindKey = nil
+                end
                 if animtrack then
                     animtrack:Stop()
                     animtrack:Destroy()
@@ -1597,8 +1602,7 @@ run(function()
                 end
                 if entitylib.isAlive and storedCFrame then
                     local root = entitylib.character.RootPart
-                    root.CFrame = CFrame.new(root.CFrame.X, storedCFrame.Y, root.CFrame.Z)
-                    root.CFrame = root.CFrame * CFrame.Angles(0, 0, 0)
+                    root.CFrame = CFrame.new(root.CFrame.X, storedCFrame.Y, root.CFrame.Z) * CFrame.Angles(0, 0, 0)
                 end
                 storedCFrame = nil
             end
