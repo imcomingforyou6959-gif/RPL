@@ -324,44 +324,6 @@ run(function()
     local chatConnections = {}
     local running = true
 
-    local function loadTeamMembers()
-        local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
-        local suc, res = pcall(function() return game:HttpGet(url) end)
-        if not suc then return end
-        local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
-        if not ok or not data or type(data.TeamMembers) ~= "table" then return end
-        teamLookup = {}
-        nameLookup = {}
-        loweredNameCache = {}
-        for _, mem in ipairs(data.TeamMembers) do
-            if mem.userId then
-                teamLookup[mem.userId] = mem
-            end
-            if mem.username then
-                local lowered = mem.username:lower()
-                nameLookup[lowered] = mem
-                loweredNameCache[mem.username] = lowered
-            end
-        end
-    end
-    loadTeamMembers()
-
-    task.spawn(function()
-        while running do
-            task.wait(30)
-            if not running then break end
-            loadTeamMembers()
-            for _, player in ipairs(playersService:GetPlayers()) do
-                local info = isTeamMember(player)
-                if info then
-                    if player.Character then
-                        attachNametag(player.Character, info.role)
-                    end
-                end
-            end
-        end
-    end)
-
     local function getLoweredName(player)
         if loweredNameCache[player.Name] then
             return loweredNameCache[player.Name]
@@ -431,6 +393,44 @@ run(function()
             end
         end)
     end
+
+    local function loadTeamMembers()
+        local url = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/Team.json?t=" .. tick()
+        local suc, res = pcall(function() return game:HttpGet(url) end)
+        if not suc then return end
+        local ok, data = pcall(game.HttpService.JSONDecode, game:GetService("HttpService"), res)
+        if not ok or not data or type(data.TeamMembers) ~= "table" then return end
+        teamLookup = {}
+        nameLookup = {}
+        loweredNameCache = {}
+        for _, mem in ipairs(data.TeamMembers) do
+            if mem.userId then
+                teamLookup[mem.userId] = mem
+            end
+            if mem.username then
+                local lowered = mem.username:lower()
+                nameLookup[lowered] = mem
+                loweredNameCache[mem.username] = lowered
+            end
+        end
+    end
+    loadTeamMembers()
+
+    task.spawn(function()
+        while running do
+            task.wait(30)
+            if not running then break end
+            loadTeamMembers()
+            for _, player in ipairs(playersService:GetPlayers()) do
+                local info = isTeamMember(player)
+                if info then
+                    if player.Character then
+                        attachNametag(player.Character, info.role)
+                    end
+                end
+            end
+        end
+    end)
 
     local function applyChatGradient(nameElement)
         if not nameElement or nameElement:FindFirstChild("RawrGradient") then return end
