@@ -1926,6 +1926,7 @@ run(function()
     local arrestTimeouts = {}
     local AutoArrest
     local ArrestRange
+    local ArrestMode
 
     local function disconnectPlayerConnections(plr)
         if Players[plr] then
@@ -1962,8 +1963,56 @@ run(function()
         end)
     end
 
+    local function canArrest(v, char)
+        if not v or not v.Team then return false end
+        if v.Team == criminalsTeam then return true end
+        if v.Team == inmatesTeam then
+            return char:GetAttribute("Hostile") or char:GetAttribute("Trespassing")
+        end
+        return false
+    end
+
     local function Cleanup(plr)
         disconnectPlayerConnections(plr)
+    end
+
+    local function tryArrest(v, char)
+        if tick() < Cooldown then
+            notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
+            return
+        end
+        if not entitylib or not entitylib.isAlive then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
+        if dist > (ArrestRange and ArrestRange.Value or 100) then return end
+
+        if not canArrest(v, char) then return end
+
+        local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
+        if not Handcuffs then return end
+
+        Handcuffs.Parent = char
+        local start = tick()
+        local timeout = 5
+        arrestTimeouts[v] = tick() + timeout
+        repeat
+            if not entitylib or not entitylib.isAlive then break end
+            if not char or not char:FindFirstChild("HumanoidRootPart") then break end
+            if not char:FindFirstChildOfClass("Humanoid") or char:FindFirstChildOfClass("Humanoid").Health <= 0 then break end
+            if not v or not v.Parent or not v.Character then break end
+            if char:GetAttribute("Arrested") then break end
+            if tick() - start > timeout then break end
+
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then t.d.s = hrp.CFrame end
+            Arrest(v, char)
+            task.wait(0.1)
+        until not char or char:GetAttribute("Arrested") or not entitylib.isAlive
+
+        t.d.s = CFrame.new()
+        if Handcuffs then Handcuffs.Parent = lplr and lplr.Backpack end
+        arrestTimeouts[v] = nil
     end
 
     local function Auto(v)
@@ -1980,9 +2029,7 @@ run(function()
             if humanoid then
                 deathConn = humanoid.Died:Connect(function()
                     t.d.s = CFrame.new()
-                    if arrestTimeouts[v] then
-                        arrestTimeouts[v] = nil
-                    end
+                    if arrestTimeouts[v] then arrestTimeouts[v] = nil end
                 end)
                 Players[v].localDeath = deathConn
             end
@@ -1990,59 +2037,20 @@ run(function()
 
         local function Listener(char)
             if not char then return end
-            local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
-                if tick() < Cooldown then
-                    notif('Rawr.xyz', 'Arrest Cooldown: ' .. math.ceil(Cooldown - tick()) .. 's', 3)
-                    return
-                end
-                if not entitylib or not entitylib.isAlive then
-                    t.d.s = CFrame.new()
-                    return
-                end
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if not root then
-                    t.d.s = CFrame.new()
-                    return
-                end
-                local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
-                if dist > (ArrestRange and ArrestRange.Value or 100) then return end
+            local mode = ArrestMode and ArrestMode.Value or "Tased"
 
-                if char:GetAttribute("Tased") == true and lplr and lplr.Team == guardsTeam then
-                    if v and v.Team then
-                        if v.Team == criminalsTeam or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile"))) then
-                            local Handcuffs = char:FindFirstChild("Handcuffs") or (lplr and lplr.Backpack and lplr.Backpack:FindFirstChild("Handcuffs"))
-                            if Handcuffs then
-                                Handcuffs.Parent = char
-                                local start = tick()
-                                local timeout = 5
-                                arrestTimeouts[v] = tick() + timeout
-                                repeat
-                                    if not entitylib or not entitylib.isAlive then break end
-                                    if not char or not char:FindFirstChild("HumanoidRootPart") then break end
-                                    if not char:FindFirstChildOfClass("Humanoid") or char:FindFirstChildOfClass("Humanoid").Health <= 0 then break end
-                                    if not v or not v.Parent or not v.Character then break end
-                                    if char:GetAttribute("Arrested") then break end
-                                    if tick() - start > timeout then break end
-
-                                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                                    if hrp then
-                                        t.d.s = hrp.CFrame
-                                    end
-                                    Arrest(v, char)
-                                    task.wait(0.1)
-                                until not char or char:GetAttribute("Arrested") or not entitylib.isAlive
-
-                                t.d.s = CFrame.new()
-                                if Handcuffs then
-                                    Handcuffs.Parent = lplr and lplr.Backpack
-                                end
-                                arrestTimeouts[v] = nil
-                            end
-                        end
+            if mode == "Tased" then
+                local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
+                    if lplr and lplr.Team == guardsTeam and char:GetAttribute("Tased") == true then
+                        tryArrest(v, char)
                     end
+                end)
+                Players[v].TasedConnection = TasedConnection
+            else
+                if lplr and lplr.Team == guardsTeam and canArrest(v, char) then
+                    tryArrest(v, char)
                 end
-            end)
-            Players[v].TasedConnection = TasedConnection
+            end
 
             char.Destroying:Connect(function()
                 t.d.s = CFrame.new()
@@ -2076,9 +2084,7 @@ run(function()
                 AutoArrest:Clean(entitylib.Events.EntityAdded:Connect(function(plr) setup(plr.Player) end))
             else
                 for plr, conns in pairs(Players) do
-                    for _, conn in pairs(conns) do
-                        pcall(function() conn:Disconnect() end)
-                    end
+                    for _, conn in pairs(conns) do pcall(function() conn:Disconnect() end) end
                     Players[plr] = nil
                 end
                 arrestTimeouts = {}
@@ -2086,13 +2092,23 @@ run(function()
             end
         end
     })
-    ArrestRange = AutoArrest:CreateSlider({ Name = "Arrest Range", Min=1, Max=1000, Default=100, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
+
+    ArrestMode = AutoArrest:CreateDropdown({
+        Name = "Mode",
+        List = {"Tased", "Normal"},
+        Default = "Tased",
+        Function = function() end,
+        Tooltip = "Tased - Only arrest tased players\nNormal - Arrest any criminal/inmate without havin to tase em"
+    })
+    ArrestRange = AutoArrest:CreateSlider({
+        Name = "Arrest Range",
+        Min = 1, Max = 1000, Default = 100,
+        Suffix = function(val) return val == 1 and 'stud' or 'studs' end
+    })
 
     vape:Clean(function()
         for plr, conns in pairs(Players) do
-            for _, conn in pairs(conns) do
-                pcall(function() conn:Disconnect() end)
-            end
+            for _, conn in pairs(conns) do pcall(function() conn:Disconnect() end) end
             Players[plr] = nil
         end
         arrestTimeouts = {}
