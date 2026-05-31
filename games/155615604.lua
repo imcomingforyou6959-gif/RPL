@@ -1919,95 +1919,119 @@ run(function()
 end)
                                                                                                                                                                     
 run(function()
+    local ArrestPlayer = remotes:WaitForChild("ArrestPlayer")
+    local InteractWithItem = remotes:WaitForChild("InteractWithItem")
+    local Cooldown = 0
+    local Players = {}
     local AutoArrest
-    local Range
-    local HandCheck
-    local cooldown = os.clock()
+    local ArrestRange
     local lastCooldownNotif = 0
 
+    local function Arrest(player, char)
+        if not player or not char then return end
+        ArrestPlayer:InvokeServer(player, 1)
+        InteractWithItem:InvokeServer(char.Head)
+        Cooldown = tick() + 7.5
+        notif('AutoArrest', 'Arrested ' .. player.Name, 7)
+    end
+
+    local function Cleanup(plr)
+        if Players[plr] then
+            for _, conn in pairs(Players[plr]) do
+                pcall(function() conn:Disconnect() end)
+            end
+            Players[plr] = nil
+        end
+    end
+
+    local function Auto(v)
+        if not AutoArrest.Enabled then return end
+        if not entitylib.isAlive then return end
+
+        Cleanup(v)
+        Players[v] = {}
+
+        local function Listener(char)
+            if not char then return end
+            local TasedConnection = char:GetAttributeChangedSignal("Tased"):Connect(function()
+                if tick() < Cooldown then
+                    local now = tick()
+                    if now - lastCooldownNotif >= 3 then
+                        lastCooldownNotif = now
+                        notif('AutoArrest', 'Cooldown: ' .. math.ceil(Cooldown - now) .. 's remaining', 2, 'warning')
+                    end
+                    return
+                end
+
+                if not entitylib.isAlive then return end
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+
+                local dist = (entitylib.character.RootPart.Position - root.Position).Magnitude
+                if dist > (ArrestRange and ArrestRange.Value or 100) then return end
+
+                if char:GetAttribute("Tased") == true and lplr.Team == guardsTeam then
+                    local canArrest = (v.Team == criminalsTeam) or (v.Team == inmatesTeam and (char:GetAttribute("Trespassing") or char:GetAttribute("Hostile")))
+                    if canArrest then
+                        -- Desync teleport if farther than 10 studs
+                        if dist > 10 and entitylib.isAlive then
+                            local localRoot = entitylib.character.RootPart
+                            t.d.l = localRoot.CFrame
+                            t.d.s = root.CFrame
+                            localRoot.CFrame = t.d.s
+                            runService.RenderStepped:Wait()
+                            localRoot.CFrame = t.d.l
+                        end
+
+                        Arrest(v, char)
+                    end
+                end
+            end)
+            Players[v].TasedConnection = TasedConnection
+
+            char.Destroying:Connect(function()
+                t.d.s = CFrame.new()
+                Cleanup(v)
+            end)
+        end
+
+        if v.Character then Listener(v.Character) end
+
+        Players[v].leaveConnection = entitylib.Events.EntityRemoved:Connect(function(plr)
+            if plr.Player == v then Cleanup(v) end
+        end)
+    end
+
     AutoArrest = vape.Categories.Blatant:CreateModule({
-        Name = 'AutoArrest',
+        Name = "AutoArrest",
         Function = function(callback)
             if callback then
-                repeat
-                    local canAct = cooldown < os.clock()
-                    if HandCheck.Enabled then
-                        local tool = entitylib.isAlive and lplr.Character:FindFirstChildWhichIsA('Tool')
-                        canAct = canAct and tool and tool.Name == 'Handcuffs'
+                local function setup(plr)
+                    AutoArrest:Clean(plr.CharacterAdded:Connect(function() Auto(plr) end))
+                    if plr.Character then Auto(plr) end
+                end
+                for _, plr in pairs(entitylib.List) do setup(plr.Player) end
+                AutoArrest:Clean(entitylib.Events.EntityAdded:Connect(function(plr) setup(plr.Player) end))
+            else
+                for _, conns in pairs(Players) do
+                    for _, conn in pairs(conns) do
+                        pcall(function() conn:Disconnect() end)
                     end
-
-                    if canAct then
-                        local entities = entitylib.AllPosition({
-                            Range = Range.Value,
-                            Players = true,
-                            Part = 'RootPart',
-                            TargetCheck = true
-                        })
-
-                        for _, ent in entities do
-                            if ent.Character:GetAttribute('Arrested') then continue end
-
-                            local canArrest = false
-                            if ent.Player.Team == criminalsTeam then
-                                canArrest = true
-                            elseif ent.Player.Team == inmatesTeam then
-                                canArrest = ent.Character:GetAttribute('Hostile') or ent.Character:GetAttribute('Trespassing')
-                            end
-
-                            if not canArrest then continue end
-
-                            local root = ent.Character:FindFirstChild("HumanoidRootPart")
-                            if not root then continue end
-
-                            local dist = entitylib.isAlive and (entitylib.character.RootPart.Position - root.Position).Magnitude or math.huge
-
-                            if dist > 10 and entitylib.isAlive then
-                                local localRoot = entitylib.character.RootPart
-                                t.d.l = localRoot.CFrame
-                                t.d.s = root.CFrame
-                                localRoot.CFrame = t.d.s
-                                runService.RenderStepped:Wait()
-                                localRoot.CFrame = t.d.l
-                            end
-
-                            if remotes.ArrestPlayer:InvokeServer(ent.Player, 1) then
-                                cooldown = os.clock() + 7
-                                notif('AutoArrest', 'Arrested ' .. ent.Player.Name, 7)
-                            end
-
-                            break
-                        end
-                    else
-                        if cooldown > os.clock() then
-                            local now = os.clock()
-                            if now - lastCooldownNotif >= 3 then
-                                lastCooldownNotif = now
-                                notif('AutoArrest', 'Cooldown: ' .. math.ceil(cooldown - now) .. 's remaining', 2, 'warning')
-                            end
-                        end
-                    end
-
-                    task.wait(0.05)
-                until not AutoArrest.Enabled
+                end
+                Players = {}
+                t.d.s = CFrame.new()
             end
-        end,
-        Tooltip = 'Automatically handcuffs nearby criminals/inmates'
+        end
     })
-    Range = AutoArrest:CreateSlider({
-        Name = 'Range',
+    ArrestRange = AutoArrest:CreateSlider({
+        Name = "Arrest Range",
         Min = 1,
         Max = 1000,
         Default = 100,
-        Suffix = function(val)
-            return val == 1 and 'stud' or 'studs'
-        end
-    })
-    HandCheck = AutoArrest:CreateToggle({
-        Name = 'Hand Check',
-        Tooltip = 'Only arrest if you have handcuffs equipped.'
+        Suffix = function(val) return val == 1 and 'stud' or 'studs' end
     })
 end)
-                                                                                                                                        
+																																					
 run(function()
 	local AntiRiotShield
 	
