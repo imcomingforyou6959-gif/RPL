@@ -1919,117 +1919,93 @@ run(function()
 end)
                                                                                                                                                                     
 run(function()
-	local AutoArrest
-	local Range
-	local HandCheck
-	local CooldownBar
-	local cooldown = os.clock()
-	local cdholder, cdframe, cdlabel
-	
-	AutoArrest = vape.Categories.Blatant:CreateModule({
-		Name = 'AutoArrest',
-		Function = function(callback)
-			if callback then
-				repeat
-					local check = cooldown < os.clock()
-					if HandCheck.Enabled then
-						local tool = entitylib.isAlive and lplr.Character:FindFirstChildWhichIsA('Tool')
-						check = check and tool and tool.Name == 'Handcuffs'
-					end
-	
-					if check then
-						local entities = entitylib.AllPosition({
-							Range = Range.Value,
-							Players = true,
-							Part = 'RootPart',
-							TargetCheck = true
-						})
-	
-						for _, ent in entities do
-							if not ent.Character:GetAttribute('Arrested') then
-								local canArrest = false
-								if ent.Player.Team == criminalsTeam then
-									canArrest = true
-								elseif ent.Player.Team == inmatesTeam then
-									canArrest = ent.Character:GetAttribute('Hostile') or ent.Character:GetAttribute('Trespassing')
-								end
-	
-								if canArrest then
-									if remotes.ArrestPlayer:InvokeServer(ent.Player, 1) then
-										cooldown = os.clock() + 7
-										notif('AutoArrest', 'Arrested '..(ent.Player.Name), 7)
-									end
-									break
-								end
-							end
-						end
-					end
-	
-					if cdholder then
-						cdholder.Visible = cooldown > os.clock()
-						if cdholder.Visible then
-							local diff = (cooldown - os.clock())
-							cdframe.Size = UDim2.new(math.clamp(diff / 7, 0, 1), -2, 1, -2)
-							cdlabel.Text = (math.round(diff * 10) / 10)..'s'
-						end
-					end
-	
-					task.wait(0.05)
-				until not AutoArrest.Enabled
-			end
-		end,
-		Tooltip = 'Automatically uses handcuffs on nearby entities'
-	})
-	Range = AutoArrest:CreateSlider({
-		Name = 'Range',
-		Min = 1,
-		Max = 8,
-		Default = 8,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end
-	})
-	HandCheck = AutoArrest:CreateToggle({
-		Name = 'Hand Check',
-		Tooltip = 'Only arrest if you have handcuffs equipped.'
-	})
-	CooldownBar = AutoArrest:CreateToggle({
-		Name = 'Cooldown Bar',
-		Function = function(callback)
-			if callback then
-				cdholder = Instance.new('Frame')
-				cdholder.BorderSizePixel = 0
-				cdholder.BackgroundTransparency = 0.7
-				cdholder.AnchorPoint = Vector2.new(0.5, 0)
-				cdholder.BackgroundColor3 = Color3.new(1, 1, 1)
-				cdholder.Size = UDim2.new(0.1, 0, 0, 5)
-				cdholder.Position = UDim2.fromScale(0.5, 0.55)
-				cdholder.Parent = vape.gui
-				cdframe = Instance.new('Frame')
-				cdframe.BorderSizePixel = 0
-				cdframe.BackgroundTransparency = 0.3
-				cdframe.BackgroundColor3 = Color3.new(1, 1, 1)
-				cdframe.Size = UDim2.new(1, -2, 1, -2)
-				cdframe.Position = UDim2.fromOffset(1, 1)
-				cdframe.Parent = cdholder
-				cdlabel = Instance.new('TextLabel')
-				cdlabel.Size = UDim2.new(1, 0, 0, 14)
-				cdlabel.Position = UDim2.fromOffset(0, 10)
-				cdlabel.BackgroundTransparency = 1
-				cdlabel.TextColor3 = Color3.new(1, 1, 1)
-				cdlabel.TextScaled = true
-				cdlabel.TextStrokeTransparency = 0
-				cdlabel.Font = Enum.Font.Arial
-				cdlabel.Parent = cdholder
-			else
-				if cdholder then
-					cdholder:Destroy()
-					cdholder = nil
-				end
-			end
-		end,
-		Tooltip = 'Show the cooldown for arresting'
-	})
+    local AutoArrest
+    local Range
+    local HandCheck
+    local cooldown = os.clock()
+    local lastCooldownNotif = 0
+
+    AutoArrest = vape.Categories.Blatant:CreateModule({
+        Name = 'AutoArrest',
+        Function = function(callback)
+            if callback then
+                repeat
+                    local canAct = cooldown < os.clock()
+                    if HandCheck.Enabled then
+                        local tool = entitylib.isAlive and lplr.Character:FindFirstChildWhichIsA('Tool')
+                        canAct = canAct and tool and tool.Name == 'Handcuffs'
+                    end
+
+                    if canAct then
+                        local entities = entitylib.AllPosition({
+                            Range = Range.Value,
+                            Players = true,
+                            Part = 'RootPart',
+                            TargetCheck = true
+                        })
+
+                        for _, ent in entities do
+                            if ent.Character:GetAttribute('Arrested') then continue end
+
+                            local canArrest = false
+                            if ent.Player.Team == criminalsTeam then
+                                canArrest = true
+                            elseif ent.Player.Team == inmatesTeam then
+                                canArrest = ent.Character:GetAttribute('Hostile') or ent.Character:GetAttribute('Trespassing')
+                            end
+
+                            if not canArrest then continue end
+
+                            local root = ent.Character:FindFirstChild("HumanoidRootPart")
+                            if not root then continue end
+
+                            local dist = entitylib.isAlive and (entitylib.character.RootPart.Position - root.Position).Magnitude or math.huge
+
+                            if dist > 10 and entitylib.isAlive then
+                                local localRoot = entitylib.character.RootPart
+                                t.d.l = localRoot.CFrame
+                                t.d.s = root.CFrame
+                                localRoot.CFrame = t.d.s
+                                runService.RenderStepped:Wait()
+                                localRoot.CFrame = t.d.l
+                            end
+
+                            if remotes.ArrestPlayer:InvokeServer(ent.Player, 1) then
+                                cooldown = os.clock() + 7
+                                notif('AutoArrest', 'Arrested ' .. ent.Player.Name, 7)
+                            end
+
+                            break
+                        end
+                    else
+                        if cooldown > os.clock() then
+                            local now = os.clock()
+                            if now - lastCooldownNotif >= 3 then
+                                lastCooldownNotif = now
+                                notif('AutoArrest', 'Cooldown: ' .. math.ceil(cooldown - now) .. 's remaining', 2, 'warning')
+                            end
+                        end
+                    end
+
+                    task.wait(0.05)
+                until not AutoArrest.Enabled
+            end
+        end,
+        Tooltip = 'Automatically handcuffs nearby criminals/inmates'
+    })
+    Range = AutoArrest:CreateSlider({
+        Name = 'Range',
+        Min = 1,
+        Max = 1000,
+        Default = 100,
+        Suffix = function(val)
+            return val == 1 and 'stud' or 'studs'
+        end
+    })
+    HandCheck = AutoArrest:CreateToggle({
+        Name = 'Hand Check',
+        Tooltip = 'Only arrest if you have handcuffs equipped.'
+    })
 end)
                                                                                                                                         
 run(function()
