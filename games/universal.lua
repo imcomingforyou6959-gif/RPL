@@ -3543,46 +3543,71 @@ run(function()
     local Mode
     local Direction
     local renderConn
+    local lastAngle = 0
 
-    local function applyInverse()
-        if not entitylib.isAlive then return end
-        local root = entitylib.character.RootPart
-        local moveDir = entitylib.character.Humanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-
-        local lookCF = CFrame.lookAt(root.Position, root.Position - moveDir)
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, select(2, lookCF:ToOrientation()), 0)
-    end
-
-    local function applyBackwards()
-        if not entitylib.isAlive then return end
-        local root = entitylib.character.RootPart
-        local moveDir = entitylib.character.Humanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-
-        local lookCF = CFrame.lookAt(root.Position, root.Position + moveDir)
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, select(2, lookCF:ToOrientation()), 0)
-    end
-
-    local function applySideways()
-        if not entitylib.isAlive then return end
-        local root = entitylib.character.RootPart
-        local moveDir = entitylib.character.Humanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-
+    local function getAngleOffset()
         local dir = Direction and Direction.Value or "Left"
         local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
         local angle = math.atan2(camForward.X, camForward.Z)
 
         if dir == "Left" then
-            angle = angle + math.rad(90)
+            return angle + math.rad(90)
         elseif dir == "Right" then
-            angle = angle - math.rad(90)
+            return angle - math.rad(90)
         else
-            angle = angle + (math.random(0, 1) == 0 and math.rad(90) or math.rad(-90))
+            return angle + (math.random(0, 1) == 0 and math.rad(90) or math.rad(-90))
+        end
+    end
+
+    local function applyInverse()
+        if not entitylib.isAlive then return end
+        local humanoid = entitylib.character.Humanoid
+        local root = entitylib.character.RootPart
+        local moveDir = humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        local lookCF = CFrame.lookAt(root.Position, root.Position - moveDir)
+        local _, yaw, _ = lookCF:ToOrientation()
+        lastAngle = yaw
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+    end
+
+    local function applyBackwards()
+        if not entitylib.isAlive then return end
+        local humanoid = entitylib.character.Humanoid
+        local root = entitylib.character.RootPart
+        local moveDir = humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        local lookCF = CFrame.lookAt(root.Position, root.Position + moveDir)
+        local _, yaw, _ = lookCF:ToOrientation()
+        lastAngle = yaw
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+    end
+
+    local function applySideways()
+        if not entitylib.isAlive then return end
+        local humanoid = entitylib.character.Humanoid
+        local root = entitylib.character.RootPart
+        local moveDir = humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        lastAngle = getAngleOffset()
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
+    end
+
+    local function applyFirstPersonFix()
+        if not entitylib.isAlive then return end
+        local humanoid = entitylib.character.Humanoid
+        local root = entitylib.character.RootPart
+
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
+
+        if humanoid.CameraOffset ~= Vector3.new(0, 0, 0) then
+            humanoid.CameraOffset = Vector3.new(0, 0, 0)
         end
 
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, angle, 0)
+        humanoid.AutoRotate = false
     end
 
     AntiAim = vape.Categories.Blatant:CreateModule({
@@ -3593,10 +3618,13 @@ run(function()
                     local mode = Mode and Mode.Value or "Inverse"
                     if mode == "Inverse" then
                         applyInverse()
+                        applyFirstPersonFix()
                     elseif mode == "Backwards" then
                         applyBackwards()
+                        applyFirstPersonFix()
                     elseif mode == "Sideways" then
                         applySideways()
+                        applyFirstPersonFix()
                     end
                 end)
             else
@@ -3604,9 +3632,12 @@ run(function()
                     renderConn:Disconnect()
                     renderConn = nil
                 end
+                if entitylib.isAlive then
+                    entitylib.character.Humanoid.AutoRotate = true
+                end
             end
         end,
-        Tooltip = 'Fake movement direction'
+        Tooltip = 'others see u facing the wrong way'
     })
 
     Mode = AntiAim:CreateDropdown({
