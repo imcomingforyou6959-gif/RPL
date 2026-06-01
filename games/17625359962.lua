@@ -1457,7 +1457,7 @@ run(function()
         pcall(function() sky.MoonTextureId = defaultSkybox.MoonTextureId end)
     end
 
-    local WorldChanger = vape.Categories.World:CreateModule({
+    local WorldChanger = vape.Categories.Utility:CreateModule({
         Name = "World Changer",
         Function = function(callback)
             enabled = callback
@@ -1467,7 +1467,7 @@ run(function()
                 restoreDefault()
             end
         end,
-        Tooltip = "Change the skybox and world appearance"
+        Tooltip = "Change the skybox"
     })
 
     local skyboxNames = {"black storm", "blue space", "realistic", "stormy", "pink"}
@@ -1675,568 +1675,252 @@ run(function()
     local http = game:GetService("HttpService")
     local runService = game:GetService("RunService")
 
-    local bodyParts = {
-        "Head", "Torso",
-        "UpperTorso", "LowerTorso",
+    local parts = {
+        "Head", "Torso", "UpperTorso", "LowerTorso",
         "Left Arm", "Right Arm", "Left Leg", "Right Leg",
         "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm",
         "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg",
         "LeftHand", "RightHand", "LeftFoot", "RightFoot"
     }
 
-    local materials = {
+    local mats = {
         "Plastic", "Wood", "Brick", "Concrete", "CorrodedMetal", "DiamondPlate",
         "Foil", "Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Sand",
         "Slate", "SmoothPlastic", "WoodPlanks", "ForceField"
     }
 
-    local cfgPath = "newvape/assets/self_visuals.json"
+    local cfg = "newvape/assets/self_visuals.json"
     local orig = {}
-    local removedArms = {}
-    local selMat = "Plastic"
-    local selCol = Color3.new(1, 1, 1)
-    local selTrans = 0
-    local removeArms = false
-    local viewModelLoop
+    local removed = {}
+    local mat = "Plastic"
+    local col = Color3.new(1, 1, 1)
+    local trans = 0
+    local hideArms = false
+    local vmLoop
 
-    local effectsEnabled = false
-    local hw1Enabled = true
-    local hw2Enabled = true
-    local sparksEnabled = true
-    local starEnabled = true
-    local particleColor = Color3.fromRGB(255, 0, 255)
-    local Attachment = nil
-    local particleEmitters = {}
+    local fx = false
+    local h1 = true
+    local h2 = true
+    local sp = true
+    local st = true
+    local fxCol = Color3.fromRGB(255, 0, 255)
+    local atch = nil
+    local emitters = {}
 
-    local function ensureFolders()
+    local function dirs()
         if not isfolder("newvape") then makefolder("newvape") end
         if not isfolder("newvape/assets") then makefolder("newvape/assets") end
     end
 
-    local function col2tbl(c)
-        return {r = c.R, g = c.G, b = c.B}
-    end
-
-    local function tbl2col(t)
-        if type(t) == "table" and t.r and t.g and t.b then
-            return Color3.new(t.r, t.g, t.b)
-        end
+    local function c2t(c) return {r=c.R, g=c.G, b=c.B} end
+    local function t2c(t)
+        if type(t)=="table" and t.r and t.g and t.b then return Color3.new(t.r,t.g,t.b) end
         return Color3.new(1,1,1)
     end
 
     local function save()
-        ensureFolders()
-        local data = {
-            material = selMat,
-            color = col2tbl(selCol),
-            transparency = selTrans,
-            removeArms = removeArms,
-            effectsEnabled = effectsEnabled,
-            hw1Enabled = hw1Enabled,
-            hw2Enabled = hw2Enabled,
-            sparksEnabled = sparksEnabled,
-            starEnabled = starEnabled,
-            particleColor = col2tbl(particleColor)
-        }
-        pcall(function() writefile(cfgPath, http:JSONEncode(data)) end)
+        dirs()
+        pcall(function() writefile(cfg, http:JSONEncode({
+            material=mat, color=c2t(col), transparency=trans,
+            removeArms=hideArms, fx=fx, h1=h1, h2=h2, sp=sp, st=st, fxCol=c2t(fxCol)
+        })) end)
     end
 
     local function load()
-        ensureFolders()
-        if not isfile(cfgPath) then return end
-        local ok, raw = pcall(function() return readfile(cfgPath) end)
+        dirs()
+        if not isfile(cfg) then return end
+        local ok, raw = pcall(function() return readfile(cfg) end)
         if not ok then return end
-        local data = http:JSONDecode(raw)
-        if data then
-            if data.material then selMat = data.material end
-            if data.color then selCol = tbl2col(data.color) end
-            if data.transparency then selTrans = data.transparency end
-            if data.removeArms ~= nil then removeArms = data.removeArms end
-            if data.effectsEnabled ~= nil then effectsEnabled = data.effectsEnabled end
-            if data.hw1Enabled ~= nil then hw1Enabled = data.hw1Enabled end
-            if data.hw2Enabled ~= nil then hw2Enabled = data.hw2Enabled end
-            if data.sparksEnabled ~= nil then sparksEnabled = data.sparksEnabled end
-            if data.starEnabled ~= nil then starEnabled = data.starEnabled end
-            if data.particleColor then particleColor = tbl2col(data.particleColor) end
+        local d = http:JSONDecode(raw)
+        if d then
+            if d.material then mat=d.material end
+            if d.color then col=t2c(d.color) end
+            if d.transparency then trans=d.transparency end
+            if d.removeArms~=nil then hideArms=d.removeArms end
+            if d.fx~=nil then fx=d.fx end
+            if d.h1~=nil then h1=d.h1 end
+            if d.h2~=nil then h2=d.h2 end
+            if d.sp~=nil then sp=d.sp end
+            if d.st~=nil then st=d.st end
+            if d.fxCol then fxCol=t2c(d.fxCol) end
         end
     end
 
     local function cacheOrig()
-        local char = me.Character
-        if not char then return end
+        local c = me.Character
+        if not c then return end
         table.clear(orig)
-        for _, pname in ipairs(bodyParts) do
-            local p = char:FindFirstChild(pname)
-            if p and p:IsA("BasePart") then
-                orig[pname] = {
-                    material = p.Material,
-                    color = p.Color,
-                    transparency = p.Transparency
-                }
+        for _, p in ipairs(parts) do
+            local v = c:FindFirstChild(p)
+            if v and v:IsA("BasePart") then
+                orig[p] = {material=v.Material, color=v.Color, transparency=v.Transparency}
             end
         end
     end
 
-    local function applyPart(pname)
-        local part = me.Character and me.Character:FindFirstChild(pname)
-        if not part or not part:IsA("BasePart") then return end
+    local function applyPart(p)
+        local v = me.Character and me.Character:FindFirstChild(p)
+        if not v or not v:IsA("BasePart") then return end
         pcall(function()
-            part.Material = Enum.Material[selMat] or Enum.Material.Plastic
-            part.Color = selCol
-            part.Transparency = selTrans
+            v.Material = Enum.Material[mat] or Enum.Material.Plastic
+            v.Color = col
+            v.Transparency = trans
         end)
     end
 
-    local function restorePart(pname)
-        local part = me.Character and me.Character:FindFirstChild(pname)
-        if not part or not part:IsA("BasePart") then return end
-        local o = orig[pname]
+    local function restorePart(p)
+        local v = me.Character and me.Character:FindFirstChild(p)
+        if not v or not v:IsA("BasePart") then return end
+        local o = orig[p]
         pcall(function()
-            if o then
-                part.Material = o.material
-                part.Color = o.color
-                part.Transparency = o.transparency
-            else
-                part.Material = Enum.Material.Plastic
-                part.Color = Color3.new(1,1,1)
-                part.Transparency = 0
-            end
+            if o then v.Material, v.Color, v.Transparency = o.material, o.color, o.transparency
+            else v.Material, v.Color, v.Transparency = Enum.Material.Plastic, Color3.new(1,1,1), 0 end
         end)
     end
 
-    local function applyAll()
-        for _, pname in ipairs(bodyParts) do
-            applyPart(pname)
-        end
-    end
+    local function applyAll() for _, p in ipairs(parts) do applyPart(p) end end
+    local function restoreAll() if me.Character then for _, p in ipairs(parts) do restorePart(p) end end end
 
-    local function restoreAll()
-        if not me.Character then return end
-        for _, pname in ipairs(bodyParts) do
-            restorePart(pname)
-        end
-    end
+    local function makeParticles()
+        if not atch then return end
+        local c = fxCol
 
-    local function createParticleEmitters()
-        if not Attachment then return end
+        local e1 = Instance.new("ParticleEmitter")
+        e1.Name="HW1"; e1.Lifetime=NumberRange.new(1.5,1.5); e1.SpreadAngle=Vector2.new(10,-10); e1.LockedToPart=true
+        e1.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.17,0.7),NumberSequenceKeypoint.new(0.22,0.03),NumberSequenceKeypoint.new(0.28,0),NumberSequenceKeypoint.new(0.7,0),NumberSequenceKeypoint.new(0.83,0.91),NumberSequenceKeypoint.new(1,1)})
+        e1.LightEmission=0.4; e1.Color=ColorSequence.new(c); e1.VelocitySpread=10; e1.Speed=NumberRange.new(3,6); e1.Brightness=10
+        e1.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,3.06),NumberSequenceKeypoint.new(0.64,2),NumberSequenceKeypoint.new(1,0.75)})
+        e1.Rate=20; e1.Texture="rbxassetid://8047533775"; e1.RotSpeed=NumberRange.new(200,400); e1.Rotation=NumberRange.new(-180,180)
+        e1.Orientation=Enum.ParticleOrientation.VelocityPerpendicular; e1.Enabled=fx and h1; e1.Parent=atch; emitters["h1"]=e1
 
-        local hw1 = Instance.new("ParticleEmitter")
-        hw1.Name = "Healing Wave 1"
-        hw1.Lifetime = NumberRange.new(1.5, 1.5)
-        hw1.SpreadAngle = Vector2.new(10, -10)
-        hw1.LockedToPart = true
-        hw1.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.1702454, 0.7), NumberSequenceKeypoint.new(0.2254601, 0.03125), NumberSequenceKeypoint.new(0.2852761, 0), NumberSequenceKeypoint.new(0.702454, 0), NumberSequenceKeypoint.new(0.8374233, 0.9125), NumberSequenceKeypoint.new(1, 1)})
-        hw1.LightEmission = 0.4
-        hw1.Color = ColorSequence.new(particleColor)
-        hw1.VelocitySpread = 10
-        hw1.Speed = NumberRange.new(3, 6)
-        hw1.Brightness = 10
-        hw1.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 3.06), NumberSequenceKeypoint.new(0.64, 2), NumberSequenceKeypoint.new(1, 0.75)})
-        hw1.Rate = 20
-        hw1.Texture = "rbxassetid://8047533775"
-        hw1.RotSpeed = NumberRange.new(200, 400)
-        hw1.Rotation = NumberRange.new(-180, 180)
-        hw1.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
-        hw1.Enabled = effectsEnabled and hw1Enabled
-        hw1.Parent = Attachment
-        particleEmitters["hw1"] = hw1
+        local e2 = Instance.new("ParticleEmitter")
+        e2.Name="HW2"; e2.Lifetime=NumberRange.new(1.5,1.5); e2.SpreadAngle=Vector2.new(10,-10); e2.LockedToPart=true
+        e2.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(0.22,0.03),NumberSequenceKeypoint.new(0.62,0.25),NumberSequenceKeypoint.new(0.83,0.91),NumberSequenceKeypoint.new(1,1)})
+        e2.LightEmission=1; e2.Color=ColorSequence.new(c); e2.VelocitySpread=10; e2.Speed=NumberRange.new(3,5); e2.Brightness=10
+        e2.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,3.12),NumberSequenceKeypoint.new(0.41,1.37),NumberSequenceKeypoint.new(1,0.93)})
+        e2.Rate=20; e2.Texture="rbxassetid://8047796070"; e2.RotSpeed=NumberRange.new(100,300); e2.Rotation=NumberRange.new(-180,180)
+        e2.Orientation=Enum.ParticleOrientation.VelocityPerpendicular; e2.Enabled=fx and h2; e2.Parent=atch; emitters["h2"]=e2
 
-        local hw2 = Instance.new("ParticleEmitter")
-        hw2.Name = "Healing Wave 2"
-        hw2.Lifetime = NumberRange.new(1.5, 1.5)
-        hw2.SpreadAngle = Vector2.new(10, -10)
-        hw2.LockedToPart = true
-        hw2.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2254601, 0.03125), NumberSequenceKeypoint.new(0.6288344, 0.25625), NumberSequenceKeypoint.new(0.8374233, 0.9125), NumberSequenceKeypoint.new(1, 1)})
-        hw2.LightEmission = 1
-        hw2.Color = ColorSequence.new(particleColor)
-        hw2.VelocitySpread = 10
-        hw2.Speed = NumberRange.new(3, 5)
-        hw2.Brightness = 10
-        hw2.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 3.125), NumberSequenceKeypoint.new(0.416, 1.375), NumberSequenceKeypoint.new(1, 0.9375)})
-        hw2.Rate = 20
-        hw2.Texture = "rbxassetid://8047796070"
-        hw2.RotSpeed = NumberRange.new(100, 300)
-        hw2.Rotation = NumberRange.new(-180, 180)
-        hw2.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
-        hw2.Enabled = effectsEnabled and hw2Enabled
-        hw2.Parent = Attachment
-        particleEmitters["hw2"] = hw2
+        local e3 = Instance.new("ParticleEmitter")
+        e3.Name="SP"; e3.Lifetime=NumberRange.new(0.5,2); e3.SpreadAngle=Vector2.new(180,-180); e3.LightEmission=1; e3.Color=ColorSequence.new(c)
+        e3.Drag=3; e3.VelocitySpread=180; e3.Speed=NumberRange.new(5,15); e3.Brightness=10
+        e3.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.14,0.43),NumberSequenceKeypoint.new(1,0)})
+        e3.Acceleration=Vector3.new(0,3,0); e3.ZOffset=-1; e3.Rate=40; e3.Texture="rbxassetid://8611887361"
+        e3.RotSpeed=NumberRange.new(-30,30); e3.Orientation=Enum.ParticleOrientation.VelocityParallel; e3.Enabled=fx and sp; e3.Parent=atch; emitters["sp"]=e3
 
-        local sparks = Instance.new("ParticleEmitter")
-        sparks.Name = "Sparks"
-        sparks.Lifetime = NumberRange.new(0.5, 2)
-        sparks.SpreadAngle = Vector2.new(180, -180)
-        sparks.LightEmission = 1
-        sparks.Color = ColorSequence.new(particleColor)
-        sparks.Drag = 3
-        sparks.VelocitySpread = 180
-        sparks.Speed = NumberRange.new(5, 15)
-        sparks.Brightness = 10
-        sparks.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.146, 0.437), NumberSequenceKeypoint.new(1, 0)})
-        sparks.Acceleration = Vector3.new(0, 3, 0)
-        sparks.ZOffset = -1
-        sparks.Rate = 40
-        sparks.Texture = "rbxassetid://8611887361"
-        sparks.RotSpeed = NumberRange.new(-30, 30)
-        sparks.Orientation = Enum.ParticleOrientation.VelocityParallel
-        sparks.Enabled = effectsEnabled and sparksEnabled
-        sparks.Parent = Attachment
-        particleEmitters["sparks"] = sparks
-
-        local star = Instance.new("ParticleEmitter")
-        star.Name = "Star Sparks"
-        star.Lifetime = NumberRange.new(1.5, 1.5)
-        star.SpreadAngle = Vector2.new(180, -180)
-        star.LightEmission = 1
-        star.Color = ColorSequence.new(particleColor)
-        star.Drag = 3
-        star.VelocitySpread = 180
-        star.Speed = NumberRange.new(5, 10)
-        star.Brightness = 10
-        star.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.149, 0.687), NumberSequenceKeypoint.new(1, 0)})
-        star.Acceleration = Vector3.new(0, 3, 0)
-        star.ZOffset = 2
-        star.Texture = "rbxassetid://8611887703"
-        star.RotSpeed = NumberRange.new(-30, 30)
-        star.Rotation = NumberRange.new(-30, 30)
-        star.Enabled = effectsEnabled and starEnabled
-        star.Parent = Attachment
-        particleEmitters["star"] = star
+        local e4 = Instance.new("ParticleEmitter")
+        e4.Name="ST"; e4.Lifetime=NumberRange.new(1.5,1.5); e4.SpreadAngle=Vector2.new(180,-180); e4.LightEmission=1; e4.Color=ColorSequence.new(c)
+        e4.Drag=3; e4.VelocitySpread=180; e4.Speed=NumberRange.new(5,10); e4.Brightness=10
+        e4.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(0.14,0.68),NumberSequenceKeypoint.new(1,0)})
+        e4.Acceleration=Vector3.new(0,3,0); e4.ZOffset=2; e4.Texture="rbxassetid://8611887703"
+        e4.RotSpeed=NumberRange.new(-30,30); e4.Rotation=NumberRange.new(-30,30); e4.Enabled=fx and st; e4.Parent=atch; emitters["st"]=e4
     end
 
     local function setupParticles()
-        local char = me.Character
-        if not char then return end
-        local lowerTorso = char:FindFirstChild("LowerTorso")
-        if not lowerTorso then return end
+        local c = me.Character; if not c then return end
+        local t = c:FindFirstChild("LowerTorso"); if not t then return end
+        if not atch then atch=Instance.new("Attachment"); atch.Parent=t end
+        if #emitters==0 then makeParticles() end
+    end
 
-        if not Attachment then
-            Attachment = Instance.new("Attachment")
-            Attachment.Parent = lowerTorso
-        end
+    local function updateParticles()
+        if emitters["h1"] then emitters["h1"].Enabled=fx and h1 end
+        if emitters["h2"] then emitters["h2"].Enabled=fx and h2 end
+        if emitters["sp"] then emitters["sp"].Enabled=fx and sp end
+        if emitters["st"] then emitters["st"].Enabled=fx and st end
+        for _,e in pairs(emitters) do e.Color=ColorSequence.new(fxCol) end
+    end
 
-        if #particleEmitters == 0 then
-            createParticleEmitters()
+    local function clearParticles()
+        for _,e in pairs(emitters) do pcall(function() e:Destroy() end) end
+        table.clear(emitters)
+        if atch then pcall(function() atch:Destroy() end); atch=nil end
+    end
+
+    local function findVM()
+        local m={}; local v=workspace:FindFirstChild("ViewModels")
+        if not v then return m end; local f=v:FindFirstChild("FirstPerson")
+        if not f then return m end
+        for _,x in ipairs(f:GetChildren()) do
+            if x:IsA("Model") and x.Name:find(me.Name,1,true) then table.insert(m,x) end
+        end; return m
+    end
+
+    local function applyArm(a)
+        if not a or not a:IsA("BasePart") then return end
+        local n=a.Name; if n~="LeftArm" and n~="RightArm" then return end
+        for _,c in ipairs(a:GetChildren()) do pcall(function() c:Destroy() end) end
+        if hideArms then
+            if not removed[a] then removed[a]={part=a,parent=a.Parent} end
+            pcall(function() a.Parent=nil end)
+        else
+            pcall(function() a.Material=Enum.Material[mat] or Enum.Material.Plastic; a.Color=col; a.Transparency=trans end)
         end
     end
 
-    local function updateParticleState()
-        if particleEmitters["hw1"] then particleEmitters["hw1"].Enabled = effectsEnabled and hw1Enabled end
-        if particleEmitters["hw2"] then particleEmitters["hw2"].Enabled = effectsEnabled and hw2Enabled end
-        if particleEmitters["sparks"] then particleEmitters["sparks"].Enabled = effectsEnabled and sparksEnabled end
-        if particleEmitters["star"] then particleEmitters["star"].Enabled = effectsEnabled and starEnabled end
-        for _, emitter in pairs(particleEmitters) do
-            emitter.Color = ColorSequence.new(particleColor)
-        end
+    local function processArms()
+        for _,m in ipairs(findVM()) do applyArm(m:FindFirstChild("LeftArm")); applyArm(m:FindFirstChild("RightArm")) end
     end
 
-    local function removeParticles()
-        for _, emitter in pairs(particleEmitters) do
-            pcall(function() emitter:Destroy() end)
-        end
-        table.clear(particleEmitters)
-        if Attachment then
-            pcall(function() Attachment:Destroy() end)
-            Attachment = nil
-        end
+    local function restoreArms()
+        for a,d in pairs(removed) do
+            if not a then continue end
+            pcall(function() if d and d.parent then a.Parent=d.parent; applyArm(a) elseif a then a:Destroy() end end)
+        end; table.clear(removed)
     end
 
-    local function findViewModelModels()
-        local models = {}
-        local viewModels = workspace:FindFirstChild("ViewModels")
-        if not viewModels then return models end
-        local firstPerson = viewModels:FindFirstChild("FirstPerson")
-        if not firstPerson then return models end
-        local myName = me.Name
-        for _, model in ipairs(firstPerson:GetChildren()) do
-            if not model:IsA("Model") then continue end
-            if model.Name:find(myName, 1, true) then
-                table.insert(models, model)
-            end
-        end
-        return models
+    local function startArms()
+        if vmLoop then vmLoop:Disconnect() end; processArms()
+        vmLoop=runService.Heartbeat:Connect(processArms)
     end
 
-    local function clearArmChildren(arm)
-        if not arm or not arm:IsA("BasePart") then return end
-        for _, child in ipairs(arm:GetChildren()) do
-            pcall(function() child:Destroy() end)
-        end
-    end
-
-    local function applyArmVisuals(arm)
-        if not arm or not arm:IsA("BasePart") then return end
-        pcall(function()
-            arm.Material = Enum.Material[selMat] or Enum.Material.Plastic
-            arm.Color = selCol
-            arm.Transparency = selTrans
-        end)
-    end
-
-    local function processViewModelArms()
-        local models = findViewModelModels()
-        for _, model in ipairs(models) do
-            local leftArm = model:FindFirstChild("LeftArm")
-            local rightArm = model:FindFirstChild("RightArm")
-            if leftArm and leftArm:IsA("BasePart") then
-                clearArmChildren(leftArm)
-                if removeArms then
-                    if not removedArms[leftArm] then
-                        removedArms[leftArm] = {part = leftArm, parent = leftArm.Parent}
-                    end
-                    pcall(function() leftArm.Parent = nil end)
-                else
-                    applyArmVisuals(leftArm)
-                end
-            end
-            if rightArm and rightArm:IsA("BasePart") then
-                clearArmChildren(rightArm)
-                if removeArms then
-                    if not removedArms[rightArm] then
-                        removedArms[rightArm] = {part = rightArm, parent = rightArm.Parent}
-                    end
-                    pcall(function() rightArm.Parent = nil end)
-                else
-                    applyArmVisuals(rightArm)
-                end
-            end
-        end
-    end
-
-    local function restoreViewModelArms()
-        for arm, data in pairs(removedArms) do
-            if not arm then continue end
-            pcall(function()
-                if data and data.parent then
-                    arm.Parent = data.parent
-                    clearArmChildren(arm)
-                    applyArmVisuals(arm)
-                elseif arm then
-                    arm:Destroy()
-                end
-            end)
-        end
-        table.clear(removedArms)
-    end
-
-    local function startArmProcessing()
-        if viewModelLoop then viewModelLoop:Disconnect() end
-        processViewModelArms()
-        viewModelLoop = runService.Heartbeat:Connect(function()
-            processViewModelArms()
-        end)
-    end
-
-    me.CharacterAdded:Connect(function(char)
-        task.wait(0.2)
-        table.clear(orig)
-        table.clear(removedArms)
-        cacheOrig()
-        applyAll()
-        startArmProcessing()
-        removeParticles()
-        if effectsEnabled then
-            setupParticles()
-        end
+    me.CharacterAdded:Connect(function()
+        task.wait(0.2); table.clear(orig); table.clear(removed); cacheOrig(); applyAll(); startArms(); clearParticles()
+        if fx then setupParticles() end
     end)
 
-    if me.Character then
-        cacheOrig()
-    end
+    if me.Character then cacheOrig() end
 
     local SelfVisuals = vape.Categories.Render:CreateModule({
         Name = "Self Visuals",
         Function = function(on)
-            if on then
-                cacheOrig()
-                applyAll()
-                startArmProcessing()
-                if effectsEnabled then setupParticles() end
-            else
-                restoreAll()
-                restoreViewModelArms()
-                if viewModelLoop then
-                    viewModelLoop:Disconnect()
-                    viewModelLoop = nil
-                end
-                removeParticles()
-            end
+            if on then cacheOrig(); applyAll(); startArms(); if fx then setupParticles() end
+            else restoreAll(); restoreArms(); if vmLoop then vmLoop:Disconnect(); vmLoop=nil end; clearParticles() end
         end,
-        Tooltip = "Custom materials"
+        Tooltip = "Custom materials & colors"
     })
 
-    SelfVisuals:CreateDropdown({
-        Name = "Material",
-        List = materials,
-        Default = "Plastic",
-        Function = function(v)
-            selMat = v
-            applyAll()
-            processViewModelArms()
-            save()
-        end
-    })
+    SelfVisuals:CreateDropdown({Name="Material",List=mats,Default="Plastic",Function=function(v) mat=v; applyAll(); processArms(); save() end})
+    SelfVisuals:CreateColorSlider({Name="Color",Function=function(h,s,v) col=Color3.fromHSV(h,s,v); applyAll(); processArms(); save() end})
+    SelfVisuals:CreateSlider({Name="Transparency",Min=0,Max=1,Default=0,Decimal=100,Function=function(v) trans=v; applyAll(); processArms(); save() end})
+    SelfVisuals:CreateToggle({Name="Hide Arms",Default=false,Function=function(v) hideArms=v; if v then processArms() else restoreArms(); startArms() end; save() end})
 
-    SelfVisuals:CreateColorSlider({
-        Name = "Color",
-        Function = function(h, s, v)
-            selCol = Color3.fromHSV(h, s, v)
-            applyAll()
-            processViewModelArms()
-            save()
-        end
-    })
+    local fxToggle = SelfVisuals:CreateToggle({Name="Effects",Default=false,Function=function(v)
+        fx=v
+        if H1 then H1.Object.Visible=v end; if H2 then H2.Object.Visible=v end
+        if SP then SP.Object.Visible=v end; if ST then ST.Object.Visible=v end
+        if FC then FC.Object.Visible=v end
+        if v then setupParticles(); updateParticles() else clearParticles() end; save()
+    end})
 
-    SelfVisuals:CreateSlider({
-        Name = "Transparency",
-        Min = 0, Max = 1, Default = 0, Decimal = 100,
-        Function = function(v)
-            selTrans = v
-            applyAll()
-            processViewModelArms()
-            save()
-        end
-    })
-
-    SelfVisuals:CreateToggle({
-        Name = "Remove Arms",
-        Default = false,
-        Function = function(v)
-            removeArms = v
-            if v then
-                processViewModelArms()
-            else
-                restoreViewModelArms()
-                startArmProcessing()
-            end
-            save()
-        end,
-        Tooltip = "removes viewmodel arms"
-    })
-
-    local EffectsToggle = SelfVisuals:CreateToggle({
-        Name = "Effects",
-        Default = false,
-        Function = function(v)
-            effectsEnabled = v
-            if v then
-                setupParticles()
-                updateParticleState()
-            else
-                removeParticles()
-            end
-            save()
-        end,
-        Tooltip = "Enables effects"
-    })
-
-    local Hw1Toggle = SelfVisuals:CreateToggle({
-        Name = "Healing Wave 1",
-        Default = true,
-        Visible = false,
-        Function = function(v)
-            hw1Enabled = v
-            updateParticleState()
-            save()
-        end
-    })
-    local Hw2Toggle = SelfVisuals:CreateToggle({
-        Name = "Healing Wave 2",
-        Default = true,
-        Visible = false,
-        Function = function(v)
-            hw2Enabled = v
-            updateParticleState()
-            save()
-        end
-    })
-    local SparksToggle = SelfVisuals:CreateToggle({
-        Name = "Sparks",
-        Default = true,
-        Visible = false,
-        Function = function(v)
-            sparksEnabled = v
-            updateParticleState()
-            save()
-        end
-    })
-    local StarToggle = SelfVisuals:CreateToggle({
-        Name = "Star Sparks",
-        Default = true,
-        Visible = false,
-        Function = function(v)
-            starEnabled = v
-            updateParticleState()
-            save()
-        end
-    })
-
-    EffectsToggle.Function = function(v)
-        effectsEnabled = v
-        Hw1Toggle.Object.Visible = v
-        Hw2Toggle.Object.Visible = v
-        SparksToggle.Object.Visible = v
-        StarToggle.Object.Visible = v
-        if v then
-            setupParticles()
-            updateParticleState()
-        else
-            removeParticles()
-        end
-        save()
-    end
-
-    local ParticleColorSlider = SelfVisuals:CreateColorSlider({
-        Name = "Effect Color",
-        DefaultHue = 0.8,
-        Visible = false,
-        Function = function(h, s, v)
-            particleColor = Color3.fromHSV(h, s, v)
-            updateParticleState()
-            save()
-        end
-    })
-
-    local oldEffectsFunc = EffectsToggle.Function
-    EffectsToggle.Function = function(v)
-        effectsEnabled = v
-        Hw1Toggle.Object.Visible = v
-        Hw2Toggle.Object.Visible = v
-        SparksToggle.Object.Visible = v
-        StarToggle.Object.Visible = v
-        ParticleColorSlider.Object.Visible = v
-        if v then
-            setupParticles()
-            updateParticleState()
-        else
-            removeParticles()
-        end
-        save()
-    end
+    local H1 = SelfVisuals:CreateToggle({Name="Wave 1",Default=true,Visible=false,Function=function(v) h1=v; updateParticles(); save() end})
+    local H2 = SelfVisuals:CreateToggle({Name="Wave 2",Default=true,Visible=false,Function=function(v) h2=v; updateParticles(); save() end})
+    local SP = SelfVisuals:CreateToggle({Name="Sparks",Default=true,Visible=false,Function=function(v) sp=v; updateParticles(); save() end})
+    local ST = SelfVisuals:CreateToggle({Name="Stars",Default=true,Visible=false,Function=function(v) st=v; updateParticles(); save() end})
+    local FC = SelfVisuals:CreateColorSlider({Name="FX Color",DefaultHue=0.8,Visible=false,Function=function(h,s,v) fxCol=Color3.fromHSV(h,s,v); updateParticles(); save() end})
 
     load()
-    if effectsEnabled then
-        Hw1Toggle.Object.Visible = true
-        Hw2Toggle.Object.Visible = true
-        SparksToggle.Object.Visible = true
-        StarToggle.Object.Visible = true
-        ParticleColorSlider.Object.Visible = true
+    if fx then
+        if H1 then H1.Object.Visible=true end; if H2 then H2.Object.Visible=true end
+        if SP then SP.Object.Visible=true end; if ST then ST.Object.Visible=true end
+        if FC then FC.Object.Visible=true end
     end
-
-    if me.Character then
-        applyAll()
-        if effectsEnabled then setupParticles() end
-    end
-    startArmProcessing()
+    if me.Character then applyAll(); if fx then setupParticles() end end
+    startArms()
 
     vape:Clean(function()
-        restoreAll()
-        restoreViewModelArms()
-        removeParticles()
-        if viewModelLoop then
-            viewModelLoop:Disconnect()
-            viewModelLoop = nil
-        end
+        restoreAll(); restoreArms(); clearParticles()
+        if vmLoop then vmLoop:Disconnect(); vmLoop=nil end
     end)
 end)
                                                                                                                                             
