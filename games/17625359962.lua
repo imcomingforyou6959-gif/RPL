@@ -2117,7 +2117,14 @@ run(function()
     local fighterController = nil
     local gameReady = false
     local modulesLoaded = false
+    local ray_params = RaycastParams.new()
     local wallbangEnabled = true
+
+    local offsets = {
+        Vector3.new(0, 12, 0), Vector3.new(0, 16, 0), Vector3.new(0, 20, 0),
+        Vector3.new(0, 24, 0), Vector3.new(0, 28, 0), Vector3.new(0, 32, 0),
+        Vector3.new(0, 36, 0), Vector3.new(0, 40, 0)
+    }
 
     local function isGameActive()
         local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
@@ -2148,18 +2155,14 @@ run(function()
         return false
     end
 
-    local function getClosestEnemy()
-        if not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then return nil end
+    local function get_closest()
+        if not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then return nil, nil end
+        local target, char = nil, nil
+        local dist = math.huge
         local myRoot = lplr.Character.HumanoidRootPart
-        local closest = nil
-        local minDist = math.huge
 
         for _, v in next, players:GetPlayers() do
             if v == lplr then continue end
-            if not v.Character or not v.Character:FindFirstChild("Head") then continue end
-            local hum = v.Character:FindFirstChildOfClass("Humanoid")
-            if not hum or hum.Health <= 0 then continue end
-
             local myEnv = lplr:GetAttribute("EnvironmentID")
             local myTeam = lplr:GetAttribute("TeamID")
             local targetEnv = v:GetAttribute("EnvironmentID")
@@ -2169,14 +2172,45 @@ run(function()
                     continue
                 end
             end
-
-            local dist = (myRoot.Position - v.Character.Head.Position).Magnitude
-            if dist < minDist then
-                minDist = dist
-                closest = v.Character
+            if not v.Character or not v.Character:FindFirstChild("Head") then continue end
+            local hum = v.Character:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then continue end
+            local mag = (myRoot.Position - v.Character.Head.Position).Magnitude
+            if mag < dist then
+                dist = mag
+                target = v.Character.Head
+                char = v.Character
             end
         end
-        return closest
+        return target, char
+    end
+
+    local function calculate_point(origin, target_pos, target_char)
+        local ignoreList = {lplr.Character}
+        if target_char then table.insert(ignoreList, target_char) end
+        ray_params.FilterDescendantsInstances = ignoreList
+        ray_params.FilterType = Enum.RaycastFilterType.Exclude
+
+        local ray = workspace:Raycast(origin, target_pos - origin, ray_params)
+        if not ray then
+            return origin, nil
+        end
+
+        if not wallbangEnabled then return nil, nil end
+
+        local hitPos = ray.Position + ray.Normal * 0.05
+        for _, offset in next, offsets do
+            local scan_pos = hitPos + offset
+            local scan_dir = target_pos - scan_pos
+            if scan_dir.Magnitude > 0 then
+                local scan_ray = workspace:Raycast(scan_pos, scan_dir, ray_params)
+                if not scan_ray then
+                    return scan_pos, offset.Y
+                end
+            end
+        end
+
+        return nil, nil
     end
 
     task.spawn(function()
@@ -2196,51 +2230,45 @@ run(function()
 
         pcall(function()
             if not lplr.Character then return end
-
             local item = nil
             if fighterController and fighterController.LocalFighter then
                 item = fighterController.LocalFighter.EquippedItem
             end
             if not item then return end
 
-            local targetChar = getClosestEnemy()
-            if not targetChar then return end
-
-            local targetPart = targetChar:FindFirstChild("Head") or targetChar:FindFirstChild("HumanoidRootPart")
-            if not targetPart then return end
+            local target_part, target_char = get_closest()
+            if not target_part or not target_char then return end
 
             local cam = workspace.CurrentCamera.CFrame
-            local camPos = cam.Position
-            local targetPos = targetPart.Position
+            local manip, height = calculate_point(cam.Position, target_part.Position, target_char)
+            if not manip then return end
 
-            local originCF = CFrame.lookAt(camPos, targetPos)
-            local targetCF = CFrame.lookAt(targetPos, camPos)
-
+            local final_pos = Vector3.new(manip.X, manip.Y, manip.Z)
             local cameradata = {}
             cameradata[utf8.char(1)] = {
-                [utf8.char(0)] = util:EncodeCFrame(originCF),
-                [utf8.char(1)] = util:EncodeCFrame(targetCF),
-                [utf8.char(2)] = targetPart,
-                [utf8.char(3)] = util:EncodeCFrame(targetPart.CFrame:ToObjectSpace(CFrame.new(targetPart.Position)))
+                [utf8.char(0)] = util:EncodeCFrame(CFrame.new(final_pos) * CFrame.Angles(CFrame.lookAt(final_pos, target_part.Position):ToOrientation())),
+                [utf8.char(1)] = util:EncodeCFrame(CFrame.new(target_part.Position) * CFrame.Angles(CFrame.lookAt(final_pos, target_part.Position):ToOrientation())),
+                [utf8.char(2)] = target_part,
+                [utf8.char(3)] = util:EncodeCFrame(target_part.CFrame:ToObjectSpace(CFrame.new(target_part.Position)))
             }
 
             rs.Remotes.Replication.Fighter.UseItem:FireServer(item:Get("ObjectID"), enums:ToEnum("StartShooting"), cameradata, nil)
         end)
     end)
 
-    local manipulation = vape.Categories.Combat:CreateModule({
-        Name = "manipulation",
+    local SilentManip = vape.Categories.Combat:CreateModule({
+        Name = "Silent Manip",
         Function = function(callback) end,
-        Tooltip = "test"
+        Tooltip = "Silent aim using the UseItem remote"
     })
 
-    Manipulation:CreateToggle({
+    SilentManip:CreateToggle({
         Name = "Wallbang",
         Default = true,
         Function = function(v) wallbangEnabled = v end,
-        Tooltip = "Wallbang"
+        Tooltip = "Scan upward for clear shot when target is behind a wall"
     })
-end)                                                                                                                                                                                                       
+end)                                                                                                                                                                                 
                                                                                                                                                                 
 run(function()
     local camera = workspace.CurrentCamera
