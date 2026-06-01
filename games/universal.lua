@@ -3542,8 +3542,10 @@ run(function()
     local AntiAim
     local Mode
     local Direction
+    local Manual
     local renderConn
     local lastAngle = 0
+    local lockedAngle = nil
 
     local function getAngleOffset()
         local dir = Direction and Direction.Value or "Left"
@@ -3592,7 +3594,11 @@ run(function()
         local moveDir = humanoid.MoveDirection
         if moveDir.Magnitude < 0.1 then return end
 
-        lastAngle = getAngleOffset()
+        if Manual and Manual.Enabled and lockedAngle then
+            lastAngle = lockedAngle
+        else
+            lastAngle = getAngleOffset()
+        end
         root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
     end
 
@@ -3610,10 +3616,32 @@ run(function()
         humanoid.AutoRotate = false
     end
 
+    local function setupKeybinds()
+        AntiAim:Clean(inputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not AntiAim.Enabled then return end
+            if Mode.Value ~= "Sideways" then return end
+            if not Manual or not Manual.Enabled then return end
+
+            if input.KeyCode == Enum.KeyCode.Left then
+                lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) + math.rad(90)
+                notif('AntiAim', 'facing left', 1, 'info')
+            elseif input.KeyCode == Enum.KeyCode.Right then
+                lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) - math.rad(90)
+                notif('AntiAim', 'facing right', 1, 'info')
+            elseif input.KeyCode == Enum.KeyCode.Up then
+                lockedAngle = nil
+                notif('AntiAim', 'um', 2, 'info')
+            end
+        end))
+    end
+
     AntiAim = vape.Categories.Blatant:CreateModule({
         Name = 'AntiAim',
         Function = function(callback)
             if callback then
+                lockedAngle = nil
+                setupKeybinds()
                 renderConn = runService.RenderStepped:Connect(function()
                     local mode = Mode and Mode.Value or "Inverse"
                     if mode == "Inverse" then
@@ -3635,9 +3663,10 @@ run(function()
                 if entitylib.isAlive then
                     entitylib.character.Humanoid.AutoRotate = true
                 end
+                lockedAngle = nil
             end
         end,
-        Tooltip = 'others see u facing the wrong way'
+        Tooltip = 'huh'
     })
 
     Mode = AntiAim:CreateDropdown({
@@ -3648,6 +3677,12 @@ run(function()
             if Direction then
                 Direction.Object.Visible = (val == "Sideways")
             end
+            if Manual then
+                Manual.Object.Visible = (val == "Sideways")
+            end
+            if val ~= "Sideways" then
+                lockedAngle = nil
+            end
         end
     })
 
@@ -3657,6 +3692,16 @@ run(function()
         Default = 'Left',
         Visible = false,
         Function = function() end
+    })
+
+    Manual = AntiAim:CreateToggle({
+        Name = 'Manual',
+        Default = false,
+        Visible = false,
+        Function = function(v)
+            if not v then lockedAngle = nil end
+        end,
+        Tooltip = 'Use arrow keys'
     })
 end)
 	
