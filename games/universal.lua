@@ -3573,7 +3573,7 @@ run(function()
         root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
     end
 
-        local function applyBackwards()
+    local function applyBackwards()
         if not entitylib.isAlive then return end
         local root = entitylib.character.RootPart
         local moveDir = entitylib.character.Humanoid.MoveDirection
@@ -3622,10 +3622,10 @@ run(function()
 
             if input.KeyCode == Enum.KeyCode.Up then
                 lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) + math.rad(90)
-                notif('AntiAim', 'facing left', 2, 'info')
+                notif('AntiAim', 'Locked facing left', 2, 'info')
             elseif input.KeyCode == Enum.KeyCode.Down then
                 lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) - math.rad(90)
-                notif('AntiAim', 'facing right', 2, 'info')
+                notif('AntiAim', 'Locked facing right', 2, 'info')
             end
         end))
     end
@@ -3660,7 +3660,7 @@ run(function()
                 lockedAngle = nil
             end
         end,
-        Tooltip = 'hmmm'
+        Tooltip = 'Fake movement direction'
     })
 
     Mode = AntiAim:CreateDropdown({
