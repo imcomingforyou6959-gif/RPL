@@ -2111,29 +2111,63 @@ run(function()
     local workspace = cloneref(game:GetService("Workspace"))
     local runservice = cloneref(game:GetService("RunService"))
     local lplr = players.LocalPlayer
-    local util = require(rs.Modules.Utility)
+
+    -- Cache modules at startup (wait for game first)
+    local util = nil
+    local enums = nil
+    local fighterController = nil
+
+    -- Game-ready check
+    local function isGameActive()
+        local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
+        if mainGui then
+            local mainFrame = mainGui:FindFirstChild("MainFrame")
+            if mainFrame then
+                local lobby = mainFrame:FindFirstChild("Lobby")
+                if lobby then
+                    local currency = lobby:FindFirstChild("Currency")
+                    return currency and currency.Visible == false
+                end
+            end
+        end
+        return false
+    end
+
+    -- Wait for game to fully load
+    local gameReady = false
+    task.spawn(function()
+        repeat task.wait(0.5) until isGameActive() and lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart")
+        gameReady = true
+    end)
+
+    -- Load modules after game is ready
+    pcall(function() util = require(rs.Modules.Utility) end)
+    pcall(function() enums = require(rs.Modules.EnumLibrary) end)
+    pcall(function() fighterController = require(lplr.PlayerScripts.Controllers.FighterController) end)
+
+    if not util or not enums or not fighterController then
+        notif('Silent Manip', 'Failed to load required modules', 3, 'alert')
+        return
+    end
+
+    if enums.WaitForEnumBuilder then
+        enums:WaitForEnumBuilder()
+    end
+
     local ray_params = RaycastParams.new()
 
     local offsets = {
-        Vector3.new(0, 12, 0),
-        Vector3.new(0, 16, 0),
-        Vector3.new(0, 20, 0),
-        Vector3.new(0, 24, 0),
-        Vector3.new(0, 28, 0),
-        Vector3.new(0, 32, 0),
-        Vector3.new(0, 36, 0),
-        Vector3.new(0, 40, 0)
+        Vector3.new(0, 12, 0), Vector3.new(0, 16, 0), Vector3.new(0, 20, 0),
+        Vector3.new(0, 24, 0), Vector3.new(0, 28, 0), Vector3.new(0, 32, 0),
+        Vector3.new(0, 36, 0), Vector3.new(0, 40, 0)
     }
 
-    local manipulation = {}
     local wallbangEnabled = true
 
-    function manipulation.get_closest()
-        if not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then
-            return nil, nil
-        end
-
-        local target, char, dist = nil, nil, math.huge
+    local function get_closest()
+        if not lplr.Character or not lplr.Character:FindFirstChild("HumanoidRootPart") then return nil, nil end
+        local target, char = nil, nil
+        local dist = math.huge
         local myRoot = lplr.Character.HumanoidRootPart
 
         for _, v in next, players:GetPlayers() do
@@ -2161,61 +2195,49 @@ run(function()
                 char = v.Character
             end
         end
-
         return target, char
     end
 
-    function manipulation.calculate_point(origin, target_pos, target_char)
+    local function calculate_point(origin, target_pos, target_char)
         local ignoreList = {lplr.Character}
-        if target_char then
-            table.insert(ignoreList, target_char)
-        end
+        if target_char then table.insert(ignoreList, target_char) end
         ray_params.FilterDescendantsInstances = ignoreList
         ray_params.FilterType = Enum.RaycastFilterType.Exclude
 
-        if not workspace:Raycast(origin, target_pos - origin, ray_params) then
-            return origin, nil
-        end
-
-        if not wallbangEnabled then
-            return nil, nil
-        end
+        if not workspace:Raycast(origin, target_pos - origin, ray_params) then return origin, nil end
+        if not wallbangEnabled then return nil, nil end
 
         for _, offset in next, offsets do
             local scan_pos = origin + offset
-            if not workspace:Raycast(scan_pos, target_pos - scan_pos, ray_params) then
-                return scan_pos, offset.Y
-            end
+            if not workspace:Raycast(scan_pos, target_pos - scan_pos, ray_params) then return scan_pos, offset.Y end
         end
-
         return nil, nil
     end
 
+    local tickCounter = 0
     runservice.Heartbeat:Connect(function()
+        if not gameReady then return end
+        tickCounter = tickCounter + 1
+        if tickCounter % 2 ~= 0 then return end
+
         pcall(function()
             if not lplr.Character then return end
             local root = lplr.Character:FindFirstChild("HumanoidRootPart")
             if not root then return end
 
             local item = nil
-            pcall(function()
-                local fighter = require(lplr.PlayerScripts.Controllers.FighterController)
-                if fighter and fighter.LocalFighter then
-                    item = fighter.LocalFighter.EquippedItem
-                end
-            end)
+            if fighterController and fighterController.LocalFighter then
+                item = fighterController.LocalFighter.EquippedItem
+            end
             if not item then return end
 
-            local target_part, target_char = manipulation.get_closest()
+            local target_part, target_char = get_closest()
             if not target_part or not target_char then return end
 
             local cam = workspace.CurrentCamera.CFrame
-            local manip, height = manipulation.calculate_point(cam.Position, target_part.Position, target_char)
-
+            local manip, height = calculate_point(cam.Position, target_part.Position, target_char)
             if not manip then return end
 
-            local shoot_pos = cam.Position
-            local shoot_height = height or 0
             local final_pos = Vector3.new(manip.X, manip.Y, manip.Z)
 
             local cameradata = {}
@@ -2226,7 +2248,6 @@ run(function()
                 [utf8.char(3)] = util:EncodeCFrame(target_part.CFrame:ToObjectSpace(CFrame.new(target_part.Position)))
             }
 
-            local enums = require(rs.Modules.EnumLibrary)
             rs.Remotes.Replication.Fighter.UseItem:FireServer(item:Get("ObjectID"), enums:ToEnum("StartShooting"), cameradata, nil)
         end)
     end)
@@ -2234,16 +2255,16 @@ run(function()
     local SilentManip = vape.Categories.Combat:CreateModule({
         Name = "Silent Manip",
         Function = function(callback) end,
-        Tooltip = "Silent aim using the manipulator method"
+        Tooltip = "Silent"
     })
 
     SilentManip:CreateToggle({
         Name = "Wallbang",
         Default = true,
         Function = function(v) wallbangEnabled = v end,
-        Tooltip = "Scan upward for clear shot when target is behind a wall"
+        Tooltip = "Scan"
     })
-end)                                                                                                                                                                                                                                                
+end)                                                                                                                                                                                                                               
                                                                                                                                                                 
 run(function()
     local camera = workspace.CurrentCamera
