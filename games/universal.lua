@@ -3579,12 +3579,12 @@ run(function()
         local moveDir = entitylib.character.Humanoid.MoveDirection
         if moveDir.Magnitude < 0.1 then return end
 
-        local lookCF = CFrame.lookAt(root.Position, root.Position - moveDir)
-        local _, yaw, _ = lookCF:ToOrientation()
-        lastAngle = yaw
-        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+        local angle = math.atan2(-camForward.X, -camForward.Z)
+        lastAngle = angle
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, angle, 0)
     end
-
+	
     local function applySideways()
         if not entitylib.isAlive then return end
         local root = entitylib.character.RootPart
