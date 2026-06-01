@@ -3623,15 +3623,12 @@ run(function()
             if Mode.Value ~= "Sideways" then return end
             if not Manual or not Manual.Enabled then return end
 
-            if input.KeyCode == Enum.KeyCode.Left then
+            if input.KeyCode == Enum.KeyCode.Up then
                 lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) + math.rad(90)
-                notif('AntiAim', 'facing left', 1, 'info')
-            elseif input.KeyCode == Enum.KeyCode.Right then
+                notif('AntiAim', 'facing left', 2, 'info')
+            elseif input.KeyCode == Enum.KeyCode.Down then
                 lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) - math.rad(90)
-                notif('AntiAim', 'facing right', 1, 'info')
-            elseif input.KeyCode == Enum.KeyCode.Up then
-                lockedAngle = nil
-                notif('AntiAim', 'um', 2, 'info')
+                notif('AntiAim', 'facing right', 2, 'info')
             end
         end))
     end
@@ -3666,7 +3663,7 @@ run(function()
                 lockedAngle = nil
             end
         end,
-        Tooltip = 'huh'
+        Tooltip = 'self'
     })
 
     Mode = AntiAim:CreateDropdown({
@@ -3701,7 +3698,7 @@ run(function()
         Function = function(v)
             if not v then lockedAngle = nil end
         end,
-        Tooltip = 'Use arrow keys'
+        Tooltip = 'Use Up/Down arrow keys'
     })
 end)
 	
