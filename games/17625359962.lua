@@ -2726,8 +2726,8 @@ run(function()
 
     local recoilVal = 0
     local spreadVal = 0
-    local projSpeedVal = 99999
-    local shootCooldownVal = 0.001
+    local projSpeedVal = 99999999
+    local shootCooldownVal = 0
     local quickShotCooldownVal = 0
 
     local function tryApplyHook()
@@ -2757,21 +2757,11 @@ run(function()
             if type(data) == "table" then
                 local info = data.Info
                 if type(info) == "table" then
-                    if recoilVal ~= 0 then
-                        info.ShootRecoil = recoilVal
-                    end
-                    if spreadVal ~= 0 then
-                        info.ShootSpread = spreadVal
-                    end
-                    if projSpeedVal ~= 99999 then
-                        info.ProjectileSpeed = projSpeedVal
-                    end
-                    if shootCooldownVal ~= 0.001 then
-                        info.ShootCooldown = shootCooldownVal
-                    end
-                    if quickShotCooldownVal ~= 0 then
-                        info.QuickShotCooldown = quickShotCooldownVal
-                    end
+                    info.ShootRecoil = recoilVal
+                    info.ShootSpread = spreadVal
+                    info.ProjectileSpeed = projSpeedVal
+                    info.ShootCooldown = shootCooldownVal
+                    info.QuickShotCooldown = quickShotCooldownVal
                 end
             end
             return oldInput(...)
@@ -2801,268 +2791,140 @@ run(function()
     end
 
     local GunModsModule = vape.Categories.Utility:CreateModule({
-        Name = "Gun Mods V2",
+        Name = "Gun Mods",
         Function = function(callback)
             gunModsEnabled = callback
             if callback then
-                recoilVal = _G.gunModsShootRecoil or 0
-                spreadVal = _G.gunModsShootSpread or 0
-                projSpeedVal = _G.gunModsProjectileSpeed or 99999
-                shootCooldownVal = _G.gunModsShootCooldown or 0.001
-                quickShotCooldownVal = _G.gunModsQuickShotCooldown or 0
                 cancelPending()
                 pendingTask = task.delay(15, tryApplyHook)
-                
-                local Storage = game:GetService("ReplicatedStorage")
-                local success, Items = pcall(function()
-                    return require(Storage.Modules.ItemLibrary).Items
-                end)
-                
-                if success and Items then
-                    local gunExceptions = {
-                        ["Sniper"] = true,
-                        ["Crossbow"] = false,
-                        ["Bow"] = false,
-                        ["RPG"] = false,
-                    }
-                    local modifiedCount = 0
-                    for name, data in pairs(Items) do
-                        if typeof(data) == "table" and not gunExceptions[name] then
-                            if data.ShootSpread then 
-                                data.ShootSpread = _G.gunModsShootSpread or 0
-                                modifiedCount = modifiedCount + 1
-                            end
-                            if data.ShootAccuracy then 
-                                data.ShootAccuracy = 0 
-                            end
-                            if data.ShootRecoil then 
-                                data.ShootRecoil = _G.gunModsShootRecoil or 0
-                            end
-                            if data.ShootCooldown then 
-                                data.ShootCooldown = _G.gunModsShootCooldown or 0.001 
-                            end
-                            if data.ShootBurstCooldown then 
-                                data.ShootBurstCooldown = _G.gunModsShootCooldown or 0.001 
-                            end
-                            if data.ProjectileSpeed and _G.gunModsProjectileSpeed then
-                                data.ProjectileSpeed = _G.gunModsProjectileSpeed
-                            end
-                            if data.QuickShotCooldown and _G.gunModsQuickShotCooldown then
-                                data.QuickShotCooldown = _G.gunModsQuickShotCooldown
-                            end
-                        end
-                    end
-                    vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns", 3, "success")
-                end
             else
                 removeHook()
             end
         end,
-        Tooltip = "weapon modifications"
+        Tooltip = "Your better than them <3."
     })
 
     GunModsModule:CreateSlider({
         Name = "Recoil",
         Min = 0, Max = 10, Default = 0, Decimal = 10,
-        Function = function(v) 
-            recoilVal = v
-            _G.gunModsShootRecoil = v
-        end,
+        Function = function(v) recoilVal = v end,
         Suffix = "x"
     })
-    
     GunModsModule:CreateSlider({
         Name = "Spread",
         Min = 0, Max = 10, Default = 0, Decimal = 10,
-        Function = function(v) 
-            spreadVal = v
-            _G.gunModsShootSpread = v
-        end,
+        Function = function(v) spreadVal = v end,
         Suffix = "x"
     })
-    
     GunModsModule:CreateSlider({
         Name = "Projectile Speed",
-        Min = 100, Max = 99999, Default = 99999,
-        Function = function(v) 
-            projSpeedVal = v
-            _G.gunModsProjectileSpeed = v
-        end,
+        Min = 100, Max = 99999, Default = 99999999,
+        Function = function(v) projSpeedVal = v end,
         Suffix = "studs/s"
     })
-    
     GunModsModule:CreateSlider({
         Name = "Shoot Cooldown",
-        Min = 0.001, Max = 1, Default = 0.001, Decimal = 1000,
-        Function = function(v) 
-            shootCooldownVal = v
-            _G.gunModsShootCooldown = v
-        end,
+        Min = 0, Max = 1, Default = 0, Decimal = 100,
+        Function = function(v) shootCooldownVal = v end,
         Suffix = "s"
     })
-    
     GunModsModule:CreateSlider({
         Name = "Quick Shot Cooldown",
         Min = 0, Max = 1, Default = 0, Decimal = 100,
-        Function = function(v) 
-            quickShotCooldownVal = v
-            _G.gunModsQuickShotCooldown = v
-        end,
+        Function = function(v) quickShotCooldownVal = v end,
         Suffix = "s"
     })
+end)
+                                                                                                                                                                                                                                                                                                                                                        
+run(function()
+    local module = vape.Categories.Utility:CreateModule({
+        Name = "Gun Mods V2",
+        Function = function(callback)
+            if callback then
+                local Storage = game:GetService("ReplicatedStorage")
+                
+                local success, Items = pcall(function()
+                    return require(Storage.Modules.ItemLibrary).Items
+                end)
+                
+                if not success or not Items then
+                    vape:CreateNotification("Gun Mods v2", "Failed to load ItemLibrary", 3, "alert")
+                    return
+                end
 
-    local rapidFireOption = nil
-    local recoilReductionOption = nil
-    local projectileSpeedOption = nil
+                local gunExceptions = {
+                    ["Sniper"] = true,
+                    ["Crossbow"] = false,
+                    ["Bow"] = false,
+                    ["RPG"] = false,
+                }
 
-    GunModsModule:CreateToggle({
-        Name = "Rapid Fire",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.RapidFire = state
-            if rapidFireOption then
-                rapidFireOption:SetVisible(state)
+                local modifiedCount = 0
+
+                for name, data in pairs(Items) do
+                    if typeof(data) == "table" and not gunExceptions[name] then
+                        if data.ShootSpread then 
+                            data.ShootSpread = 0 
+                            modifiedCount = modifiedCount + 1
+                        end
+                        if data.ShootAccuracy then 
+                            data.ShootAccuracy = 0 
+                        end
+                        if data.ShootRecoil then 
+                            data.ShootRecoil = 0 
+                        end
+                        if data.ShootCooldown then 
+                            data.ShootCooldown = _G.gunModsShootCooldown or 0.001 
+                        end
+                        if data.ShootBurstCooldown then 
+                            data.ShootBurstCooldown = _G.gunModsShootCooldown or 0.001 
+                        end
+                    end
+                end
+
+                vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns", 3, "success")
             end
-        end
+        end,
+        Tooltip = "Fast fire rate with adjustable cooldown"
     })
 
-    rapidFireOption = GunModsModule:CreateSlider({
-        Name = "Fire Cooldown",
+    module:CreateSlider({
+        Name = "Shoot Cooldown",
         Min = 0.001,
         Max = 0.5,
-        Default = 0.01,
+        Default = 0.001,
         Decimal = 1000,
+        Function = function(v)
+            _G.gunModsShootCooldown = v
+        end,
         Suffix = "s",
-        Visible = false,
-        Function = function(v)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.RapidFireSpeed = v
-        end
+        Tooltip = "Delay between shots"
     })
 
-    GunModsModule:CreateToggle({
-        Name = "Instant Reload",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.InstantReload = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "No Recoil",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.NoRecoil = state
-            if recoilReductionOption then
-                recoilReductionOption:SetVisible(state)
-            end
-        end
-    })
-
-    recoilReductionOption = GunModsModule:CreateSlider({
-        Name = "Recoil Reduction",
+    module:CreateSlider({
+        Name = "Shoot Spread",
         Min = 0,
-        Max = 100,
-        Default = 100,
-        Suffix = "%",
-        Visible = false,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
         Function = function(v)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.RecoilReduction = v
-        end
+            _G.gunModsShootSpread = v
+        end,
+        Tooltip = "Bullet spread amount"
     })
 
-    GunModsModule:CreateToggle({
-        Name = "No Spread",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.NoSpread = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "No Weapon Bob",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.NoWeaponBob = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "Instant ADS",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.InstantADS = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "Instant Equip",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.InstantEquip = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "No Equip Animation",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.NoEquipAnimation = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "Infinite Ammo",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.InfiniteAmmo = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "Instant Bullet Travel",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.InstantBulletTravel = state
-        end
-    })
-
-    GunModsModule:CreateToggle({
-        Name = "Projectile Speed",
-        Default = false,
-        Function = function(state)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.ProjectileSpeed = state
-            if projectileSpeedOption then
-                projectileSpeedOption:SetVisible(state)
-            end
-        end
-    })
-
-    projectileSpeedOption = GunModsModule:CreateSlider({
-        Name = "Speed Multiplier",
-        Min = 1,
-        Max = 20,
-        Default = 5,
-        Decimal = 1,
-        Visible = false,
+    module:CreateSlider({
+        Name = "Shoot Recoil",
+        Min = 0,
+        Max = 10,
+        Default = 0,
+        Decimal = 10,
         Function = function(v)
-            getgenv().RivalsWeaponMods = getgenv().RivalsWeaponMods or {}
-            getgenv().RivalsWeaponMods.ProjectileSpeedMultiplier = v
-        end
+            _G.gunModsShootRecoil = v
+        end,
+        Tooltip = "Gun recoil amount"
     })
-end)
+end
 
 run(function()
     local module = vape.Categories.Utility:CreateModule({
