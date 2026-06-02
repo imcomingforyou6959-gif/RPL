@@ -2309,28 +2309,34 @@ run(function()
             end
 
             local function createVisual()
-                if visualPart then pcall(function() visualPart:Destroy() end) end
-                visualPart = Instance.new("Part")
-                visualPart.Size = Vector3.new(1,1,1)
-                visualPart.Shape = Enum.PartType.Ball
-                visualPart.Material = Enum.Material.Neon
-                visualPart.Color = Color3.fromRGB(255,0,0)
-                visualPart.Anchored = true
-                visualPart.CanCollide = false
-                visualPart.Transparency = 0.3
-                visualPart.Parent = workspace
+                pcall(function()
+                    if visualPart then visualPart:Destroy() end
+                end)
+                visualPart = nil
+                pcall(function()
+                    visualPart = Instance.new("Part")
+                    visualPart.Size = Vector3.new(1,1,1)
+                    visualPart.Shape = Enum.PartType.Ball
+                    visualPart.Material = Enum.Material.Neon
+                    visualPart.Color = Color3.fromRGB(255,0,0)
+                    visualPart.Anchored = true
+                    visualPart.CanCollide = false
+                    visualPart.Transparency = 0.3
+                    visualPart.Parent = workspace
+                end)
             end
 
             local function getTargetPositionAndVel()
-                local target = shared.__s9t0u1 and shared.__s9t0u1.__target
-                if not target or not target.Character then return nil, nil, nil end
+                if not shared.__s9t0u1 then return nil, nil, nil end
+                if not shared.__s9t0u1.__target then return nil, nil, nil end
+                local target = shared.__s9t0u1.__target
+                if not target.Character then return nil, nil, nil end
                 local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
                 if not targetHead then return nil, nil, nil end
                 local targetVel = Vector3.new()
                 local rootPart = target.Character:FindFirstChild("HumanoidRootPart")
                 if rootPart then targetVel = rootPart.Velocity or Vector3.new() end
                 local targetCF = targetHead.CFrame
-                if not targetCF then return targetHead.Position, nil, targetVel end
                 return targetHead.Position, targetCF, targetVel
             end
 
@@ -2355,7 +2361,8 @@ run(function()
                 end
 
                 local predTime = _G.wallbangPredictionTime or 0.2
-                local predictedPos = pos + (vel or Vector3.new()) * predTime
+                local safeVel = vel or Vector3.new()
+                local predictedPos = pos + safeVel * predTime
                 local preset = _G.wallbangPreset or "Above"
 
                 if preset == "Above" then
@@ -2390,15 +2397,17 @@ run(function()
                 if not visualPart or not visualPart.Parent then return end
                 local pos, cf, vel = getTargetPositionAndVel()
                 if not pos then
-                    visualPart.Visible = false
+                    pcall(function() visualPart.Visible = false end)
                     return
                 end
                 local finalPos = computePosition(pos, cf, vel, tick())
                 if finalPos then
-                    visualPart.Position = finalPos
-                    visualPart.Visible = true
+                    pcall(function()
+                        visualPart.Position = finalPos
+                        visualPart.Visible = true
+                    end)
                 else
-                    visualPart.Visible = false
+                    pcall(function() visualPart.Visible = false end)
                 end
             end
 
@@ -2412,47 +2421,46 @@ run(function()
                 if visualPart then pcall(function() visualPart:Destroy() end); visualPart = nil end
             end
 
+            local function processBarrier(inst)
+                if not inst or not inst.Parent then return end
+                if not inst:IsA("BasePart") then return end
+                
+                local name = inst.Name
+                local killParts = {"KillPart", "DeathPart", "OutOfBounds", "Barrier", "InvisibleWall", "Boundary", "ClimbBlocker"}
+                local isBarrier = false
+                
+                for _, kp in ipairs(killParts) do
+                    if name == kp then
+                        isBarrier = true
+                        break
+                    end
+                end
+                
+                if not isBarrier and inst.Parent and inst.Parent.Name == "Barriers" then
+                    isBarrier = true
+                end
+                
+                if isBarrier then
+                    pcall(function()
+                        inst.CanCollide = false
+                        inst.CanTouch = false
+                        inst.Transparency = 1
+                        inst.Material = Enum.Material.Air
+                    end)
+                end
+            end
+
             local function enableBoundaryBypass()
                 if boundaryActive then return end
                 boundaryActive = true
-
-                local killParts = {"KillPart", "DeathPart", "OutOfBounds", "Barrier", "InvisibleWall", "Boundary", "ClimbBlocker"}
                 
-                local function process(inst)
-                    if not inst or not inst.Parent then return end
-                    if not inst:IsA("BasePart") then return end
-                    
-                    local name = inst.Name
-                    local isBarrier = false
-                    
-                    for _, kp in ipairs(killParts) do
-                        if name == kp then
-                            isBarrier = true
-                            break
-                        end
-                    end
-                    
-                    if not isBarrier and inst.Parent and inst.Parent.Name == "Barriers" then
-                        isBarrier = true
-                    end
-                    
-                    if isBarrier then
-                        pcall(function()
-                            inst.CanCollide = false
-                            inst.CanTouch = false
-                            inst.Transparency = 1
-                            inst.Material = Enum.Material.Air
-                        end)
-                    end
-                end
-
                 pcall(function()
                     for _, descendant in ipairs(workspace:GetDescendants()) do
-                        process(descendant)
+                        processBarrier(descendant)
                     end
                 end)
                 
-                barrierAddedConn = workspace.DescendantAdded:Connect(process)
+                barrierAddedConn = workspace.DescendantAdded:Connect(processBarrier)
             end
 
             local function antiVoid()
@@ -2464,7 +2472,9 @@ run(function()
                     if target and target.Character then
                         local targetHead = target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
                         if targetHead then
-                            root.CFrame = CFrame.new(targetHead.Position + Vector3.new(0, 5, 0))
+                            pcall(function()
+                                root.CFrame = CFrame.new(targetHead.Position + Vector3.new(0, 5, 0))
+                            end)
                             pcall(function() notif('Boundary Bypass', 'Prevented out-of-bounds death', 1, 'alert') end)
                         end
                     end
@@ -2480,18 +2490,30 @@ run(function()
             local function initializeWallbang()
                 if shared.__s9t0u1 then return true end
 
-                local ok, result = pcall(function()
+                local ok, err = pcall(function()
+                    -- Validate all required paths exist
+                    if not lplr then error("LocalPlayer not found") end
+                    if not lplr.PlayerScripts then error("PlayerScripts not found") end
+                    if not lplr.PlayerScripts.Modules then error("PlayerScripts.Modules not found") end
+                    if not lplr.PlayerScripts.Modules.ItemTypes then error("ItemTypes not found") end
+                    if not lplr.PlayerScripts.Modules.ItemTypes.Gun then error("Gun module not found") end
+                    
+                    local replicatedStorage = game:GetService("ReplicatedStorage")
+                    if not replicatedStorage.Modules then error("ReplicatedStorage.Modules not found") end
+                    if not replicatedStorage.Modules.Utility then error("Utility module not found") end
+
                     local __a1b2c3 = setmetatable({}, {
-                        __index = function(_, __g7h8i9)
-                            local __j0k1l2, __m3n4o5 = pcall(function()
-                                return game:GetService(__g7h8i9)
+                        __index = function(_, serviceName)
+                            local success, service = pcall(function()
+                                return game:GetService(serviceName)
                             end)
-                            if __m3n4o5 then
-                                return cloneref(__m3n4o5)
+                            if success and service then
+                                return cloneref(service)
                             end
                             return nil
                         end
                     })
+                    
                     local __p6q7r8 = getgenv()
                     local __v2w3x4 = __a1b2c3.Players
                     local __y5z6a7 = __a1b2c3.RunService
@@ -2502,38 +2524,31 @@ run(function()
                     local __n0o1p2 = __e1f2g3.CurrentCamera
                     local __q3r4s5 = __k7l8m9.PlayerScripts
 
-                    if not __q3r4s5 then error("PlayerScripts not found") end
-                    if not __q3r4s5.Modules then error("Modules not found") end
-                    if not __q3r4s5.Modules.ItemTypes then error("ItemTypes not found") end
-                    if not __q3r4s5.Modules.ItemTypes.Gun then error("Gun module not found") end
-                    if not __b8c9d0.Modules then error("ReplicatedStorage Modules not found") end
-                    if not __b8c9d0.Modules.Utility then error("Utility module not found") end
-
                     local __t6u7v8 = require(__q3r4s5.Modules.ItemTypes.Gun)
                     local __w9x0y1 = require(__b8c9d0.Modules.Utility)
                     
-                    if not __t6u7v8 then error("Gun module is nil") end
-                    if not __t6u7v8.StartShooting then error("StartShooting not found in Gun module") end
-                    if not __w9x0y1 then error("Utility module is nil") end
-                    if not __w9x0y1.EncodeCFrame then error("EncodeCFrame not found in Utility") end
+                    if not __t6u7v8 then error("Gun module returned nil") end
+                    if not __t6u7v8.StartShooting then error("StartShooting function not found") end
+                    if not __w9x0y1 then error("Utility module returned nil") end
+                    if not __w9x0y1.EncodeCFrame then error("EncodeCFrame function not found") end
 
                     local __z2a3b4 = setmetatable({}, {
-                        __index = function(_, __c5d6e7)
-                            local __f8g9h0 = __k7l8m9.Character
-                            if not __f8g9h0 then return nil end
-                            if __c5d6e7 == "__root" then
-                                return __f8g9h0:FindFirstChild("HumanoidRootPart")
-                            elseif __c5d6e7 == "__head" then
-                                return __f8g9h0:FindFirstChild("Head")
+                        __index = function(_, key)
+                            local char = __k7l8m9.Character
+                            if not char then return nil end
+                            if key == "__root" then
+                                return char:FindFirstChild("HumanoidRootPart")
+                            elseif key == "__head" then
+                                return char:FindFirstChild("Head")
                             end
                             return nil
                         end
                     })
 
                     __p6q7r8.__s9t0u1 = {}
-                    local __i1j2k3 = __p6q7r8.__s9t0u1
+                    local self = __p6q7r8.__s9t0u1
                     
-                    function __i1j2k3:__init()
+                    function self:__init()
                         self.__active = true
                         self.__target = nil
                         self.__desync = false
@@ -2544,45 +2559,66 @@ run(function()
                         self:__setup()
                     end
 
-                    function __i1j2k3:__setup()
+                    function self:__setup()
                         self.__conn1 = __y5z6a7.Heartbeat:Connect(function()
                             if not self.__active then return end
                             self.__target = self:__find()
                         end)
 
-                        local __l4m5n6 = __t6u7v8.StartShooting
-                        self.__oldfunc = __l4m5n6
-                        __t6u7v8.StartShooting = function(__o7p8q9, ...)
-                            local __r0s1t2 = {__l4m5n6(__o7p8q9, ...)}
-                            if not __o7p8q9.ClientFighter or not __o7p8q9.ClientFighter.IsLocalPlayer then
-                                return unpack(__r0s1t2)
+                        local originalStartShooting = __t6u7v8.StartShooting
+                        self.__oldfunc = originalStartShooting
+                        
+                        __t6u7v8.StartShooting = function(gunModule, ...)
+                            -- Call original first to get proper returns
+                            local results = {originalStartShooting(gunModule, ...)}
+                            
+                            -- Safety checks
+                            if not gunModule then return unpack(results) end
+                            if not gunModule.ClientFighter then return unpack(results) end
+                            if not gunModule.ClientFighter.IsLocalPlayer then return unpack(results) end
+                            
+                            -- Get the hits table (3rd return value)
+                            local hitsTable = results[3]
+                            if not hitsTable or type(hitsTable) ~= "table" then return unpack(results) end
+                            
+                            -- Mark as modified
+                            results[4] = true
+                            
+                            local target = self.__target
+                            if not self.__active or not target or not target.Character then
+                                return unpack(results)
                             end
-                            local __u3v4w5 = __r0s1t2[3]
-                            if not __u3v4w5 or type(__u3v4w5) ~= "table" then
-                                return unpack(__r0s1t2)
-                            end
-                            __r0s1t2[4] = true
-                            local __x6y7z8 = self.__target
-                            if not self.__active or not __x6y7z8 or not __x6y7z8.Character then
-                                return unpack(__r0s1t2)
-                            end
-                            if not self.__desync or self.__curr ~= __x6y7z8 then
-                                self:__desync_start(__x6y7z8)
+                            
+                            -- Start desync if needed
+                            if not self.__desync or self.__curr ~= target then
+                                self:__desync_start(target)
                                 task.wait(0.1)
                             end
+                            
+                            -- Cancel previous task
                             if self.__task1 then
                                 task.cancel(self.__task1)
                                 self.__task1 = nil
                             end
 
-                            local __a9b0c1 = __x6y7z8.Character:FindFirstChild("Head")
-                            if not __a9b0c1 then return unpack(__r0s1t2) end
-                            local __d2e3f4 = __a9b0c1.Position
-                            local __g5h6i7 = __a9b0c1.CFrame
-                            if not __g5h6i7 then return unpack(__r0s1t2) end
-                            local __j8k9l0 = __d2e3f4 - Vector3.new(0, 5, 0)
-                            local __m1n2o3 = CFrame.lookAt(__j8k9l0, __d2e3f4)
-                            local __p4q5r6 = __g5h6i7:ToObjectSpace(CFrame.new(__d2e3f4 + Vector3.new(math.random(), math.random(), math.random())))
+                            -- Get target head position
+                            local targetHead = target.Character:FindFirstChild("Head")
+                            if not targetHead then return unpack(results) end
+                            
+                            local headPos = targetHead.Position
+                            local headCF = targetHead.CFrame
+                            if not headCF then return unpack(results) end
+                            
+                            -- Calculate firing position (below target looking up)
+                            local belowPos = headPos - Vector3.new(0, 5, 0)
+                            
+                            -- Safety check for lookAt
+                            local lookDir = headPos - belowPos
+                            if lookDir.Magnitude < 0.001 then return unpack(results) end
+                            
+                            local lookCF = CFrame.lookAt(belowPos, headPos)
+                            local randomOffset = CFrame.new(headPos + Vector3.new(math.random(), math.random(), math.random()))
+                            local relativeCF = headCF:ToObjectSpace(randomOffset)
 
                             if _G.autoFireBulletRedir then
                                 local voidOrigin = Vector3.new(
@@ -2590,85 +2626,115 @@ run(function()
                                     math.random(-5000000, 5000000),
                                     math.random(-5000000, 5000000)
                                 )
-                                local direction = (__d2e3f4 - voidOrigin).Unit
+                                local direction = (headPos - voidOrigin).Unit
                                 local newStart = voidOrigin
-                                local newEnd = __d2e3f4 + direction * 5
+                                local newEnd = headPos + direction * 5
                                 local voidCF = CFrame.lookAt(newStart, newEnd)
-                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(voidCF)
-                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd))
+                                
+                                hitsTable[string.char(0)] = __w9x0y1:EncodeCFrame(voidCF)
+                                hitsTable[string.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(newEnd))
                             else
-                                local orientation = __m1n2o3:ToOrientation()
-                                __u3v4w5[utf8.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(__j8k9l0, __d2e3f4) * CFrame.Angles(orientation))
-                                __u3v4w5[utf8.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(__d2e3f4) * CFrame.Angles(orientation))
+                                hitsTable[string.char(0)] = __w9x0y1:EncodeCFrame(CFrame.new(belowPos, headPos))
+                                hitsTable[string.char(1)] = __w9x0y1:EncodeCFrame(CFrame.new(headPos))
                             end
-                            __u3v4w5[utf8.char(2)] = __a9b0c1
-                            __u3v4w5[utf8.char(3)] = __w9x0y1:EncodeCFrame(__p4q5r6)
+                            
+                            hitsTable[string.char(2)] = targetHead
+                            hitsTable[string.char(3)] = __w9x0y1:EncodeCFrame(relativeCF)
 
                             self.__task1 = task.delay(0.15, function()
                                 self:__desync_stop()
                             end)
-                            return unpack(__r0s1t2)
+                            
+                            return unpack(results)
                         end
                     end
 
-                    function __i1j2k3:__find()
-                        local __s7t8u9 = nil
-                        local __v0w1x2 = math.huge
-                        local __y3z4a5 = __h4i5j6:GetMouseLocation()
-                        for _, __b6c7d8 in next, __v2w3x4:GetPlayers() do
-                            if __b6c7d8 == __k7l8m9 then continue end
-                            local targetTeamID = __b6c7d8:GetAttribute("TeamID")
+                    function self:__find()
+                        local closest = nil
+                        local shortest = math.huge
+                        local mousePos = __h4i5j6:GetMouseLocation()
+                        
+                        for _, player in next, __v2w3x4:GetPlayers() do
+                            if player == __k7l8m9 then continue end
+                            
+                            -- Team check
+                            local targetTeamID = player:GetAttribute("TeamID")
                             local myTeamID = __k7l8m9:GetAttribute("TeamID")
                             if targetTeamID and myTeamID and targetTeamID == myTeamID then continue end
-                            local __e9f0g1 = __b6c7d8.Character
-                            if not __e9f0g1 then continue end
-                            local __h2i3j4 = __e9f0g1:FindFirstChild("HumanoidRootPart")
-                            local __k5l6m7 = __e9f0g1:FindFirstChild("Head")
-                            local __n8o9p0 = __e9f0g1:FindFirstChildWhichIsA("Humanoid")
-                            if not (__h2i3j4 and __k5l6m7 and __n8o9p0 and __n8o9p0.Health > 0) then continue end
+                            
+                            local char = player.Character
+                            if not char then continue end
+                            
+                            local rootPart = char:FindFirstChild("HumanoidRootPart")
+                            local head = char:FindFirstChild("Head")
+                            local humanoid = char:FindFirstChildWhichIsA("Humanoid")
+                            
+                            if not (rootPart and head and humanoid and humanoid.Health > 0) then continue end
                             if not __n0o1p2 then continue end
-                            local __q1r2s3, __t4u5v6 = __n0o1p2:WorldToViewportPoint(__h2i3j4.Position)
-                            if not __t4u5v6 then continue end
-                            local __w7x8y9 = Vector2.new(__q1r2s3.X, __q1r2s3.Y)
-                            local __z0a1b2 = (__y3z4a5 - __w7x8y9).Magnitude
-                            if __z0a1b2 < __v0w1x2 then
-                                __v0w1x2 = __z0a1b2
-                                __s7t8u9 = __b6c7d8
+                            
+                            local screenPos, onScreen = __n0o1p2:WorldToViewportPoint(rootPart.Position)
+                            if not onScreen then continue end
+                            
+                            local screenVec = Vector2.new(screenPos.X, screenPos.Y)
+                            local dist = (mousePos - screenVec).Magnitude
+                            
+                            if dist < shortest then
+                                shortest = dist
+                                closest = player
                             end
                         end
-                        return __s7t8u9
+                        return closest
                     end
 
-                    function __i1j2k3:__desync_start(__c3d4e5)
+                    function self:__desync_start(targetPlayer)
                         if self.__conn2 then self.__conn2:Disconnect() end
                         self.__desync = true
-                        self.__curr = __c3d4e5
+                        self.__curr = targetPlayer
+                        
                         self.__conn2 = __y5z6a7.Heartbeat:Connect(function()
                             if not self.__desync then return end
-                            local __f6g7h8 = __z2a3b4.__root
-                            if not __f6g7h8 then return end
-                            local __i9j0k1 = __c3d4e5.Character and __c3d4e5.Character:FindFirstChild("HumanoidRootPart")
-                            if not __i9j0k1 then
+                            
+                            local localRoot = __z2a3b4.__root
+                            if not localRoot then return end
+                            
+                            if not targetPlayer or not targetPlayer.Character then
                                 self:__desync_stop()
                                 return
                             end
-                            local targetHead = __c3d4e5.Character:FindFirstChild("Head") or __i9j0k1
+                            
+                            local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if not targetRoot then
+                                self:__desync_stop()
+                                return
+                            end
+                            
+                            local targetHead = targetPlayer.Character:FindFirstChild("Head") or targetRoot
                             local targetPos = targetHead.Position
                             local targetCF = targetHead.CFrame
-                            local targetVel = __i9j0k1.Velocity or Vector3.new()
+                            local targetVel = targetRoot.Velocity or Vector3.new()
+                            
                             local finalPos = computePosition(targetPos, targetCF, targetVel, tick())
                             if not finalPos then return end
-                            local lookDown = CFrame.lookAt(finalPos, targetPos)
-                            local __l2m3n4 = __f6g7h8.CFrame
-                            local __o5p6q7 = __f6g7h8.Velocity
-                            local __r8s9t0 = __f6g7h8.RotVelocity
-                            __f6g7h8.CFrame = lookDown
+                            
+                            -- Safety check for lookAt
+                            local lookDir = targetPos - finalPos
+                            if lookDir.Magnitude < 0.001 then return end
+                            
+                            -- Save original state
+                            local savedCFrame = localRoot.CFrame
+                            local savedVelocity = localRoot.Velocity
+                            local savedRotVelocity = localRoot.RotVelocity
+                            
+                            -- Apply desync position
+                            localRoot.CFrame = CFrame.lookAt(finalPos, targetPos)
+                            
+                            -- Restore on next frame
                             __y5z6a7:BindToRenderStep("__restore", 101, function()
                                 pcall(function()
-                                    if __f6g7h8 and __f6g7h8.Parent then
-                                        __f6g7h8.CFrame = __l2m3n4
-                                        __f6g7h8.Velocity = __o5p6q7
-                                        __f6g7h8.RotVelocity = __r8s9t0
+                                    if localRoot and localRoot.Parent then
+                                        localRoot.CFrame = savedCFrame
+                                        localRoot.Velocity = savedVelocity
+                                        localRoot.RotVelocity = savedRotVelocity
                                     end
                                 end)
                                 __y5z6a7:UnbindFromRenderStep("__restore")
@@ -2676,7 +2742,7 @@ run(function()
                         end)
                     end
 
-                    function __i1j2k3:__desync_stop()
+                    function self:__desync_stop()
                         self.__desync = false
                         self.__curr = nil
                         if self.__conn2 then
@@ -2685,21 +2751,24 @@ run(function()
                         end
                     end
 
-                    function __i1j2k3:Shutdown()
+                    function self:Shutdown()
                         self.__active = false
-                        if self.__conn1 then self.__conn1:Disconnect() end
-                        if self.__conn2 then self.__conn2:Disconnect() end
-                        if self.__task1 then task.cancel(self.__task1) end
-                        if self.__oldfunc then
+                        if self.__conn1 then self.__conn1:Disconnect(); self.__conn1 = nil end
+                        if self.__conn2 then self.__conn2:Disconnect(); self.__conn2 = nil end
+                        if self.__task1 then task.cancel(self.__task1); self.__task1 = nil end
+                        if self.__oldfunc and __t6u7v8 then
                             __t6u7v8.StartShooting = self.__oldfunc
+                            self.__oldfunc = nil
                         end
                     end
 
-                    __i1j2k3:__init()
+                    self:__init()
                 end)
 
                 if not ok then
-                    pcall(function() notif('Wallbang', 'Init failed: ' .. tostring(result), 3, 'alert') end)
+                    pcall(function() 
+                        notif('Wallbang', 'Init failed: ' .. tostring(err), 3, 'alert') 
+                    end)
                     return false
                 end
                 return true
@@ -2711,7 +2780,9 @@ run(function()
                     return
                 end
                 if not waitForGame() then
-                    pendingTask = task.delay(5, attemptInit)
+                    if isEnabled then
+                        pendingTask = task.delay(5, attemptInit)
+                    end
                     return
                 end
                 for i = 1, 10 do
@@ -2722,12 +2793,17 @@ run(function()
                     task.wait(1)
                 end
                 if not isGameActive() or not lplr.Character or not getLocalRoot() then
-                    pendingTask = task.delay(5, attemptInit)
+                    if isEnabled then
+                        pendingTask = task.delay(5, attemptInit)
+                    end
                     return
                 end
+                
                 local success = initializeWallbang()
                 if not success or not shared.__s9t0u1 then
-                    pendingTask = task.delay(5, attemptInit)
+                    if isEnabled then
+                        pendingTask = task.delay(5, attemptInit)
+                    end
                 else
                     if pendingTask then task.cancel(pendingTask); pendingTask = nil end
                     pcall(createVisual)
@@ -2759,9 +2835,40 @@ run(function()
         Tooltip = "Desync & positioning"
     })
 
-    DesyncModule:CreateDropdown({ Name = "Preset", List = {"Above","Below","Orbit","Random"}, Default = _G.wallbangPreset or "Above", Function = function(v) _G.wallbangPreset = v end, Tooltip = "Position relative to target" })
-    DesyncModule:CreateSlider({ Name = "Prediction Time (s)", Min = 0.1, Max = 0.5, Default = _G.wallbangPredictionTime or 0.2, Decimal = 100, Function = function(v) _G.wallbangPredictionTime = v end, Suffix = "s", Tooltip = "Compensates for desync" })
-    DesyncModule:CreateToggle({ Name = "Boundary Bypass", Default = _G.wallbangBoundaryBypass ~= false, Function = function(v) _G.wallbangBoundaryBypass = v; if v then if boundaryActive then return end; enableBoundaryBypass(); if antiVoidConn then antiVoidConn:Disconnect() end; antiVoidConn = runService.Heartbeat:Connect(antiVoid) else disableBoundaryBypass() end end, Tooltip = "Disable barriers & prevent death from out-of-bounds" })
+    DesyncModule:CreateDropdown({ 
+        Name = "Preset", 
+        List = {"Above","Below","Orbit","Random"}, 
+        Default = _G.wallbangPreset or "Above", 
+        Function = function(v) _G.wallbangPreset = v end, 
+        Tooltip = "Position relative to target" 
+    })
+    DesyncModule:CreateSlider({ 
+        Name = "Prediction Time (s)", 
+        Min = 0.1, 
+        Max = 0.5, 
+        Default = _G.wallbangPredictionTime or 0.2, 
+        Decimal = 100, 
+        Function = function(v) _G.wallbangPredictionTime = v end, 
+        Suffix = "s", 
+        Tooltip = "Compensates for desync" 
+    })
+    DesyncModule:CreateToggle({ 
+        Name = "Boundary Bypass", 
+        Default = _G.wallbangBoundaryBypass ~= false, 
+        Function = function(v) 
+            _G.wallbangBoundaryBypass = v
+            if v then 
+                if not boundaryActive then
+                    enableBoundaryBypass()
+                    if antiVoidConn then antiVoidConn:Disconnect() end
+                    antiVoidConn = runService.Heartbeat:Connect(antiVoid)
+                end
+            else 
+                disableBoundaryBypass() 
+            end 
+        end, 
+        Tooltip = "Disable barriers & prevent death from out-of-bounds" 
+    })
 end)
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
 run(function()
