@@ -85,6 +85,7 @@ local function safeCall(desc, func)
 end
 
 local function canClick()
+    if not lplr or not lplr.PlayerGui then return false end
     local mousepos = (inputService:GetMouseLocation() - guiService:GetGuiInset())
     for _, v in lplr.PlayerGui:GetGuiObjectsAtPosition(mousepos.X, mousepos.Y) do
         local obj = v:FindFirstAncestorOfClass('ScreenGui')
@@ -94,7 +95,7 @@ local function canClick()
         local obj = v:FindFirstAncestorOfClass('ScreenGui')
         if v.Active and v.Visible and obj and obj.Enabled then return false end
     end
-    local scaledGui = vape.gui.ScaledGui
+    local scaledGui = vape.gui and vape.gui.ScaledGui
     local clickGuiVisible = scaledGui and scaledGui.ClickGui and scaledGui.ClickGui.Visible
     return not clickGuiVisible and not inputService:GetFocusedTextBox()
 end
@@ -119,6 +120,7 @@ local function isEnemy(player)
 end
 
 local function isLobbyVisible()
+    if not lplr or not lplr.PlayerGui then return false end
     local mainGui = lplr.PlayerGui:FindFirstChild("MainGui")
     if mainGui then
         local mainFrame = mainGui:FindFirstChild("MainFrame")
