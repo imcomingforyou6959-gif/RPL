@@ -5423,17 +5423,14 @@ function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 		if hasImage then
 			local animeImage = Instance.new('ImageLabel')
 			animeImage.Name = 'AnimeImage'
-			animeImage.Size = UDim2.fromOffset(45, 45)
-			animeImage.Position = UDim2.fromOffset(12, 15)
+			animeImage.Size = UDim2.fromOffset(25, 25)
+			animeImage.Position = UDim2.fromOffset(46, 44)
 			animeImage.BackgroundTransparency = 1
 			animeImage.Image = getcustomasset(imageAsset)
 			animeImage.ZIndex = 5
 			animeImage.Parent = notification
 			
-			iconshadow.Visible = false
-			icon.Visible = false
-			titlelabel.Position = UDim2.fromOffset(70, 16)
-			textshadow.Position = UDim2.fromOffset(71, 44)
+			textshadow.Position = UDim2.fromOffset(75, 44)
 			
 			if imageAsset:match("%.gif$") then
 				local angle = 0
