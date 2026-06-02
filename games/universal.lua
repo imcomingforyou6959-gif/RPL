@@ -3622,10 +3622,10 @@ run(function()
 
             if input.KeyCode == Enum.KeyCode.Up then
                 lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) + math.rad(90)
-                notif('AntiAim', 'Locked facing left', 2, 'info')
+                notif('AntiAim', 'Locked facing left', 2, 'info', "anime.png")
             elseif input.KeyCode == Enum.KeyCode.Down then
                 lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) - math.rad(90)
-                notif('AntiAim', 'Locked facing right', 2, 'info')
+                notif('AntiAim', 'Locked facing right', 2, 'info', "anime.png")
             end
         end))
     end
