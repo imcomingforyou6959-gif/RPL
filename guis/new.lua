@@ -5430,7 +5430,7 @@ function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 			animeImage.ZIndex = 5
 			animeImage.Parent = notification
 			
-			textshadow.Position = UDim2.fromOffset(75, 44)
+			textshadow.Position = UDim2.fromOffset(85, 44)
 			
 			if imageAsset:match("%.gif$") then
 				local angle = 0
