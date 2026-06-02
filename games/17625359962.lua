@@ -1397,14 +1397,30 @@ run(function()
         highlight.FillTransparency = 0.5
         highlight.OutlineTransparency = 0.3
         highlight.Adornee = part
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.Parent = part
         highlights[part] = highlight
         labelCount = labelCount + 1
+        
+        local originalTransparency = part.Transparency
+        local hookConn
+        hookConn = part:GetPropertyChangedSignal("Transparency"):Connect(function()
+            if highlight and highlight.Parent then
+                highlight.Enabled = true
+            end
+        end)
+        if not part._highlightConn then
+            part._highlightConn = hookConn
+        end
     end
 
     local function removeHighlight(part)
         local h = highlights[part]
         if not h then return end
+        if part._highlightConn then
+            pcall(function() part._highlightConn:Disconnect() end)
+            part._highlightConn = nil
+        end
         pcall(function() h:Destroy() end)
         highlights[part] = nil
         labelCount = labelCount - 1
@@ -1473,7 +1489,6 @@ run(function()
                     local part = table.remove(pendingQueue, 1)
                     if part then pendingSet[part] = nil end
                     if not part or not part.Parent then
-                        -- skip
                     else
                         if isTripminePart(part) and not (camPos and (part.Position - camPos).Magnitude > MAX_DIST) then
                             makeHighlight(part)
