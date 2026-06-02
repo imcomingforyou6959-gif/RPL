@@ -5346,7 +5346,7 @@ function mainapi:CreateLegit()
 	return legitapi
 end
 
-function mainapi:CreateNotification(title, text, duration, type)
+function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 	if not self.Notifications.Enabled then return end
 	task.delay(0, function()
 		if self.ThreadFix then
@@ -5354,9 +5354,15 @@ function mainapi:CreateNotification(title, text, duration, type)
 		end
 		local i = #notifications:GetChildren() + 1
 		local notification = Instance.new('ImageLabel')
+		
+		local hasImage = imageAsset and imageAsset ~= ''
+		local imageHeight = hasImage and 50 or 0
+		local baseHeight = 75
+		local totalHeight = baseHeight + imageHeight
+		
 		notification.Name = 'Notification'
-		notification.Size = UDim2.fromOffset(math.max(getfontsize(removeTags(text), 14, uipallet.Font).X + 80, 266), 75)
-		notification.Position = UDim2.new(1, 0, 1, -(29 + (78 * i)))
+		notification.Size = UDim2.fromOffset(math.max(getfontsize(removeTags(text), 14, uipallet.Font).X + 80, 266), totalHeight)
+		notification.Position = UDim2.new(1, 0, 1, -(29 + (totalHeight + 3) * i))
 		notification.ZIndex = 5
 		notification.BackgroundTransparency = 1
 		notification.Image = getcustomasset('newvape/assets/new/notification.png')
@@ -5364,6 +5370,7 @@ function mainapi:CreateNotification(title, text, duration, type)
 		notification.SliceCenter = Rect.new(7, 7, 9, 9)
 		notification.Parent = notifications
 		addBlur(notification, true)
+		
 		local iconshadow = Instance.new('ImageLabel')
 		iconshadow.Name = 'Icon'
 		iconshadow.Size = UDim2.fromOffset(60, 60)
@@ -5374,11 +5381,13 @@ function mainapi:CreateNotification(title, text, duration, type)
 		iconshadow.ImageColor3 = Color3.new()
 		iconshadow.ImageTransparency = 0.5
 		iconshadow.Parent = notification
+		
 		local icon = iconshadow:Clone()
 		icon.Position = UDim2.fromOffset(-1, -1)
 		icon.ImageColor3 = Color3.new(1, 1, 1)
 		icon.ImageTransparency = 0
 		icon.Parent = iconshadow
+		
 		local titlelabel = Instance.new('TextLabel')
 		titlelabel.Name = 'Title'
 		titlelabel.Size = UDim2.new(1, -56, 0, 20)
@@ -5393,6 +5402,7 @@ function mainapi:CreateNotification(title, text, duration, type)
 		titlelabel.RichText = true
 		titlelabel.FontFace = uipallet.FontSemiBold
 		titlelabel.Parent = notification
+		
 		local textshadow = titlelabel:Clone()
 		textshadow.Name = 'Text'
 		textshadow.Position = UDim2.fromOffset(47, 44)
@@ -5402,6 +5412,7 @@ function mainapi:CreateNotification(title, text, duration, type)
 		textshadow.RichText = false
 		textshadow.FontFace = uipallet.Font
 		textshadow.Parent = notification
+		
 		local textlabel = textshadow:Clone()
 		textlabel.Position = UDim2.fromOffset(-1, -1)
 		textlabel.Text = text
@@ -5409,18 +5420,63 @@ function mainapi:CreateNotification(title, text, duration, type)
 		textlabel.TextTransparency = 0
 		textlabel.RichText = true
 		textlabel.Parent = textshadow
+		
+		if hasImage then
+			local animeImage = Instance.new('ImageLabel')
+			animeImage.Name = 'AnimeImage'
+			animeImage.Size = UDim2.fromOffset(40, 40)
+			animeImage.Position = UDim2.fromOffset(notification.Size.X.Offset / 2 - 20, totalHeight - 45)
+			animeImage.AnchorPoint = Vector2.new(0.5, 0)
+			animeImage.BackgroundTransparency = 1
+			animeImage.Image = getcustomasset(imageAsset)
+			animeImage.ZIndex = 5
+			animeImage.Parent = notification
+			
+			if imageAsset:match("%.gif$") then
+				local imageButton = Instance.new('ImageButton')
+				imageButton.Size = animeImage.Size
+				imageButton.Position = animeImage.Position
+				imageButton.AnchorPoint = animeImage.AnchorPoint
+				imageButton.BackgroundTransparency = 1
+				imageButton.Image = animeImage.Image
+				imageButton.ZIndex = 5
+				imageButton.Parent = notification
+				animeImage:Destroy()
+				
+				local angle = 0
+				local spinConnection
+				spinConnection = runService.RenderStepped:Connect(function()
+					if imageButton and imageButton.Parent then
+						angle = (angle + 5) % 360
+						imageButton.Rotation = angle
+					else
+						spinConnection:Disconnect()
+					end
+				end)
+				animeImage = imageButton
+			end
+			
+			task.delay(duration - 0.5, function()
+				if animeImage and animeImage.Parent then
+					tween:Tween(animeImage, TweenInfo.new(0.3, Enum.EasingStyle.Linear), {
+						ImageTransparency = 1
+					})
+				end
+			end)
+		end
+		
 		local progress = Instance.new('Frame')
 		progress.Name = 'Progress'
 		progress.Size = UDim2.new(1, -13, 0, 2)
 		progress.Position = UDim2.new(0, 3, 1, -4)
 		progress.ZIndex = 5
-		progress.BackgroundColor3 =
-    	type == 'alert' and Color3.fromRGB(250, 50, 56)
-    	or type == 'warning' and Color3.fromRGB(236, 129, 43)
-    	or type == 'success' and Color3.fromRGB(50, 200, 80)
-    	or Color3.fromRGB(220, 220, 220)
+		progress.BackgroundColor3 = type == 'alert' and Color3.fromRGB(250, 50, 56)
+			or type == 'warning' and Color3.fromRGB(236, 129, 43)
+			or type == 'success' and Color3.fromRGB(50, 200, 80)
+			or Color3.fromRGB(220, 220, 220)
 		progress.BorderSizePixel = 0
 		progress.Parent = notification
+		
 		if tween.Tween then
 			tween:Tween(notification, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
 				AnchorPoint = Vector2.new(1, 0)
@@ -5429,6 +5485,7 @@ function mainapi:CreateNotification(title, text, duration, type)
 				Size = UDim2.fromOffset(0, 2)
 			})
 		end
+		
 		task.delay(duration, function()
 			if tween.Tween then
 				tween:Tween(notification, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
