@@ -2924,7 +2924,7 @@ run(function()
         end,
         Tooltip = "Gun recoil amount"
     })
-end
+end)
 
 run(function()
     local module = vape.Categories.Utility:CreateModule({
