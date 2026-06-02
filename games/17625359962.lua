@@ -2852,55 +2852,155 @@ run(function()
 end)
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
+    local Storage = game:GetService("ReplicatedStorage")
+    local Items = nil
+    local originalData = {}
+
+    local success, library = pcall(function()
+        return require(Storage.Modules.ItemLibrary)
+    end)
+    if success and library then
+        Items = library.Items or library
+    end
+
+    _G.gunModsShootCooldown = 0.001
+    _G.gunModsShootSpread = 0
+    _G.gunModsShootRecoil = 0
+    _G.gunModsInfAmmo = false
+    _G.gunModsInstantReload = false
+    _G.gunModsInfRange = false
+    _G.gunModsAlwaysAuto = false
+
+    local gunExceptions = {
+        ["Sniper"] = true,
+        ["Crossbow"] = false,
+        ["Bow"] = false,
+        ["RPG"] = false,
+    }
+
+    local function updateGuns(enabled)
+        if not Items then return end
+
+        for name, data in pairs(Items) do
+            if typeof(data) == "table" and not gunExceptions[name] then
+                local isGun = data.ShootCooldown or data.ShootSpread or (data[13] == "Gun" or data[33] == "Primary")
+                
+                if isGun then
+                    if not originalData[name] then
+                        originalData[name] = {
+                            ShootSpread = data.ShootSpread or data[41] or 0,
+                            ShootAccuracy = data.ShootAccuracy or data[50] or 0,
+                            ShootRecoil = data.ShootRecoil or data[59] or 0,
+                            ShootCooldown = data.ShootCooldown or data[42] or 0.25,
+                            ShootBurstCooldown = data.ShootBurstCooldown or 0,
+                            MaxAmmo = data.MaxAmmo or data[39] or 100,
+                            ReloadTime = data.ReloadTime or data[12] or 1,
+                            Range = data.Range or data[53] or 300,
+                            IsAuto = data.IsAutomatic or data[2] or data[57] or false,
+                            
+                            Idx2 = data[2],
+                            Idx12 = data[12],
+                            Idx39 = data[39],
+                            Idx41 = data[41],
+                            Idx42 = data[42],
+                            Idx50 = data[50],
+                            Idx53 = data[53],
+                            Idx57 = data[57],
+                            Idx59 = data[59]
+                        }
+                    end
+
+                    if enabled then
+                        if data.ShootSpread then data.ShootSpread = _G.gunModsShootSpread end
+                        if data.ShootAccuracy then data.ShootAccuracy = _G.gunModsShootSpread end
+                        if data.ShootRecoil then data.ShootRecoil = _G.gunModsShootRecoil end
+                        if data.ShootCooldown then data.ShootCooldown = _G.gunModsShootCooldown end
+                        if data.ShootBurstCooldown then data.ShootBurstCooldown = _G.gunModsShootCooldown end
+
+                        if data[41] then data[41] = _G.gunModsShootSpread end
+                        if data[42] then data[42] = _G.gunModsShootCooldown end
+                        if data[50] then data[50] = _G.gunModsShootSpread end
+                        if data[59] then data[59] = _G.gunModsShootRecoil end
+
+                        if _G.gunModsInfAmmo then
+                            if data.MaxAmmo then data.MaxAmmo = 99999 end
+                            if data[39] then data[39] = 99999 end
+                        else
+                            if data.MaxAmmo then data.MaxAmmo = originalData[name].MaxAmmo end
+                            if data[39] then data[39] = originalData[name].Idx39 end
+                        end
+
+                        if _G.gunModsInstantReload then
+                            if data.ReloadTime then data.ReloadTime = 0 end
+                            if data[12] then data[12] = 0 end
+                        else
+                            if data.ReloadTime then data.ReloadTime = originalData[name].ReloadTime end
+                            if data[12] then data[12] = originalData[name].Idx12 end
+                        end
+
+                        if _G.gunModsInfRange then
+                            if data.Range then data.Range = 999999 end
+                            if data[53] then data[53] = 999999 end
+                        else
+                            if data.Range then data.Range = originalData[name].Range end
+                            if data[53] then data[53] = originalData[name].Idx53 end
+                        end
+
+                        if _G.gunModsAlwaysAuto then
+                            if data.IsAutomatic ~= nil then data.IsAutomatic = true end
+                            if data[2] ~= nil then data[2] = true end
+                            if data[57] ~= nil then data[57] = true end
+                        else
+                            if data.IsAutomatic ~= nil then data.IsAutomatic = originalData[name].IsAuto end
+                            if data[2] ~= nil then data[2] = originalData[name].Idx2 end
+                            if data[57] ~= nil then data[57] = originalData[name].Idx57 end
+                        end
+                    else
+                        local orig = originalData[name]
+                        if orig then
+                            if data.ShootSpread then data.ShootSpread = orig.ShootSpread end
+                            if data.ShootAccuracy then data.ShootAccuracy = orig.ShootAccuracy end
+                            if data.ShootRecoil then data.ShootRecoil = orig.ShootRecoil end
+                            if data.ShootCooldown then data.ShootCooldown = orig.ShootCooldown end
+                            if data.ShootBurstCooldown then data.ShootBurstCooldown = orig.ShootBurstCooldown end
+                            if data.MaxAmmo then data.MaxAmmo = orig.MaxAmmo end
+                            if data.ReloadTime then data.ReloadTime = orig.ReloadTime end
+                            if data.Range then data.Range = orig.Range end
+                            if data.IsAutomatic ~= nil then data.IsAutomatic = orig.IsAuto end
+
+                            if data[2] ~= nil then data[2] = orig.Idx2 end
+                            if data[12] then data[12] = orig.Idx12 end
+                            if data[39] then data[39] = orig.Idx39 end
+                            if data[41] then data[41] = orig.Idx41 end
+                            if data[42] then data[42] = orig.Idx42 end
+                            if data[50] then data[50] = orig.Idx50 end
+                            if data[53] then data[53] = orig.Idx53 end
+                            if data[57] ~= nil then data[57] = orig.Idx57 end
+                            if data[59] then data[59] = orig.Idx59 end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     local module = vape.Categories.Utility:CreateModule({
         Name = "Gun Mods V2",
         Function = function(callback)
             if callback then
-                local Storage = game:GetService("ReplicatedStorage")
-                
-                local success, Items = pcall(function()
-                    return require(Storage.Modules.ItemLibrary).Items
-                end)
-                
-                if not success or not Items then
-                    vape:CreateNotification("Gun Mods v2", "Failed to load ItemLibrary", 3, "alert")
+                if not Items then
+                    vape:CreateNotification("Gun Mods v2", "ItemLibrary could not be retrieved", 3, "alert")
+                    if module.ToggleButton then module:ToggleButton(false) end
                     return
                 end
-
-                local gunExceptions = {
-                    ["Sniper"] = true,
-                    ["Crossbow"] = false,
-                    ["Bow"] = false,
-                    ["RPG"] = false,
-                }
-
-                local modifiedCount = 0
-
-                for name, data in pairs(Items) do
-                    if typeof(data) == "table" and not gunExceptions[name] then
-                        if data.ShootSpread then 
-                            data.ShootSpread = 0 
-                            modifiedCount = modifiedCount + 1
-                        end
-                        if data.ShootAccuracy then 
-                            data.ShootAccuracy = 0 
-                        end
-                        if data.ShootRecoil then 
-                            data.ShootRecoil = 0 
-                        end
-                        if data.ShootCooldown then 
-                            data.ShootCooldown = _G.gunModsShootCooldown or 0.001 
-                        end
-                        if data.ShootBurstCooldown then 
-                            data.ShootBurstCooldown = _G.gunModsShootCooldown or 0.001 
-                        end
-                    end
-                end
-
-                vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns", 3, "success")
+                updateGuns(true)
+                vape:CreateNotification("Gun Mods v2", "Modifications Activated", 3, "success")
+            else
+                updateGuns(false)
+                vape:CreateNotification("Gun Mods v2", "Modifications Removed", 3, "neutral")
             end
         end,
-        Tooltip = "Fast fire rate with adjustable cooldown"
+        Tooltip = "test."
     })
 
     module:CreateSlider({
@@ -2911,9 +3011,9 @@ run(function()
         Decimal = 1000,
         Function = function(v)
             _G.gunModsShootCooldown = v
+            if module.Enabled then updateGuns(true) end
         end,
-        Suffix = "s",
-        Tooltip = "Delay between shots"
+        Suffix = "s"
     })
 
     module:CreateSlider({
@@ -2924,8 +3024,8 @@ run(function()
         Decimal = 10,
         Function = function(v)
             _G.gunModsShootSpread = v
-        end,
-        Tooltip = "Bullet spread amount"
+            if module.Enabled then updateGuns(true) end
+        end
     })
 
     module:CreateSlider({
@@ -2936,8 +3036,44 @@ run(function()
         Decimal = 10,
         Function = function(v)
             _G.gunModsShootRecoil = v
+            if module.Enabled then updateGuns(true) end
+        end
+    })
+
+    module:CreateToggle({
+        Name = "Infinite Ammo Capacity",
+        Function = function(callback)
+            _G.gunModsInfAmmo = callback
+            if module.Enabled then updateGuns(true) end
         end,
-        Tooltip = "Gun recoil amount"
+        Tooltip = "test"
+    })
+
+    module:CreateToggle({
+        Name = "Instant Reload Speed",
+        Function = function(callback)
+            _G.gunModsInstantReload = callback
+            if module.Enabled then updateGuns(true) end
+        end,
+        Tooltip = "test"
+    })
+
+    module:CreateToggle({
+        Name = "Infinite Range Projection",
+        Function = function(callback)
+            _G.gunModsInfRange = callback
+            if module.Enabled then updateGuns(true) end
+        end,
+        Tooltip = "hm"
+    })
+
+    module:CreateToggle({
+        Name = "Force Always Automatic",
+        Function = function(callback)
+            _G.gunModsAlwaysAuto = callback
+            if module.Enabled then updateGuns(true) end
+        end,
+        Tooltip = "Forces automatic"
     })
 end)
 
