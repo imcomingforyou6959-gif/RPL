@@ -5433,27 +5433,16 @@ function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 			animeImage.Parent = notification
 			
 			if imageAsset:match("%.gif$") then
-				local imageButton = Instance.new('ImageButton')
-				imageButton.Size = animeImage.Size
-				imageButton.Position = animeImage.Position
-				imageButton.AnchorPoint = animeImage.AnchorPoint
-				imageButton.BackgroundTransparency = 1
-				imageButton.Image = animeImage.Image
-				imageButton.ZIndex = 5
-				imageButton.Parent = notification
-				animeImage:Destroy()
-				
 				local angle = 0
 				local spinConnection
 				spinConnection = runService.RenderStepped:Connect(function()
-					if imageButton and imageButton.Parent then
+					if animeImage and animeImage.Parent then
 						angle = (angle + 5) % 360
-						imageButton.Rotation = angle
+						animeImage.Rotation = angle
 					else
 						spinConnection:Disconnect()
 					end
 				end)
-				animeImage = imageButton
 			end
 			
 			task.delay(duration - 0.5, function()
