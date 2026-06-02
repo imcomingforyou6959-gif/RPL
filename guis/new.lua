@@ -1121,6 +1121,7 @@ button.MouseButton1Click:Connect(function()
         end)
     end
 end)
+
 dropdown.MouseEnter:Connect(function()
     tween:Tween(bkg, uipallet.Tween, {
         BackgroundColor3 = color.Light(uipallet.Main, 0.0875)
@@ -1136,6 +1137,7 @@ optionapi.Object = dropdown
 api.Options[optionsettings.Name] = optionapi
 
 return optionapi
+	end,
 	Font = function(optionsettings, children, api)
 		local fonts = {
 			optionsettings.Blacklist,
