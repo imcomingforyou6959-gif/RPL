@@ -5356,9 +5356,8 @@ function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 		local notification = Instance.new('ImageLabel')
 		
 		local hasImage = imageAsset and imageAsset ~= ''
-		local imageHeight = hasImage and 50 or 0
 		local baseHeight = 75
-		local totalHeight = baseHeight + imageHeight
+		local totalHeight = baseHeight
 		
 		notification.Name = 'Notification'
 		notification.Size = UDim2.fromOffset(math.max(getfontsize(removeTags(text), 14, uipallet.Font).X + 80, 266), totalHeight)
@@ -5424,9 +5423,8 @@ function mainapi:CreateNotification(title, text, duration, type, imageAsset)
 		if hasImage then
 			local animeImage = Instance.new('ImageLabel')
 			animeImage.Name = 'AnimeImage'
-			animeImage.Size = UDim2.fromOffset(40, 40)
-			animeImage.Position = UDim2.fromOffset(notification.Size.X.Offset / 2 - 20, totalHeight - 45)
-			animeImage.AnchorPoint = Vector2.new(0.5, 0)
+			animeImage.Size = UDim2.fromOffset(20, 20)
+			animeImage.Position = UDim2.fromOffset(notification.Size.X.Offset - 28, 48)
 			animeImage.BackgroundTransparency = 1
 			animeImage.Image = getcustomasset(imageAsset)
 			animeImage.ZIndex = 5
