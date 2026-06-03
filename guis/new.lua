@@ -1084,76 +1084,36 @@ button.MouseButton1Click:Connect(function()
                 optionapi:SetValue(v, true)
             end)
             
+            tween:Tween(dropdownoption, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
+                BackgroundTransparency = 0
+            })
+            
             ind += 1
         end
         
         local targetHeight = 40 + (#optionsettings.List - 1) * 26
-        
-        for i, v in ipairs(content:GetChildren()) do
-            if v:IsA("TextButton") then
-                v.BackgroundTransparency = 1
-                task.delay(i * 0.03, function()
-                    if v and v.Parent then
-                        tween:Tween(v, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
-                            BackgroundTransparency = 0
-                        })
-                    end
-                end)
-            end
-        end
-        
-        for i = 0, targetHeight - 40, 5 do
-            task.delay(i * 0.002, function()
-                if dropdown and dropdown.Parent then
-                    dropdown.Size = UDim2.new(1, 0, 0, 40 + i)
-                end
-            end)
-        end
-        task.delay((targetHeight - 40) * 0.002 + 0.05, function()
-            if dropdown and dropdown.Parent then
-                dropdown.Size = UDim2.new(1, 0, 0, targetHeight)
-                dropdownchildren.Size = UDim2.new(1, 0, 0, (#optionsettings.List - 1) * 26)
-            end
-        end)
-        
-        dropdownchildren.Size = UDim2.new(1, 0, 0, (#optionsettings.List - 1) * 26)
+        tween:Tween(dropdown, uipallet.Tween, {
+            Size = UDim2.new(1, 0, 0, targetHeight)
+        })
+        dropdownchildren:TweenSize(UDim2.new(1, 0, 0, (#optionsettings.List - 1) * 26), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.2, true)
     else
-        local children = {}
         for _, v in ipairs(dropdownchildren:GetDescendants()) do
             if v:IsA("TextButton") then
-                table.insert(children, v)
+                tween:Tween(v, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {
+                    BackgroundTransparency = 1
+                })
             end
         end
         
-        for i, v in ipairs(children) do
-            tween:Tween(v, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {
-                BackgroundTransparency = 1
-            })
-        end
-        
-        for i = 0, (#optionsettings.List - 1) * 26, 5 do
-            task.delay(i * 0.0015, function()
-                if dropdownchildren and dropdownchildren.Parent then
-                    dropdownchildren.Size = UDim2.new(1, 0, 0, (#optionsettings.List - 1) * 26 - i)
-                end
-            end)
-        end
-        
-        for i = 40, 0, -5 do
-            task.delay((40 - i) * 0.002, function()
-                if dropdown and dropdown.Parent then
-                    dropdown.Size = UDim2.new(1, 0, 0, i)
-                end
-            end)
-        end
+        dropdownchildren:TweenSize(UDim2.new(1, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+        tween:Tween(dropdown, uipallet.Tween, {
+            Size = UDim2.new(1, 0, 0, 40)
+        })
         
         task.delay(0.15, function()
             if dropdownchildren then
                 dropdownchildren:Destroy()
                 dropdownchildren = nil
-            end
-            if dropdown then
-                dropdown.Size = UDim2.new(1, 0, 0, 40)
             end
         end)
         
