@@ -38,6 +38,8 @@ if not iswindowactive then iswindowactive = function() return true end end
 if not mouse1press then mouse1press = function() end end
 if not mouse1release then mouse1release = function() end end
 
+local getcustomaudio = getcustomaudio or function(path) return nil end
+
 local run = function(func, issue)
     if issue then return end
     pcall(func)
@@ -1396,7 +1398,6 @@ run(function()
     }
 
     local getAsset = getcustomasset or getsynasset or function(path)
-        warn("No getcustomasset/getsynasset available")
         return nil
     end
 
@@ -1440,134 +1441,136 @@ run(function()
 
     local hitsoundEnabled = false
     local currentSoundId = soundMap["Bell"]
-    local oldShootFunction = nil
-    local oldFireRemote = nil
+    local currentVolume = 0.5
+    local lastHitTime = 0
+    local hitCooldown = 0.1
+
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local RunService = game:GetService("RunService")
+    local Camera = workspace.CurrentCamera
+    local UserInputService = game:GetService("UserInputService")
 
     local function playHitSound()
         local sound = Instance.new("Sound")
         sound.SoundId = currentSoundId
-        sound.Volume = 0.5
+        sound.Volume = currentVolume
         sound.Parent = game:GetService("CoreGui")
         sound:Play()
         game:GetService("Debris"):AddItem(sound, 2)
     end
 
-    local function hookGunController()
-        local replicatedStorage = game:GetService("ReplicatedStorage")
-        local gunController = replicatedStorage:FindFirstChild("Scripts")
-        if gunController then
-            gunController = gunController:FindFirstChild("ToolScripts")
-            if gunController then
-                gunController = gunController:FindFirstChild("GunController")
-            end
-        end
+    local function isEnemy(player)
+        if player == LocalPlayer then return false end
+        local myTeam = LocalPlayer.Team
+        local theirTeam = player.Team
+        if not myTeam or not theirTeam then return true end
+        return myTeam.Name ~= theirTeam.Name
+    end
+
+    local function isAlive(player)
+        if not player.Character then return false end
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        return humanoid and humanoid.Health > 0
+    end
+
+    local function getTargetAtCrosshair()
+        local mousePos = UserInputService:GetMouseLocation()
+        local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
         
-        if not gunController then return false end
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        params.FilterDescendantsInstances = {LocalPlayer.Character}
         
-        for i = 1, 50 do
-            local success, upvalue = pcall(function()
-                return debug.getupvalue(gunController, i)
-            end)
-            if success and type(upvalue) == "function" then
-                local info = debug.getinfo(upvalue)
-                if info and info.name == "shoot" then
-                    oldShootFunction = upvalue
-                    debug.setupvalue(gunController, i, function(...)
-                        if hitsoundEnabled then
-                            playHitSound()
-                        end
-                        return oldShootFunction(...)
-                    end)
-                    return true
+        local result = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
+        
+        if result and result.Instance then
+            local character = result.Instance:FindFirstAncestorOfClass("Model")
+            if character then
+                local player = Players:GetPlayerFromCharacter(character)
+                if player and player ~= LocalPlayer and isAlive(player) and isEnemy(player) then
+                    return player
                 end
             end
         end
-        return false
+        return nil
     end
 
-    local function hookShootRemote()
-        local replicatedStorage = game:GetService("ReplicatedStorage")
-        local shootRemote = replicatedStorage:FindFirstChild("ShootEvent")
+    local function monitorHealth()
+        local lastHealth = {}
         
-        if not shootRemote or not shootRemote:IsA("RemoteEvent") then
-            for _, child in pairs(replicatedStorage:GetChildren()) do
-                if child:IsA("RemoteEvent") and (child.Name:lower():find("shoot") or child.Name:lower():find("fire")) then
-                    shootRemote = child
-                    break
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    lastHealth[player.Name] = humanoid.Health
                 end
             end
         end
         
-        if shootRemote and shootRemote:IsA("RemoteEvent") then
-            oldFireRemote = shootRemote.FireServer
-            shootRemote.FireServer = function(...)
-                if hitsoundEnabled then
-                    playHitSound()
-                end
-                return oldFireRemote(...)
-            end
-            return true
-        end
-        return false
-    end
-
-    local function applyPrisonLifeHitsound()
-        if not hitsoundEnabled then return end
-        
-        local hooked = hookGunController()
-        if not hooked then
-            hookShootRemote()
-        end
-    end
-
-    local function removeHooks()
-        local replicatedStorage = game:GetService("ReplicatedStorage")
-        
-        if oldShootFunction then
-            local gunController = replicatedStorage:FindFirstChild("Scripts")
-            if gunController then
-                gunController = gunController:FindFirstChild("ToolScripts")
-                if gunController then
-                    gunController = gunController:FindFirstChild("GunController")
-                    if gunController then
-                        for i = 1, 50 do
-                            local success, upvalue = pcall(function()
-                                return debug.getupvalue(gunController, i)
-                            end)
-                            if success and type(upvalue) == "function" then
-                                local info = debug.getinfo(upvalue)
-                                if info and info.name == "shoot" then
-                                    debug.setupvalue(gunController, i, oldShootFunction)
-                                    break
-                                end
+        Players.PlayerAdded:Connect(function(player)
+            player.CharacterAdded:Connect(function(character)
+                task.wait(0.5)
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    lastHealth[player.Name] = humanoid.Health
+                    
+                    humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+                        if not hitsoundEnabled then return end
+                        local newHealth = humanoid.Health
+                        local oldHealth = lastHealth[player.Name] or newHealth
+                        
+                        if newHealth < oldHealth and newHealth > 0 then
+                            if tick() - lastHitTime >= hitCooldown then
+                                lastHitTime = tick()
+                                playHitSound()
                             end
                         end
-                    end
+                        lastHealth[player.Name] = newHealth
+                    end)
                 end
-            end
-            oldShootFunction = nil
-        end
+            end)
+        end)
         
-        if oldFireRemote then
-            local shootRemote = replicatedStorage:FindFirstChild("ShootEvent")
-            if shootRemote and shootRemote:IsA("RemoteEvent") then
-                shootRemote.FireServer = oldFireRemote
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                player.CharacterAdded:Connect(function(character)
+                    task.wait(0.5)
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        lastHealth[player.Name] = humanoid.Health
+                        
+                        humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+                            if not hitsoundEnabled then return end
+                            local newHealth = humanoid.Health
+                            local oldHealth = lastHealth[player.Name] or newHealth
+                            
+                            if newHealth < oldHealth and newHealth > 0 then
+                                if tick() - lastHitTime >= hitCooldown then
+                                    lastHitTime = tick()
+                                    playHitSound()
+                                end
+                            end
+                            lastHealth[player.Name] = newHealth
+                        end)
+                    end
+                end)
             end
-            oldFireRemote = nil
         end
     end
 
     local HitsoundModule = vape.Categories.Utility:CreateModule({
-        Name = "Hitsound",
+        Name = "Prison Life Hitsound",
         Function = function(callback)
             hitsoundEnabled = callback
             if callback then
-                applyPrisonLifeHitsound()
+                monitorHealth()
+                notif('Prison Life Hitsound', 'Enabled - Plays when you hit someone', 2, 'success')
             else
-                removeHooks()
+                notif('Prison Life Hitsound', 'Disabled', 1, 'info')
             end
         end,
-        Tooltip = "hitsounds"
+        Tooltip = "Plays sound when you hit an enemy"
     })
     
     HitsoundModule:CreateToggle({
@@ -1576,9 +1579,7 @@ run(function()
         Function = function(c)
             hitsoundEnabled = c
             if c then
-                applyPrisonLifeHitsound()
-            else
-                removeHooks()
+                monitorHealth()
             end
         end
     })
@@ -1598,10 +1599,24 @@ run(function()
         Max = 100,
         Default = 50,
         Function = function(v)
+            currentVolume = v / 100
         end,
         Suffix = "%"
     })
-end)																						
+    
+    HitsoundModule:CreateSlider({
+        Name = "Hit Cooldown",
+        Min = 0.05,
+        Max = 0.5,
+        Default = 0.1,
+        Decimal = 100,
+        Function = function(v)
+            hitCooldown = v
+        end,
+        Suffix = "s",
+        Tooltip = "Prevents sound spam from rapid hits"
+    })
+end)																			
                                                                                 
 run(function()
     local SilentAim
