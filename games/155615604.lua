@@ -1443,13 +1443,7 @@ run(function()
     local currentSoundId = soundMap["Bell"]
     local currentVolume = 0.5
     local lastHitTime = 0
-    local hitCooldown = 0.1
-
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local RunService = game:GetService("RunService")
-    local Camera = workspace.CurrentCamera
-    local UserInputService = game:GetService("UserInputService")
+    local hitCooldown = 0.05
 
     local function playHitSound()
         local sound = Instance.new("Sound")
@@ -1460,114 +1454,42 @@ run(function()
         game:GetService("Debris"):AddItem(sound, 2)
     end
 
-    local function isEnemy(player)
-        if player == LocalPlayer then return false end
-        local myTeam = LocalPlayer.Team
-        local theirTeam = player.Team
-        if not myTeam or not theirTeam then return true end
-        return myTeam.Name ~= theirTeam.Name
-    end
+    local originalPrisonLifeHook = t.sa.hooks.PrisonLife
 
-    local function isAlive(player)
-        if not player.Character then return false end
-        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-        return humanoid and humanoid.Health > 0
-    end
-
-    local function getTargetAtCrosshair()
-        local mousePos = UserInputService:GetMouseLocation()
-        local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
+    t.sa.hooks.PrisonLife = function(args)
+        local result = nil
         
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Blacklist
-        params.FilterDescendantsInstances = {LocalPlayer.Character}
-        
-        local result = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
-        
-        if result and result.Instance then
-            local character = result.Instance:FindFirstAncestorOfClass("Model")
-            if character then
-                local player = Players:GetPlayerFromCharacter(character)
-                if player and player ~= LocalPlayer and isAlive(player) and isEnemy(player) then
-                    return player
-                end
-            end
-        end
-        return nil
-    end
-
-    local function monitorHealth()
-        local lastHealth = {}
-        
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    lastHealth[player.Name] = humanoid.Health
-                end
-            end
+        if originalPrisonLifeHook then
+            result = originalPrisonLifeHook(args)
         end
         
-        Players.PlayerAdded:Connect(function(player)
-            player.CharacterAdded:Connect(function(character)
-                task.wait(0.5)
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    lastHealth[player.Name] = humanoid.Health
-                    
-                    humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-                        if not hitsoundEnabled then return end
-                        local newHealth = humanoid.Health
-                        local oldHealth = lastHealth[player.Name] or newHealth
-                        
-                        if newHealth < oldHealth and newHealth > 0 then
-                            if tick() - lastHitTime >= hitCooldown then
-                                lastHitTime = tick()
-                                playHitSound()
-                            end
+        if args and args[1] and type(args[1]) == "table" then
+            for _, hit in pairs(args[1]) do
+                if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                    local part = hit[3]
+                    local character = part:FindFirstAncestorOfClass("Model")
+                    if character and character:FindFirstChildOfClass("Humanoid") then
+                        if hitsoundEnabled and tick() - lastHitTime >= hitCooldown then
+                            lastHitTime = tick()
+                            playHitSound()
                         end
-                        lastHealth[player.Name] = newHealth
-                    end)
-                end
-            end)
-        end)
-        
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                player.CharacterAdded:Connect(function(character)
-                    task.wait(0.5)
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        lastHealth[player.Name] = humanoid.Health
-                        
-                        humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-                            if not hitsoundEnabled then return end
-                            local newHealth = humanoid.Health
-                            local oldHealth = lastHealth[player.Name] or newHealth
-                            
-                            if newHealth < oldHealth and newHealth > 0 then
-                                if tick() - lastHitTime >= hitCooldown then
-                                    lastHitTime = tick()
-                                    playHitSound()
-                                end
-                            end
-                            lastHealth[player.Name] = newHealth
-                        end)
+                        break
                     end
-                end)
+                end
             end
         end
+        
+        return result
     end
 
     local HitsoundModule = vape.Categories.Utility:CreateModule({
-        Name = "Prison Life Hitsound",
+        Name = "Hitsound",
         Function = function(callback)
             hitsoundEnabled = callback
             if callback then
-                monitorHealth()
-                notif('Prison Life Hitsound', 'Enabled - Plays when you hit someone', 2, 'success')
+                notif('hitsound', 'Enabled', 2, 'success')
             else
-                notif('Prison Life Hitsound', 'Disabled', 1, 'info')
+                notif('Hitsound', 'Disabled', 1, 'info')
             end
         end,
         Tooltip = "Plays sound when you hit an enemy"
@@ -1578,9 +1500,6 @@ run(function()
         Default = false,
         Function = function(c)
             hitsoundEnabled = c
-            if c then
-                monitorHealth()
-            end
         end
     })
     
@@ -1589,7 +1508,7 @@ run(function()
         List = soundNames,
         Function = function(val)
             currentSoundId = soundMap[val] or soundMap["Bell"]
-            notif('Prison Life Hitsound', 'Selected: '..val, 2, 'success')
+            notif('Hitsound', 'Selected: '..val, 2, 'success')
         end
     })
     
@@ -1602,19 +1521,6 @@ run(function()
             currentVolume = v / 100
         end,
         Suffix = "%"
-    })
-    
-    HitsoundModule:CreateSlider({
-        Name = "Hit Cooldown",
-        Min = 0.05,
-        Max = 0.5,
-        Default = 0.1,
-        Decimal = 100,
-        Function = function(v)
-            hitCooldown = v
-        end,
-        Suffix = "s",
-        Tooltip = "Prevents sound spam from rapid hits"
     })
 end)																			
                                                                                 
