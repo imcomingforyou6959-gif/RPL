@@ -3542,10 +3542,8 @@ run(function()
     local AntiAim
     local Mode
     local Direction
-    local ManualToggle
     local renderConn
     local lastAngle = 0
-    local lockedAngle = nil
 
     local function getAngleOffset()
         local dir = Direction and Direction.Value or "Left"
@@ -3591,11 +3589,7 @@ run(function()
         local moveDir = entitylib.character.Humanoid.MoveDirection
         if moveDir.Magnitude < 0.1 then return end
 
-        if ManualToggle and ManualToggle.Enabled and lockedAngle then
-            lastAngle = lockedAngle
-        else
-            lastAngle = getAngleOffset()
-        end
+        lastAngle = getAngleOffset()
         root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
     end
 
@@ -3613,29 +3607,10 @@ run(function()
         humanoid.AutoRotate = false
     end
 
-    local function setupKeybinds()
-        AntiAim:Clean(inputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not AntiAim.Enabled then return end
-            if Mode.Value ~= "Sideways" then return end
-            if not ManualToggle or not ManualToggle.Enabled then return end
-
-            if input.KeyCode == Enum.KeyCode.Up then
-                lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) + math.rad(90)
-                notif('AntiAim', 'Locked facing left', 2, 'info', "newvape/assets/new/anime.png")
-            elseif input.KeyCode == Enum.KeyCode.Down then
-                lockedAngle = math.atan2(gameCamera.CFrame.LookVector.X, gameCamera.CFrame.LookVector.Z) - math.rad(90)
-                notif('AntiAim', 'Locked facing right', 2, 'info', "newvape/assets/new/anime.png")
-            end
-        end))
-    end
-
     AntiAim = vape.Categories.Blatant:CreateModule({
         Name = 'AntiAim',
         Function = function(callback)
             if callback then
-                lockedAngle = nil
-                setupKeybinds()
                 renderConn = runService.RenderStepped:Connect(function()
                     local mode = Mode and Mode.Value or "Inverse"
                     if mode == "Inverse" then
@@ -3657,10 +3632,9 @@ run(function()
                 if entitylib.isAlive then
                     entitylib.character.Humanoid.AutoRotate = true
                 end
-                lockedAngle = nil
             end
         end,
-        Tooltip = 'Fake movement direction'
+        Tooltip = 'Fake'
     })
 
     Mode = AntiAim:CreateDropdown({
@@ -3670,12 +3644,6 @@ run(function()
         Function = function(val)
             if Direction then
                 Direction.Object.Visible = (val == "Sideways")
-            end
-            if ManualToggle then
-                ManualToggle.Object.Visible = (val == "Sideways")
-            end
-            if val ~= "Sideways" then
-                lockedAngle = nil
             end
         end
     })
@@ -3687,17 +3655,83 @@ run(function()
         Visible = false,
         Function = function() end
     })
-
-    ManualToggle = AntiAim:CreateToggle({
-        Name = 'Manual',
-        Default = false,
-        Visible = false,
-        Function = function(v)
-            if not v then lockedAngle = nil end
-        end,
-        Tooltip = 'Use Up/Down arrow keys'
-    })
 end)
+																																																											
+run(function()
+    local ManualAntiAim
+    local renderConn
+    local lastAngle = 0
+    local manualMode = false
+    local manualDirection = nil
+
+    local function getManualAngle()
+        local camForward = gameCamera.CFrame.LookVector * Vector3.new(1, 0, 1)
+        local angle = math.atan2(camForward.X, camForward.Z)
+        
+        if manualDirection == "Left" then
+            return angle + math.rad(90)
+        elseif manualDirection == "Right" then
+            return angle - math.rad(90)
+        end
+        return angle
+    end
+
+    local function applyManualSideways()
+        if not entitylib.isAlive then return end
+        local root = entitylib.character.RootPart
+        local moveDir = entitylib.character.Humanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        lastAngle = getManualAngle()
+        root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, lastAngle, 0)
+        
+        local humanoid = entitylib.character.Humanoid
+        if humanoid.CameraOffset ~= Vector3.new(0, 0, 0) then
+            humanoid.CameraOffset = Vector3.new(0, 0, 0)
+        end
+        humanoid.AutoRotate = false
+    end
+
+    ManualAntiAim = vape.Categories.Blatant:CreateModule({
+        Name = 'Manual AntiAim',
+        Function = function(callback)
+            if callback then
+                manualMode = true
+                renderConn = runService.RenderStepped:Connect(function()
+                    if manualMode and manualDirection then
+                        applyManualSideways()
+                    end
+                end)
+                notif('Manual AntiAim', 'Enabled - Use Q/E keys', 2, 'info')
+            else
+                if renderConn then
+                    renderConn:Disconnect()
+                    renderConn = nil
+                end
+                manualMode = false
+                manualDirection = nil
+                if entitylib.isAlive then
+                    entitylib.character.Humanoid.AutoRotate = true
+                end
+                notif('Manual AntiAim', 'Disabled', 1, 'info')
+            end
+        end,
+        Tooltip = 'Manual'
+    })
+
+    inputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not ManualAntiAim.Enabled then return end
+        
+        if input.KeyCode == Enum.KeyCode.Q then
+            manualDirection = "Left"
+            notif('Manual AntiAim', 'Facing Left', 1, 'info', "newvape/assets/new/anime.png")
+        elseif input.KeyCode == Enum.KeyCode.E then
+            manualDirection = "Right"
+            notif('Manual AntiAim', 'Facing Right', 1, 'info', "newvape/assets/new/anime.png")
+        end
+    end)
+end)																																																											
 	
 run(function()
 	local Swim
