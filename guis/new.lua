@@ -6781,16 +6781,45 @@ function mainapi:UpdateTextGUI(afterload)
 	if not afterload and not mainapi.Loaded then return end
 	if textgui.Button.Enabled then
 		local right = textgui.Children.AbsolutePosition.X > (gui.AbsoluteSize.X / 2)
+		
+		local fadeInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad)
+		
 		VapeLogo.Visible = textguiwatermark.Enabled
+		if textguiwatermark.Enabled then
+			VapeLogo.ImageTransparency = 1
+			tween:Tween(VapeLogo, fadeInfo, {ImageTransparency = 0})
+		end
 		VapeLogo.Position = right and UDim2.new(1 / VapeTextScale.Scale, -113, 0, 6) or UDim2.fromOffset(0, 6)
+		
 		VapeLogoShadow.Visible = textguishadow.Enabled
+		if textguishadow.Enabled then
+			VapeLogoShadow.ImageTransparency = 1
+			tween:Tween(VapeLogoShadow, fadeInfo, {ImageTransparency = 0})
+		end
+		
 		VapeLabelCustom.Text = textguibox.Value
 		VapeLabelCustom.FontFace = textguifontcustom.Value
 		VapeLabelCustom.Visible = VapeLabelCustom.Text ~= '' and textguitext.Enabled
 		VapeLabelCustomShadow.Visible = VapeLabelCustom.Visible and textguishadow.Enabled
+		
+		if VapeLabelCustom.Visible then
+			VapeLabelCustom.TextTransparency = 1
+			tween:Tween(VapeLabelCustom, fadeInfo, {TextTransparency = 0})
+			if textguishadow.Enabled then
+				VapeLabelCustomShadow.TextTransparency = 1
+				tween:Tween(VapeLabelCustomShadow, fadeInfo, {TextTransparency = 0})
+			end
+		end
+		
 		VapeLabelSorter.HorizontalAlignment = right and Enum.HorizontalAlignment.Right or Enum.HorizontalAlignment.Left
+		
+		local targetPos = UDim2.fromOffset(right and 3 or 0, 11 + (VapeLogo.Visible and 32 or 0) + (VapeLabelCustom.Visible and 28 or 0) + (textguibackground.Enabled and 3 or 0))
+		tween:Tween(VapeLabelHolder, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+			Position = targetPos
+		})
+		
 		VapeLabelHolder.Size = UDim2.fromScale(1 / VapeTextScale.Scale, 1)
-		VapeLabelHolder.Position = UDim2.fromOffset(right and 3 or 0, 11 + (VapeLogo.Visible and VapeLogo.Size.Y.Offset or 0) + (VapeLabelCustom.Visible and 28 or 0) + (textguibackground.Enabled and 3 or 0))
+		
 		if VapeLabelCustom.Visible then
 			local size = getfontsize(removeTags(VapeLabelCustom.Text), VapeLabelCustom.TextSize, VapeLabelCustom.FontFace)
 			VapeLabelCustom.Size = UDim2.fromOffset(size.X, size.Y)
@@ -6802,11 +6831,20 @@ function mainapi:UpdateTextGUI(afterload)
 			if v.Enabled then
 				table.insert(found, v.Object.Name)
 			end
-			v.Object:Destroy()
+			tween:Tween(v.Object, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+				BackgroundTransparency = 1
+			})
+			task.delay(0.1, function()
+				if v.Object and v.Object.Parent then
+					v.Object:Destroy()
+				end
+			end)
 		end
 		table.clear(VapeLabels)
 
-		local info = TweenInfo.new(0.3, Enum.EasingStyle.Exponential)
+		local info = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+		local slideInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		
 		for i, v in mainapi.Modules do
 			if textguimodules.Enabled and table.find(textguimoduleslist.ListEnabled, i) then continue end
 			if textguirender.Enabled and v.Category == 'Render' then continue end
@@ -6817,6 +6855,9 @@ function mainapi:UpdateTextGUI(afterload)
 				holder.BackgroundTransparency = 1
 				holder.ClipsDescendants = true
 				holder.Parent = VapeLabelHolder
+				
+				holder.Position = UDim2.fromOffset(right and 50 or -50, 0)
+				
 				local holderbackground
 				local holdercolorline
 				if textguibackground.Enabled then
@@ -6826,6 +6867,7 @@ function mainapi:UpdateTextGUI(afterload)
 					holderbackground.BackgroundTransparency = textguibackgroundtransparency.Value
 					holderbackground.BorderSizePixel = 0
 					holderbackground.Parent = holder
+					
 					local holderline = Instance.new('Frame')
 					holderline.Size = UDim2.new(1, 0, 0, 1)
 					holderline.Position = UDim2.new(0, 0, 1, -1)
@@ -6833,16 +6875,21 @@ function mainapi:UpdateTextGUI(afterload)
 					holderline.BackgroundTransparency = 0.928 + (0.072 * math.clamp((textguibackgroundtransparency.Value - 0.5) / 0.5, 0, 1))
 					holderline.BorderSizePixel = 0
 					holderline.Parent = holderbackground
+					
 					local holderline2 = holderline:Clone()
 					holderline2.Name = 'Line'
 					holderline2.Position = UDim2.new()
 					holderline2.Parent = holderbackground
+					
 					holdercolorline = Instance.new('Frame')
 					holdercolorline.Size = UDim2.new(0, 2, 1, 0)
 					holdercolorline.Position = right and UDim2.new(1, -5, 0, 0) or UDim2.new()
 					holdercolorline.BorderSizePixel = 0
 					holdercolorline.Parent = holderbackground
+					holdercolorline.BackgroundColor3 = Color3.fromHSV(mainapi.GUIColor.Hue, mainapi.GUIColor.Sat, mainapi.GUIColor.Value)
+					holdercolorline.Size = UDim2.new(0, 0, 1, 0)
 				end
+				
 				local holdertext = Instance.new('TextLabel')
 				holdertext.Position = UDim2.fromOffset(right and 3 or 6, 2)
 				holdertext.BackgroundTransparency = 1
@@ -6851,8 +6898,11 @@ function mainapi:UpdateTextGUI(afterload)
 				holdertext.TextSize = 15
 				holdertext.FontFace = textguifont.Value
 				holdertext.RichText = true
+				holdertext.TextTransparency = 1
+				
 				local size = getfontsize(removeTags(holdertext.Text), holdertext.TextSize, holdertext.FontFace)
 				holdertext.Size = UDim2.fromOffset(size.X, size.Y)
+				
 				if textguishadow.Enabled then
 					local holderdrop = holdertext:Clone()
 					holderdrop.Position = UDim2.fromOffset(holdertext.Position.X.Offset + 1, holdertext.Position.Y.Offset + 1)
@@ -6861,23 +6911,44 @@ function mainapi:UpdateTextGUI(afterload)
 					holderdrop.Parent = holder
 				end
 				holdertext.Parent = holder
+				
 				local holdersize = UDim2.fromOffset(size.X + 10, size.Y + (textguibackground.Enabled and 5 or 3))
+				
+				tween:Tween(holder, slideInfo, {
+					Position = UDim2.fromOffset(0, 0)
+				})
+				
+				tween:Tween(holdertext, fadeInfo, {
+					TextTransparency = 0
+				})
+				
 				if textguianimations.Enabled then
 					if not table.find(found, i) then
 						tween:Tween(holder, info, {
 							Size = holdersize
 						})
+						if holdercolorline then
+							tween:Tween(holdercolorline, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+								Size = UDim2.new(0, 2, 1, 0)
+							})
+						end
 					else
 						holder.Size = holdersize
 						if not v.Enabled then
 							tween:Tween(holder, info, {
 								Size = UDim2.fromOffset()
 							})
+							if holdercolorline then
+								tween:Tween(holdercolorline, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+									Size = UDim2.new(0, 0, 1, 0)
+								})
+							end
 						end
 					end
 				else
 					holder.Size = v.Enabled and holdersize or UDim2.fromOffset()
 				end
+				
 				table.insert(VapeLabels, {
 					Object = holder,
 					Text = holdertext,
