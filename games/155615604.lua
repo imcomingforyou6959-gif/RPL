@@ -1380,6 +1380,228 @@ run(function()
         end
     })
 end)
+
+run(function()
+    local assetSounds = {
+        {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
+        {name="Bubble", id="rbxassetid://6534947588"},{name="Pick", id="rbxassetid://1347140027"},
+        {name="Pop", id="rbxassetid://198598793"},{name="Rust", id="rbxassetid://1255040462"},
+        {name="Sans", id="rbxassetid://3188795283"},{name="Fart", id="rbxassetid://130833677"},
+        {name="Big", id="rbxassetid://5332005053"},{name="Vine", id="rbxassetid://5332680810"},
+        {name="Bruh", id="rbxassetid://4578740568"},{name="Skeet", id="rbxassetid://5633695679"},
+        {name="Fatality", id="rbxassetid://6534947869"},{name="Bonk", id="rbxassetid://5766898159"},
+        {name="Minecraft", id="rbxassetid://4018616850"},{name="TomScream", id="rbxassetid://7553397015"},
+        {name="Prowler", id="rbxassetid://131169447699141"},{name="Fortnite", id="rbxassetid://140073271098075"},
+        {name="iphone", id="rbxassetid://131935970184832"},{name="Lmk", id="rbxassetid://118833207462382"},
+    }
+
+    local getAsset = getcustomasset or getsynasset or function(path)
+        warn("No getcustomasset/getsynasset available")
+        return nil
+    end
+
+    local customSoundFiles = {
+        "1nn.mp3", "67.mp3", "BatHit.mp3", "Beep.mp3", "Bonk.mp3", "Bow.mp3",
+        "Bubble.mp3", "Bubble2.mp3", "CSGO.mp3", "Cod.mp3", "Fairy1.mp3",
+        "Fairy2.mp3", "Fatality.mp3", "Fatality2.mp3", "Hentai1.mp3",
+        "Hentai2.mp3", "Hentai3.mp3", "Lazer.mp3", "MarioCoins.mp3",
+        "MinecraftXP.mp3", "Neverlose.mp3", "OSU.mp3", "PubgPan.mp3",
+        "Rifk7.mp3", "RustHeadshot.mp3", "Skeet.mp3", "SpanishMoan.mp3",
+        "StaryKrow.mp3", "Steve.mp3", "TF2Crit.mp3", "TF2Default.mp3",
+        "Windows.mp3", "boolean.ogg", "disable.ogg", "enable.ogg",
+        "keypress.ogg", "keyrelease.ogg", "lobby.mp3", "moan1.ogg",
+        "moan2.ogg", "moan3.ogg", "moan4.ogg", "orthodox.ogg",
+        "pmsound.ogg", "rifk.ogg"
+    }
+
+    local customSounds = {}
+    local soundFolder = "newvape/assets/sounds/"
+
+    for _, fileName in ipairs(customSoundFiles) do
+        local fullPath = soundFolder .. fileName
+        local assetId = getAsset(fullPath)
+        if assetId then
+            local displayName = fileName:gsub("%.mp3$", ""):gsub("%.ogg$", "")
+            table.insert(customSounds, {name = displayName, id = assetId})
+        end
+    end
+
+    local soundNames = {}
+    local soundMap = {}
+
+    for _, s in ipairs(assetSounds) do
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.id
+    end
+    for _, s in ipairs(customSounds) do
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.id
+    end
+
+    local hitsoundEnabled = false
+    local currentSoundId = soundMap["Bell"]
+    local oldShootFunction = nil
+    local oldFireRemote = nil
+
+    local function playHitSound()
+        local sound = Instance.new("Sound")
+        sound.SoundId = currentSoundId
+        sound.Volume = 0.5
+        sound.Parent = game:GetService("CoreGui")
+        sound:Play()
+        game:GetService("Debris"):AddItem(sound, 2)
+    end
+
+    local function hookGunController()
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        local gunController = replicatedStorage:FindFirstChild("Scripts")
+        if gunController then
+            gunController = gunController:FindFirstChild("ToolScripts")
+            if gunController then
+                gunController = gunController:FindFirstChild("GunController")
+            end
+        end
+        
+        if not gunController then return false end
+        
+        for i = 1, 50 do
+            local success, upvalue = pcall(function()
+                return debug.getupvalue(gunController, i)
+            end)
+            if success and type(upvalue) == "function" then
+                local info = debug.getinfo(upvalue)
+                if info and info.name == "shoot" then
+                    oldShootFunction = upvalue
+                    debug.setupvalue(gunController, i, function(...)
+                        if hitsoundEnabled then
+                            playHitSound()
+                        end
+                        return oldShootFunction(...)
+                    end)
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local function hookShootRemote()
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        local shootRemote = replicatedStorage:FindFirstChild("ShootEvent")
+        
+        if not shootRemote or not shootRemote:IsA("RemoteEvent") then
+            for _, child in pairs(replicatedStorage:GetChildren()) do
+                if child:IsA("RemoteEvent") and (child.Name:lower():find("shoot") or child.Name:lower():find("fire")) then
+                    shootRemote = child
+                    break
+                end
+            end
+        end
+        
+        if shootRemote and shootRemote:IsA("RemoteEvent") then
+            oldFireRemote = shootRemote.FireServer
+            shootRemote.FireServer = function(...)
+                if hitsoundEnabled then
+                    playHitSound()
+                end
+                return oldFireRemote(...)
+            end
+            return true
+        end
+        return false
+    end
+
+    local function applyPrisonLifeHitsound()
+        if not hitsoundEnabled then return end
+        
+        local hooked = hookGunController()
+        if not hooked then
+            hookShootRemote()
+        end
+    end
+
+    local function removeHooks()
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        
+        if oldShootFunction then
+            local gunController = replicatedStorage:FindFirstChild("Scripts")
+            if gunController then
+                gunController = gunController:FindFirstChild("ToolScripts")
+                if gunController then
+                    gunController = gunController:FindFirstChild("GunController")
+                    if gunController then
+                        for i = 1, 50 do
+                            local success, upvalue = pcall(function()
+                                return debug.getupvalue(gunController, i)
+                            end)
+                            if success and type(upvalue) == "function" then
+                                local info = debug.getinfo(upvalue)
+                                if info and info.name == "shoot" then
+                                    debug.setupvalue(gunController, i, oldShootFunction)
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            oldShootFunction = nil
+        end
+        
+        if oldFireRemote then
+            local shootRemote = replicatedStorage:FindFirstChild("ShootEvent")
+            if shootRemote and shootRemote:IsA("RemoteEvent") then
+                shootRemote.FireServer = oldFireRemote
+            end
+            oldFireRemote = nil
+        end
+    end
+
+    local HitsoundModule = vape.Categories.Utility:CreateModule({
+        Name = "Hitsound",
+        Function = function(callback)
+            hitsoundEnabled = callback
+            if callback then
+                applyPrisonLifeHitsound()
+            else
+                removeHooks()
+            end
+        end,
+        Tooltip = "hitsounds"
+    })
+    
+    HitsoundModule:CreateToggle({
+        Name = "Enable Hitsound",
+        Default = false,
+        Function = function(c)
+            hitsoundEnabled = c
+            if c then
+                applyPrisonLifeHitsound()
+            else
+                removeHooks()
+            end
+        end
+    })
+    
+    HitsoundModule:CreateDropdown({
+        Name = "Select Sound",
+        List = soundNames,
+        Function = function(val)
+            currentSoundId = soundMap[val] or soundMap["Bell"]
+            notif('Prison Life Hitsound', 'Selected: '..val, 2, 'success')
+        end
+    })
+    
+    HitsoundModule:CreateSlider({
+        Name = "Volume",
+        Min = 0,
+        Max = 100,
+        Default = 50,
+        Function = function(v)
+        end,
+        Suffix = "%"
+    })
+end)																						
                                                                                 
 run(function()
     local SilentAim
