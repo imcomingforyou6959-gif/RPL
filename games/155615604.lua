@@ -1454,65 +1454,58 @@ run(function()
         game:GetService("Debris"):AddItem(sound, 2)
     end
 
-    local originalPrisonLifeHook = t.sa.hooks.PrisonLife
-
-    t.sa.hooks.PrisonLife = function(args)
-        local result = nil
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    local ShootEvent = replicatedStorage:FindFirstChild("ShootEvent")
+    
+    if ShootEvent then
+        local oldFireServer = ShootEvent.FireServer
         
-        if originalPrisonLifeHook then
-            result = originalPrisonLifeHook(args)
-        end
-        
-        if args and args[1] and type(args[1]) == "table" then
-            for _, hit in pairs(args[1]) do
-                if hit and hit[3] and typeof(hit[3]) == "Instance" then
-                    local part = hit[3]
-                    local character = part:FindFirstAncestorOfClass("Model")
+        ShootEvent.FireServer = function(...)
+            local args = {...}
+            local hits = args[1]
+            
+            if hits and type(hits) == "table" and hits[1] and hits[1][3] then
+                local targetPart = hits[1][3]
+                if targetPart and typeof(targetPart) == "Instance" then
+                    local character = targetPart:FindFirstAncestorOfClass("Model")
                     if character and character:FindFirstChildOfClass("Humanoid") then
                         if hitsoundEnabled and tick() - lastHitTime >= hitCooldown then
                             lastHitTime = tick()
                             playHitSound()
                         end
-                        break
                     end
                 end
             end
+            
+            return oldFireServer(unpack(args))
         end
-        
-        return result
     end
 
-    local HitsoundModule = vape.Categories.Utility:CreateModule({
+    local Hitsound = vape.Categories.Utility:CreateModule({
         Name = "Hitsound",
         Function = function(callback)
             hitsoundEnabled = callback
-            if callback then
-                notif('hitsound', 'Enabled', 2, 'success')
-            else
-                notif('Hitsound', 'Disabled', 1, 'info')
-            end
         end,
         Tooltip = "Plays sound when you hit an enemy"
     })
     
-    HitsoundModule:CreateToggle({
-        Name = "Enable Hitsound",
+    Hitsound:CreateToggle({
+        Name = "Enable",
         Default = false,
         Function = function(c)
             hitsoundEnabled = c
         end
     })
     
-    HitsoundModule:CreateDropdown({
-        Name = "Select Sound",
+    Hitsound:CreateDropdown({
+        Name = "Sound",
         List = soundNames,
         Function = function(val)
             currentSoundId = soundMap[val] or soundMap["Bell"]
-            notif('Hitsound', 'Selected: '..val, 2, 'success')
         end
     })
     
-    HitsoundModule:CreateSlider({
+    Hitsound:CreateSlider({
         Name = "Volume",
         Min = 0,
         Max = 100,
@@ -1521,6 +1514,18 @@ run(function()
             currentVolume = v / 100
         end,
         Suffix = "%"
+    })
+    
+    Hitsound:CreateSlider({
+        Name = "Cooldown",
+        Min = 0.01,
+        Max = 0.2,
+        Default = 0.05,
+        Decimal = 100,
+        Function = function(v)
+            hitCooldown = v
+        end,
+        Suffix = "s"
     })
 end)																			
                                                                                 
