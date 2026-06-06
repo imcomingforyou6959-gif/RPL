@@ -2125,49 +2125,45 @@ run(function()
         debris:AddItem(sound, 2)
     end
     
+    -- Store original redirect
     local originalRedirect = t.sa.redirect
+    
+    -- Track our shots
     local lastShotTime = 0
-    local ourShotTime = 0
     local UserInputService = game:GetService("UserInputService")
     
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if not hitsoundEnabled then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             lastShotTime = tick()
         end
     end)
     
+    -- Replace redirect with our version that preserves original behavior
     t.sa.redirect = function(args)
-        local isOurShot = (tick() - lastShotTime) < 0.2 or (tick() - ourShotTime) < 0.1
-        
+        -- Call original redirect first (this modifies the hits table)
         if originalRedirect then
             originalRedirect(args)
         end
         
-        if isOurShot and args and args[1] and type(args[1]) == "table" then
-            for _, hit in pairs(args[1]) do
-                if hit and hit[3] and typeof(hit[3]) == "Instance" then
-                    local targetPart = hit[3]
-                    local character = targetPart:FindFirstAncestorOfClass("Model")
-                    if character and character:FindFirstChildOfClass("Humanoid") then
-                        if hitsoundEnabled and tick() - lastHitTime >= hitCooldown then
-                            lastHitTime = tick()
-                            playHitSound()
+        -- Check if this was our shot and play sound
+        local isOurShot = (tick() - lastShotTime) < 0.3
+        if isOurShot and hitsoundEnabled and args and args[1] then
+            local hits = args[1]
+            if type(hits) == "table" then
+                for _, hit in pairs(hits) do
+                    if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                        local character = hit[3]:FindFirstAncestorOfClass("Model")
+                        if character and character:FindFirstChildOfClass("Humanoid") then
+                            if tick() - lastHitTime >= hitCooldown then
+                                lastHitTime = tick()
+                                playHitSound()
+                            end
+                            break
                         end
-                        break
                     end
                 end
             end
-        end
-    end
-    
-    local oldTryShoot = nil
-    if tryShoot then
-        oldTryShoot = tryShoot
-        tryShoot = function(origin, targetPart, tool)
-            ourShotTime = tick()
-            return oldTryShoot(origin, targetPart, tool)
         end
     end
     
@@ -2176,36 +2172,34 @@ run(function()
         Function = function(callback)
             hitsoundEnabled = callback
             if not callback then
+                -- Restore original
                 t.sa.redirect = originalRedirect
-                if oldTryShoot then tryShoot = oldTryShoot end
             else
+                -- Re-apply our redirect
                 t.sa.redirect = function(args)
-                    local isOurShot = (tick() - lastShotTime) < 0.2 or (tick() - ourShotTime) < 0.1
                     if originalRedirect then originalRedirect(args) end
+                    local isOurShot = (tick() - lastShotTime) < 0.3
                     if isOurShot and args and args[1] then
-                        for _, hit in pairs(args[1]) do
-                            if hit and hit[3] and typeof(hit[3]) == "Instance" then
-                                local character = hit[3]:FindFirstAncestorOfClass("Model")
-                                if character and character:FindFirstChildOfClass("Humanoid") then
-                                    if tick() - lastHitTime >= hitCooldown then
-                                        lastHitTime = tick()
-                                        playHitSound()
+                        local hits = args[1]
+                        if type(hits) == "table" then
+                            for _, hit in pairs(hits) do
+                                if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                                    local character = hit[3]:FindFirstAncestorOfClass("Model")
+                                    if character and character:FindFirstChildOfClass("Humanoid") then
+                                        if tick() - lastHitTime >= hitCooldown then
+                                            lastHitTime = tick()
+                                            playHitSound()
+                                        end
+                                        break
                                     end
-                                    break
                                 end
                             end
                         end
                     end
                 end
-                if oldTryShoot then
-                    tryShoot = function(origin, targetPart, tool)
-                        ourShotTime = tick()
-                        return oldTryShoot(origin, targetPart, tool)
-                    end
-                end
             end
         end,
-        Tooltip = 'Plays sound when u hit an enemy'
+        Tooltip = 'Plays sound when YOU hit an enemy'
     })
     
     HitSound:CreateToggle({
@@ -2316,7 +2310,8 @@ run(function()
         debris:AddItem(sound, 3)
     end
     
-    local lastHitTarget = nil
+    -- Track who we last hit
+    local lastHitCharacter = nil
     local lastHitTime = 0
     local originalRedirect = t.sa.redirect
     
@@ -2325,12 +2320,13 @@ run(function()
             originalRedirect(args)
         end
         
+        -- Record who we hit
         if args and args[1] and type(args[1]) == "table" then
             for _, hit in pairs(args[1]) do
                 if hit and hit[3] and typeof(hit[3]) == "Instance" then
                     local character = hit[3]:FindFirstAncestorOfClass("Model")
                     if character and character:FindFirstChildOfClass("Humanoid") then
-                        lastHitTarget = character
+                        lastHitCharacter = character
                         lastHitTime = tick()
                         break
                     end
@@ -2339,54 +2335,50 @@ run(function()
         end
     end
     
+    -- Monitor health to detect kills
     local playerHealths = {}
+    
+    local function onCharacterAdded(player, character)
+        task.wait(0.5)
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+        
+        playerHealths[player.Name] = humanoid.Health
+        
+        humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+            if not killsoundEnabled then return end
+            local newHealth = humanoid.Health
+            local oldHealth = playerHealths[player.Name] or newHealth
+            
+            if newHealth <= 0 and oldHealth > 0 then
+                local isOurKill = (lastHitCharacter == character and (tick() - lastHitTime) < 3)
+                if isOurKill then
+                    playKillSound()
+                end
+            end
+            playerHealths[player.Name] = newHealth
+        end)
+    end
     
     local function setupKillDetection()
         for _, player in pairs(playersService:GetPlayers()) do
             if player ~= lplr then
-                player.CharacterAdded:Connect(function(character)
-                    task.wait(0.5)
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        playerHealths[player.Name] = humanoid.Health
-                        humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-                            if not killsoundEnabled then return end
-                            local newHealth = humanoid.Health
-                            local oldHealth = playerHealths[player.Name] or newHealth
-                            
-                            if newHealth <= 0 and oldHealth > 0 then
-                                local isOurKill = (lastHitTarget == character and (tick() - lastHitTime) < 3)
-                                if isOurKill then
-                                    playKillSound()
-                                end
-                            end
-                            playerHealths[player.Name] = newHealth
-                        end)
-                    end
-                end)
-                
                 if player.Character then
-                    local character = player.Character
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        playerHealths[player.Name] = humanoid.Health
-                        humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-                            if not killsoundEnabled then return end
-                            local newHealth = humanoid.Health
-                            local oldHealth = playerHealths[player.Name] or newHealth
-                            
-                            if newHealth <= 0 and oldHealth > 0 then
-                                local isOurKill = (lastHitTarget == character and (tick() - lastHitTime) < 3)
-                                if isOurKill then
-                                    playKillSound()
-                                end
-                            end
-                            playerHealths[player.Name] = newHealth
-                        end)
-                    end
+                    onCharacterAdded(player, player.Character)
                 end
+                player.CharacterAdded:Connect(function(character)
+                    onCharacterAdded(player, character)
+                end)
             end
         end
+        
+        playersService.PlayerAdded:Connect(function(player)
+            if player ~= lplr then
+                player.CharacterAdded:Connect(function(character)
+                    onCharacterAdded(player, character)
+                end)
+            end
+        end)
     end
     
     KillSound = vape.Categories.Utility:CreateModule({
