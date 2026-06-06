@@ -1874,6 +1874,41 @@ run(function()
         Tooltip = "Stretches the view horizontally."
     })
 end)
+
+run(function()
+	local AntiInvisible
+	
+	local function EntityAdded(ent)
+		local animator = ent.Humanoid:WaitForChild('Animator', 5)
+	
+		if animator and AntiInvisible.Enabled then
+			AntiInvisible:Clean(animator.AnimationPlayed:Connect(function(anim)
+				if anim.Animation.AnimationId:find('215384594') then
+					anim:AdjustWeight(0)
+				end
+			end))
+	
+			for _, anim in animator:GetPlayingAnimationTracks() do
+				if anim.Animation.AnimationId:find('215384594') then
+					anim:AdjustWeight(0)
+				end
+			end
+		end
+	end
+	
+	AntiInvisible = vape.Categories.Blatant:CreateModule({
+		Name = 'AntiInvisible',
+		Function = function(callback)
+			if callback then
+				AntiInvisible:Clean(entitylib.Events.EntityAdded:Connect(EntityAdded))
+				for _, v in entitylib.List do
+					task.spawn(EntityAdded, v)
+				end
+			end
+		end,
+		Tooltip = 'Prevent people from using invisible animations'
+	})
+end)																																			
                                                                                                                                 
 run(function()
     local GunMods
