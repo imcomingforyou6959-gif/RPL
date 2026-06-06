@@ -2591,37 +2591,116 @@ end)
 run(function()
 	local Crosshair
 	local Image
-	local old
+	local old = nil
+	local targetUpvalue = nil
 	
 	Crosshair = vape.Legit:CreateModule({
 		Name = 'Crosshair',
 		Function = function(callback)
 			if callback then
-				for _, v in getconnections(lplr.CharacterAdded) do
-					if v.Function and debug.info(v.Function, 's'):find('GunController') then
-						old = v.Function
-						break
+				if not old then
+					if not lplr.Character then
+						lplr.CharacterAdded:Wait()
+					end
+					
+					local success, connections = pcall(function()
+						return getconnections(lplr.CharacterAdded)
+					end)
+					
+					if success and connections then
+						for _, v in pairs(connections) do
+							local func = v and v.Function
+							if func then
+								local info = debug and debug.info and debug.info(func, 's')
+								if info and info:find('GunController') then
+									old = func
+									break
+								end
+							end
+						end
+					end
+					
+					if not old then
+						local signal = lplr.CharacterAdded
+						if signal and signal._events then
+							for _, conn in pairs(signal._events) do
+								local func = conn and conn.Fn
+								if func then
+									local info = debug and debug.info and debug.info(func, 's')
+									if info and info:find('GunController') then
+										old = func
+										break
+									end
+								end
+							end
+						end
+					end
+					
+					if not old then
+						pcall(function()
+							local replicatedStorage = game:GetService("ReplicatedStorage")
+							local gunController = replicatedStorage:FindFirstChild("Scripts")
+							if gunController then
+								gunController = gunController:FindFirstChild("ToolScripts")
+								if gunController then
+									gunController = gunController:FindFirstChild("GunController")
+									if gunController then
+										for i = 1, 50 do
+											local upvalue = debug.getupvalue(gunController, i)
+											if type(upvalue) == "function" then
+												local info = debug.info(upvalue, 'n')
+												if info == "onEquipped" then
+													old = upvalue
+													break
+												end
+											end
+										end
+									end
+								end
+							end
+						end)
 					end
 				end
-	
-				if old then
-					debug.setconstant(debug.getupvalue(old, 3), 30, Image.Value:find('rbxasset') and Image.Value or isfile(Image.Value) and getcustomasset(Image.Value) or '')
+				
+				if old and Image and Image.Value then
+					local success, err = pcall(function()
+						local assetPath = Image.Value
+						if assetPath:find('rbxasset') then
+							debug.setconstant(debug.getupvalue(old, 3), 30, assetPath)
+						elseif isfile and isfile(assetPath) and getcustomasset then
+							debug.setconstant(debug.getupvalue(old, 3), 30, getcustomasset(assetPath))
+						else
+							debug.setconstant(debug.getupvalue(old, 3), 30, 'rbxassetid://98794608762931')
+						end
+					end)
+					if not success then
+						warn("Failed to set crosshair: " .. tostring(err))
+					end
 				end
 			else
 				if old then
-					debug.setconstant(debug.getupvalue(old, 3), 30, 'rbxassetid://98794608762931')
-					old = nil
+					pcall(function()
+						debug.setconstant(debug.getupvalue(old, 3), 30, 'rbxassetid://98794608762931')
+					end)
 				end
 			end
 		end,
 		Tooltip = 'Change the crosshair icon'
 	})
+	
 	Image = Crosshair:CreateTextBox({
 		Name = 'Image',
-		Placeholder = 'assetid',
+		Placeholder = 'rbxassetid://123 or file path',
 		Function = function()
-			if old then
-				debug.setconstant(debug.getupvalue(old, 3), 30, Image.Value:find('rbxasset') and Image.Value or isfile(Image.Value) and getcustomasset(Image.Value) or '')
+			if Crosshair.Enabled and old and Image and Image.Value then
+				pcall(function()
+					local assetPath = Image.Value
+					if assetPath:find('rbxasset') then
+						debug.setconstant(debug.getupvalue(old, 3), 30, assetPath)
+					elseif isfile and isfile(assetPath) and getcustomasset then
+						debug.setconstant(debug.getupvalue(old, 3), 30, getcustomasset(assetPath))
+					end
+				end)
 			end
 		end
 	})
@@ -2738,4 +2817,4 @@ run(function()
     })
 end)
 
-print("Hello, V4.9.8.5")
+print("Hello, V4.9.8.6")
