@@ -2586,7 +2586,46 @@ run(function()
         if Particle then Particle:Destroy() end
         if WeatherPart then WeatherPart:Destroy() end
     end)
-end)																																																	
+end)
+
+run(function()
+	local Crosshair
+	local Image
+	local old
+	
+	Crosshair = vape.Legit:CreateModule({
+		Name = 'Crosshair',
+		Function = function(callback)
+			if callback then
+				for _, v in getconnections(lplr.CharacterAdded) do
+					if v.Function and debug.info(v.Function, 's'):find('GunController') then
+						old = v.Function
+						break
+					end
+				end
+	
+				if old then
+					debug.setconstant(debug.getupvalue(old, 3), 30, Image.Value:find('rbxasset') and Image.Value or isfile(Image.Value) and getcustomasset(Image.Value) or '')
+				end
+			else
+				if old then
+					debug.setconstant(debug.getupvalue(old, 3), 30, 'rbxassetid://98794608762931')
+					old = nil
+				end
+			end
+		end,
+		Tooltip = 'Change the crosshair icon'
+	})
+	Image = Crosshair:CreateTextBox({
+		Name = 'Image',
+		Placeholder = 'assetid',
+		Function = function()
+			if old then
+				debug.setconstant(debug.getupvalue(old, 3), 30, Image.Value:find('rbxasset') and Image.Value or isfile(Image.Value) and getcustomasset(Image.Value) or '')
+			end
+		end
+	})
+end)																																																					
 
 run(function()
     local Lighting = game:GetService("Lighting")
