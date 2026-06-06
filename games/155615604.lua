@@ -2053,6 +2053,201 @@ run(function()
 end)
 
 run(function()
+    local HitSound
+    local Volume
+    local sounds = {}
+    local currentSoundId = nil
+    local hitsoundEnabled = false
+    local lastHitTime = 0
+    local hitCooldown = 0.05
+    
+    local assetSounds = {
+        {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
+        {name="Bubble", id="rbxassetid://6534947588"},{name="Pick", id="rbxassetid://1347140027"},
+        {name="Pop", id="rbxassetid://198598793"},{name="Rust", id="rbxassetid://1255040462"},
+        {name="Sans", id="rbxassetid://3188795283"},{name="Fart", id="rbxassetid://130833677"},
+        {name="Big", id="rbxassetid://5332005053"},{name="Vine", id="rbxassetid://5332680810"},
+        {name="Bruh", id="rbxassetid://4578740568"},{name="Skeet", id="rbxassetid://5633695679"},
+        {name="Fatality", id="rbxassetid://6534947869"},{name="Bonk", id="rbxassetid://5766898159"},
+        {name="Minecraft", id="rbxassetid://4018616850"},{name="TomScream", id="rbxassetid://7553397015"},
+        {name="Prowler", id="rbxassetid://131169447699141"},{name="Fortnite", id="rbxassetid://140073271098075"},
+        {name="iphone", id="rbxassetid://131935970184832"},{name="Lmk", id="rbxassetid://118833207462382"},
+    }
+    
+    local soundNames = {}
+    local soundMap = {}
+    
+    for _, s in ipairs(assetSounds) do
+        table.insert(soundNames, s.name)
+        soundMap[s.name] = s.id
+        table.insert(sounds, s.id)
+    end
+    
+    local getAsset = getcustomasset or getsynasset or function(path) return nil end
+    
+    local customSoundFiles = {
+        "1nn.mp3", "67.mp3", "BatHit.mp3", "Beep.mp3", "Bonk.mp3", "Bow.mp3",
+        "Bubble.mp3", "Bubble2.mp3", "CSGO.mp3", "Cod.mp3", "Fairy1.mp3",
+        "Fairy2.mp3", "Fatality.mp3", "Fatality2.mp3", "Hentai1.mp3",
+        "Hentai2.mp3", "Hentai3.mp3", "Lazer.mp3", "MarioCoins.mp3",
+        "MinecraftXP.mp3", "Neverlose.mp3", "OSU.mp3", "PubgPan.mp3",
+        "Rifk7.mp3", "RustHeadshot.mp3", "Skeet.mp3", "SpanishMoan.mp3",
+        "StaryKrow.mp3", "Steve.mp3", "TF2Crit.mp3", "TF2Default.mp3",
+        "Windows.mp3", "boolean.ogg", "disable.ogg", "enable.ogg",
+        "keypress.ogg", "keyrelease.ogg", "lobby.mp3", "moan1.ogg",
+        "moan2.ogg", "moan3.ogg", "moan4.ogg", "orthodox.ogg",
+        "pmsound.ogg", "rifk.ogg"
+    }
+    
+    local soundFolder = "newvape/assets/sounds/"
+    
+    for _, fileName in ipairs(customSoundFiles) do
+        local fullPath = soundFolder .. fileName
+        local assetId = getAsset(fullPath)
+        if assetId then
+            local displayName = fileName:gsub("%.mp3$", ""):gsub("%.ogg$", "")
+            table.insert(soundNames, displayName)
+            soundMap[displayName] = assetId
+            table.insert(sounds, assetId)
+        end
+    end
+    
+    currentSoundId = sounds[1]
+    
+    local function playHitSound()
+        local sound = Instance.new("Sound")
+        sound.SoundId = currentSoundId
+        sound.Volume = Volume and Volume.Value or 0.5
+        sound.Parent = game:GetService("CoreGui")
+        sound:Play()
+        game:GetService("Debris"):AddItem(sound, 2)
+    end
+    
+    local originalRedirect = t.sa.redirect
+    
+    local lastShotTime = 0
+    local shootCooldown = 0.1
+    
+    local UserInputService = game:GetService("UserInputService")
+    
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not hitsoundEnabled then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            lastShotTime = tick()
+        end
+    end)
+    
+    local ourShotTime = 0
+    
+    t.sa.redirect = function(args)
+        local isOurShot = (tick() - lastShotTime) < 0.2 or (tick() - ourShotTime) < 0.1
+        
+        if originalRedirect then
+            originalRedirect(args)
+        end
+        
+        if isOurShot and args and args[1] and type(args[1]) == "table" then
+            for _, hit in pairs(args[1]) do
+                if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                    local targetPart = hit[3]
+                    local character = targetPart:FindFirstAncestorOfClass("Model")
+                    if character and character:FindFirstChildOfClass("Humanoid") then
+                        if hitsoundEnabled and tick() - lastHitTime >= hitCooldown then
+                            lastHitTime = tick()
+                            playHitSound()
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
+    local oldTryShoot = nil
+    if tryShoot then
+        oldTryShoot = tryShoot
+        tryShoot = function(origin, targetPart, tool)
+            ourShotTime = tick()
+            return oldTryShoot(origin, targetPart, tool)
+        end
+    end
+    
+    HitSound = vape.Categories.Utility:CreateModule({
+        Name = 'HitSound',
+        Function = function(callback)
+            hitsoundEnabled = callback
+            if not callback then
+                t.sa.redirect = originalRedirect
+                if oldTryShoot then tryShoot = oldTryShoot end
+            else
+                t.sa.redirect = function(args)
+                    local isOurShot = (tick() - lastShotTime) < 0.2 or (tick() - ourShotTime) < 0.1
+                    if originalRedirect then originalRedirect(args) end
+                    if isOurShot and args and args[1] then
+                        for _, hit in pairs(args[1]) do
+                            if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                                local character = hit[3]:FindFirstAncestorOfClass("Model")
+                                if character and character:FindFirstChildOfClass("Humanoid") then
+                                    if tick() - lastHitTime >= hitCooldown then
+                                        lastHitTime = tick()
+                                        playHitSound()
+                                    end
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+                if oldTryShoot then
+                    tryShoot = function(origin, targetPart, tool)
+                        ourShotTime = tick()
+                        return oldTryShoot(origin, targetPart, tool)
+                    end
+                end
+            end
+        end,
+        Tooltip = 'Plays a sound when u hit an enemy'
+    })
+    
+    HitSound:CreateToggle({
+        Name = 'Enable',
+        Default = false,
+        Function = function(c)
+            hitsoundEnabled = c
+        end
+    })
+    
+    HitSound:CreateDropdown({
+        Name = 'Sound',
+        List = soundNames,
+        Function = function(val)
+            currentSoundId = soundMap[val] or sounds[1]
+        end
+    })
+    
+    Volume = HitSound:CreateSlider({
+        Name = 'Volume',
+        Min = 0,
+        Max = 2,
+        Default = 1,
+        Decimal = 10
+    })
+    
+    HitSound:CreateSlider({
+        Name = 'Cooldown',
+        Min = 0.01,
+        Max = 0.2,
+        Default = 0.05,
+        Decimal = 100,
+        Function = function(v)
+            hitCooldown = v
+        end,
+        Suffix = 's'
+    })
+end)																																					
+
+run(function()
     local KillSound
     local Volume
     local sounds = {}
@@ -2121,7 +2316,30 @@ run(function()
         game:GetService("Debris"):AddItem(sound, 3)
     end
     
-    -- Track player health to detect kills
+    local lastHitTarget = nil
+    local lastHitTime = 0
+    
+    local originalRedirect = t.sa.redirect
+    
+    t.sa.redirect = function(args)
+        if originalRedirect then
+            originalRedirect(args)
+        end
+        
+        if args and args[1] and type(args[1]) == "table" then
+            for _, hit in pairs(args[1]) do
+                if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                    local character = hit[3]:FindFirstAncestorOfClass("Model")
+                    if character and character:FindFirstChildOfClass("Humanoid") then
+                        lastHitTarget = character
+                        lastHitTime = tick()
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
     local playerHealths = {}
     
     local function setupKillDetection()
@@ -2136,8 +2354,12 @@ run(function()
                             if not killsoundEnabled then return end
                             local newHealth = humanoid.Health
                             local oldHealth = playerHealths[player.Name] or newHealth
+                            
                             if newHealth <= 0 and oldHealth > 0 then
-                                playKillSound()
+                                local isOurKill = (lastHitTarget == character and (tick() - lastHitTime) < 3)
+                                if isOurKill then
+                                    playKillSound()
+                                end
                             end
                             playerHealths[player.Name] = newHealth
                         end)
@@ -2153,8 +2375,12 @@ run(function()
                             if not killsoundEnabled then return end
                             local newHealth = humanoid.Health
                             local oldHealth = playerHealths[player.Name] or newHealth
+                            
                             if newHealth <= 0 and oldHealth > 0 then
-                                playKillSound()
+                                local isOurKill = (lastHitTarget == character and (tick() - lastHitTime) < 3)
+                                if isOurKill then
+                                    playKillSound()
+                                end
                             end
                             playerHealths[player.Name] = newHealth
                         end)
@@ -2172,7 +2398,7 @@ run(function()
                 setupKillDetection()
             end
         end,
-        Tooltip = 'Plays sound when you kill an enemy'
+        Tooltip = 'Plays sound when u kill an enemy'
     })
     
     KillSound:CreateToggle({
