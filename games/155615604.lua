@@ -2125,32 +2125,14 @@ run(function()
         debris:AddItem(sound, 2)
     end
     
-    -- Store original redirect
-    local originalRedirect = t.sa.redirect
-    
-    -- Track our shots
-    local lastShotTime = 0
-    local UserInputService = game:GetService("UserInputService")
-    
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            lastShotTime = tick()
-        end
-    end)
-    
-    -- Replace redirect with our version that preserves original behavior
-    t.sa.redirect = function(args)
-        -- Call original redirect first (this modifies the hits table)
-        if originalRedirect then
-            originalRedirect(args)
-        end
-        
-        -- Check if this was our shot and play sound
-        local isOurShot = (tick() - lastShotTime) < 0.3
-        if isOurShot and hitsoundEnabled and args and args[1] then
+    local oldShootEventFire
+    if ShootEvent then
+        oldShootEventFire = ShootEvent.FireServer
+        ShootEvent.FireServer = function(...)
+            local args = {...}
             local hits = args[1]
-            if type(hits) == "table" then
+            
+            if hitsoundEnabled and hits and type(hits) == "table" then
                 for _, hit in pairs(hits) do
                     if hit and hit[3] and typeof(hit[3]) == "Instance" then
                         local character = hit[3]:FindFirstAncestorOfClass("Model")
@@ -2164,6 +2146,8 @@ run(function()
                     end
                 end
             end
+            
+            return oldShootEventFire(unpack(args))
         end
     end
     
@@ -2171,35 +2155,34 @@ run(function()
         Name = 'HitSound',
         Function = function(callback)
             hitsoundEnabled = callback
-            if not callback then
-                -- Restore original
-                t.sa.redirect = originalRedirect
-            else
-                -- Re-apply our redirect
-                t.sa.redirect = function(args)
-                    if originalRedirect then originalRedirect(args) end
-                    local isOurShot = (tick() - lastShotTime) < 0.3
-                    if isOurShot and args and args[1] then
-                        local hits = args[1]
-                        if type(hits) == "table" then
-                            for _, hit in pairs(hits) do
-                                if hit and hit[3] and typeof(hit[3]) == "Instance" then
-                                    local character = hit[3]:FindFirstAncestorOfClass("Model")
-                                    if character and character:FindFirstChildOfClass("Humanoid") then
-                                        if tick() - lastHitTime >= hitCooldown then
-                                            lastHitTime = tick()
-                                            playHitSound()
-                                        end
-                                        break
+            if not callback and ShootEvent and oldShootEventFire then
+                ShootEvent.FireServer = oldShootEventFire
+            elseif callback and ShootEvent then
+                oldShootEventFire = ShootEvent.FireServer
+                ShootEvent.FireServer = function(...)
+                    local args = {...}
+                    local hits = args[1]
+                    
+                    if hits and type(hits) == "table" then
+                        for _, hit in pairs(hits) do
+                            if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                                local character = hit[3]:FindFirstAncestorOfClass("Model")
+                                if character and character:FindFirstChildOfClass("Humanoid") then
+                                    if tick() - lastHitTime >= hitCooldown then
+                                        lastHitTime = tick()
+                                        playHitSound()
                                     end
+                                    break
                                 end
                             end
                         end
                     end
+                    
+                    return oldShootEventFire(unpack(args))
                 end
             end
         end,
-        Tooltip = 'Plays sound when YOU hit an enemy'
+        Tooltip = 'Plays sound when you hit an enemy'
     })
     
     HitSound:CreateToggle({
@@ -2245,6 +2228,8 @@ run(function()
     local sounds = {}
     local currentSoundId = nil
     local killsoundEnabled = false
+    local lastHitCharacter = nil
+    local lastHitTime = 0
     
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
@@ -2310,28 +2295,28 @@ run(function()
         debris:AddItem(sound, 3)
     end
     
-    -- Track who we last hit
-    local lastHitCharacter = nil
-    local lastHitTime = 0
-    local originalRedirect = t.sa.redirect
-    
-    t.sa.redirect = function(args)
-        if originalRedirect then
-            originalRedirect(args)
-        end
-        
-        -- Record who we hit
-        if args and args[1] and type(args[1]) == "table" then
-            for _, hit in pairs(args[1]) do
-                if hit and hit[3] and typeof(hit[3]) == "Instance" then
-                    local character = hit[3]:FindFirstAncestorOfClass("Model")
-                    if character and character:FindFirstChildOfClass("Humanoid") then
-                        lastHitCharacter = character
-                        lastHitTime = tick()
-                        break
+    -- Hook ShootEvent to track who we hit
+    local oldShootEventFire
+    if ShootEvent then
+        oldShootEventFire = ShootEvent.FireServer
+        ShootEvent.FireServer = function(...)
+            local args = {...}
+            local hits = args[1]
+            
+            if hits and type(hits) == "table" then
+                for _, hit in pairs(hits) do
+                    if hit and hit[3] and typeof(hit[3]) == "Instance" then
+                        local character = hit[3]:FindFirstAncestorOfClass("Model")
+                        if character and character:FindFirstChildOfClass("Humanoid") then
+                            lastHitCharacter = character
+                            lastHitTime = tick()
+                            break
+                        end
                     end
                 end
             end
+            
+            return oldShootEventFire(unpack(args))
         end
     end
     
