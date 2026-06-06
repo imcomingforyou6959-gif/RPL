@@ -2125,13 +2125,9 @@ run(function()
         debris:AddItem(sound, 2)
     end
     
-    local oldShootEventFire
     if ShootEvent then
-        oldShootEventFire = ShootEvent.FireServer
-        ShootEvent.FireServer = function(...)
-            local args = {...}
-            local hits = args[1]
-            
+        local oldFire = ShootEvent.FireServer
+        ShootEvent.FireServer = function(hits)
             if hitsoundEnabled and hits and type(hits) == "table" then
                 for _, hit in pairs(hits) do
                     if hit and hit[3] and typeof(hit[3]) == "Instance" then
@@ -2146,8 +2142,7 @@ run(function()
                     end
                 end
             end
-            
-            return oldShootEventFire(unpack(args))
+            return oldFire(hits)
         end
     end
     
@@ -2155,32 +2150,6 @@ run(function()
         Name = 'HitSound',
         Function = function(callback)
             hitsoundEnabled = callback
-            if not callback and ShootEvent and oldShootEventFire then
-                ShootEvent.FireServer = oldShootEventFire
-            elseif callback and ShootEvent then
-                oldShootEventFire = ShootEvent.FireServer
-                ShootEvent.FireServer = function(...)
-                    local args = {...}
-                    local hits = args[1]
-                    
-                    if hits and type(hits) == "table" then
-                        for _, hit in pairs(hits) do
-                            if hit and hit[3] and typeof(hit[3]) == "Instance" then
-                                local character = hit[3]:FindFirstAncestorOfClass("Model")
-                                if character and character:FindFirstChildOfClass("Humanoid") then
-                                    if tick() - lastHitTime >= hitCooldown then
-                                        lastHitTime = tick()
-                                        playHitSound()
-                                    end
-                                    break
-                                end
-                            end
-                        end
-                    end
-                    
-                    return oldShootEventFire(unpack(args))
-                end
-            end
         end,
         Tooltip = 'Plays sound when you hit an enemy'
     })
@@ -2228,8 +2197,6 @@ run(function()
     local sounds = {}
     local currentSoundId = nil
     local killsoundEnabled = false
-    local lastHitCharacter = nil
-    local lastHitTime = 0
     
     local assetSounds = {
         {name="Bameware", id="rbxassetid://3124331820"},{name="Bell", id="rbxassetid://6534947240"},
@@ -2285,6 +2252,7 @@ run(function()
     currentSoundId = sounds[1]
     
     local debris = game:GetService("Debris")
+    local killfeed = replicatedStorageService:FindFirstChild("Killfeed")
     
     local function playKillSound()
         local sound = Instance.new("Sound")
@@ -2295,86 +2263,45 @@ run(function()
         debris:AddItem(sound, 3)
     end
     
-    -- Hook ShootEvent to track who we hit
-    local oldShootEventFire
-    if ShootEvent then
-        oldShootEventFire = ShootEvent.FireServer
-        ShootEvent.FireServer = function(...)
-            local args = {...}
-            local hits = args[1]
-            
-            if hits and type(hits) == "table" then
-                for _, hit in pairs(hits) do
-                    if hit and hit[3] and typeof(hit[3]) == "Instance" then
-                        local character = hit[3]:FindFirstAncestorOfClass("Model")
-                        if character and character:FindFirstChildOfClass("Humanoid") then
-                            lastHitCharacter = character
-                            lastHitTime = tick()
-                            break
-                        end
-                    end
-                end
-            end
-            
-            return oldShootEventFire(unpack(args))
-        end
-    end
-    
-    -- Monitor health to detect kills
-    local playerHealths = {}
-    
-    local function onCharacterAdded(player, character)
-        task.wait(0.5)
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid then return end
-        
-        playerHealths[player.Name] = humanoid.Health
-        
-        humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+    if killfeed then
+        killfeed.ChildAdded:Connect(function(child)
             if not killsoundEnabled then return end
-            local newHealth = humanoid.Health
-            local oldHealth = playerHealths[player.Name] or newHealth
-            
-            if newHealth <= 0 and oldHealth > 0 then
-                local isOurKill = (lastHitCharacter == character and (tick() - lastHitTime) < 3)
-                if isOurKill then
+            if child:IsA("StringValue") and child.Value then
+                local killMessage = child.Value
+                local playerName = lplr.Name
+                if killMessage:find(playerName) and killMessage:find("killed") then
                     playKillSound()
                 end
             end
-            playerHealths[player.Name] = newHealth
         end)
-    end
-    
-    local function setupKillDetection()
-        for _, player in pairs(playersService:GetPlayers()) do
-            if player ~= lplr then
-                if player.Character then
-                    onCharacterAdded(player, player.Character)
+        
+        for _, child in pairs(killfeed:GetChildren()) do
+            if child:IsA("StringValue") and child.Value then
+                local killMessage = child.Value
+                local playerName = lplr.Name
+                if killMessage:find(playerName) and killMessage:find("killed") then
+                    playKillSound()
                 end
-                player.CharacterAdded:Connect(function(character)
-                    onCharacterAdded(player, character)
-                end)
             end
         end
-        
-        playersService.PlayerAdded:Connect(function(player)
-            if player ~= lplr then
-                player.CharacterAdded:Connect(function(character)
-                    onCharacterAdded(player, character)
-                end)
-            end
-        end)
     end
     
     KillSound = vape.Categories.Utility:CreateModule({
         Name = 'KillSound',
         Function = function(callback)
             killsoundEnabled = callback
-            if callback then
-                setupKillDetection()
+            if callback and killfeed then
+                for _, child in pairs(killfeed:GetChildren()) do
+                    if child:IsA("StringValue") and child.Value then
+                        local killMessage = child.Value
+                        if killMessage:find(lplr.Name) and killMessage:find("killed") then
+                            playKillSound()
+                        end
+                    end
+                end
             end
         end,
-        Tooltip = 'Plays sound when YOU kill an enemy'
+        Tooltip = 'Plays sound when u kill someone'
     })
     
     KillSound:CreateToggle({
@@ -2382,9 +2309,6 @@ run(function()
         Default = false,
         Function = function(c)
             killsoundEnabled = c
-            if c then
-                setupKillDetection()
-            end
         end
     })
     
