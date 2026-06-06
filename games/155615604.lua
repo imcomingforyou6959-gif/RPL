@@ -2512,7 +2512,7 @@ run(function()
         end
     end)
 
-    local WeatherModule = vape.Categories.Render:CreateModule({
+    local WeatherModule = vape.Categories.World:CreateModule({
         Name = 'Weather',
         Function = function(callback)
             enabled = callback
