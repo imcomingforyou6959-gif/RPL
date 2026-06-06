@@ -564,46 +564,15 @@ run(function()
 	local ColorSl
 	local handle
 	local old
-	local vtool = nil
-	
-	local aimTimer = 0
-	local aimVec = Vector3.new()
-	local shootTimer = 0
-	
-	if not Spring then
-		Spring = {
-			new = function(config)
-				local self = {
-					Target = Vector3.new(),
-					Position = Vector3.new(),
-					Velocity = Vector3.new(),
-					Speed = config and config.Speed or 10
-				}
-				function self:Update(dt)
-					local diff = self.Target - self.Position
-					self.Velocity = self.Velocity + diff * self.Speed * dt
-					self.Velocity = self.Velocity * (1 - dt * 5)
-					self.Position = self.Position + self.Velocity * dt
-					return self.Position
-				end
-				return self
-			end
-		}
-	end
-	
 	local moveSpring = Spring.new()
 	local aimSpring = Spring.new({Speed = 15})
 	
 	local function ToolAdded(obj)
 		if obj and obj:IsA('Tool') then
 			if old then
-				pcall(function()
-					for _, v in pairs(old:GetDescendants()) do
-						if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
-							v.LocalTransparencyModifier = 0
-						end
-					end
-				end)
+				for _, v in old:QueryDescendants('BasePart, Texture, Decal') do
+					v.LocalTransparencyModifier = 0
+				end
 			end
 	
 			if vtool then
@@ -613,30 +582,15 @@ run(function()
 			old = obj
 			vtool = obj:Clone()
 			handle = vtool:FindFirstChild('Handle')
-			
-			if vtool and gameCamera then
-				vtool.Parent = gameCamera
+			vtool.Parent = gameCamera
+	
+			for _, v in vtool:QueryDescendants('BasePart') do
+				v.Material = ForceField.Enabled and Enum.Material.ForceField or v.Material
+				v.Color = ForceField.Enabled and Color3.fromHSV(ColorSl.Hue, ColorSl.Sat, ColorSl.Value) or v.Color
 			end
 	
-			if ForceField and ForceField.Enabled and ColorSl then
-				pcall(function()
-					for _, v in pairs(vtool:GetDescendants()) do
-						if v:IsA("BasePart") then
-							v.Material = Enum.Material.ForceField
-							v.Color = Color3.fromHSV(ColorSl.Hue or 0, ColorSl.Sat or 1, ColorSl.Value or 1)
-						end
-					end
-				end)
-			end
-	
-			if old then
-				pcall(function()
-					for _, v in pairs(old:GetDescendants()) do
-						if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
-							v.LocalTransparencyModifier = 1
-						end
-					end
-				end)
+			for _, v in old:QueryDescendants('BasePart, Texture, Decal') do
+				v.LocalTransparencyModifier = 1
 			end
 		end
 	end
@@ -648,90 +602,52 @@ run(function()
 			handle = nil
 		end
 	
-		if Viewmodel and ent and ent.Character then
-			Viewmodel:Clean(ent.Character.ChildAdded:Connect(ToolAdded))
-			Viewmodel:Clean(ent.Character.ChildRemoved:Connect(function(obj)
-				if obj == old then
-					if vtool then
-						vtool:Destroy()
-						vtool = nil
-					end
-		
-					if old then
-						pcall(function()
-							for _, v in pairs(old:GetDescendants()) do
-								if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
-									v.LocalTransparencyModifier = 0
-								end
-							end
-						end)
-					end
-		
-					old = nil
-					handle = nil
+		Viewmodel:Clean(ent.Character.ChildAdded:Connect(ToolAdded))
+		Viewmodel:Clean(ent.Character.ChildRemoved:Connect(function(obj)
+			if obj == old then
+				if vtool then
+					vtool:Destroy()
+					vtool = nil
 				end
-			end))
-		
-			ToolAdded(ent.Character:FindFirstChildWhichIsA('Tool'))
-		end
+	
+				for _, v in old:QueryDescendants('BasePart, Texture, Decal') do
+					v.LocalTransparencyModifier = 0
+				end
+	
+				old = nil
+			end
+		end))
+	
+		ToolAdded(ent.Character:FindFirstChildWhichIsA('Tool'))
 	end
 	
 	Viewmodel = vape.Legit:CreateModule({
 		Name = 'Viewmodel',
 		Function = function(callback)
 			if callback then
-				if entitylib and entitylib.Events then
-					Viewmodel:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
-				end
-				
-				if entitylib and entitylib.isAlive then
+				Viewmodel:Clean(entitylib.Events.LocalAdded:Connect(EntityAdded))
+				if entitylib.isAlive then
 					task.spawn(EntityAdded, entitylib.character)
 				end
 	
-				local renderConn = runService.RenderStepped:Connect(function(dt)
-					if not handle then return end
-					
-					local isAlive = entitylib and entitylib.isAlive and entitylib.character
-					
-					if isAlive and entitylib.character.RootPart then
-						moveSpring.Target = entitylib.character.RootPart.AssemblyLinearVelocity * 0.005
-					else
-						moveSpring.Target = Vector3.zero
-					end
-					
-					if moveSpring.Target.Magnitude > 0.1 and Sway and Sway.Enabled then
-						local swayOffset = (gameCamera.CFrame * CFrame.new(math.sin(tick() * 10) * 0.06, 0, 0)).Position - gameCamera.CFrame.Position
-						moveSpring.Target = moveSpring.Target + swayOffset
-					end
+				Viewmodel:Clean(runService.RenderStepped:Connect(function(dt)
+					if handle then
+						moveSpring.Target = entitylib.isAlive and entitylib.character.RootPart.AssemblyLinearVelocity * 0.005 or Vector3.zero
+						if moveSpring.Target.Magnitude > 0.1 and Sway.Enabled then
+							moveSpring.Target += (gameCamera.CFrame * CFrame.new(math.sin(tick() * 10) * 0.06, 0, 0)).Position - gameCamera.CFrame.Position
+						end
 	
-					local cf = (gameCamera.CFrame * CFrame.new(2, -1.5, -3)) + moveSpring:Update(dt)
-					
-					local aimTarget = gameCamera.CFrame.LookVector
-					if aimTimer and aimTimer > os.clock() and aimVec then
-						aimTarget = CFrame.lookAt(cf.Position, aimVec).LookVector
+						local cf = (gameCamera.CFrame * CFrame.new(2, -1.5, -3)) + moveSpring:Update(dt)
+						aimSpring.Target = aimTimer > os.clock() and CFrame.lookAt(cf.Position, aimVec).LookVector or gameCamera.CFrame.LookVector
+						handle.CFrame = CFrame.lookAlong(cf.Position, aimSpring:Update(dt)) * CFrame.new(0, 0, math.max(shootTimer - os.clock(), 0))
+						handle.AssemblyLinearVelocity = Vector3.zero
 					end
-					
-					aimSpring.Target = aimTarget
-					
-					local cooldownOffset = 0
-					if shootTimer and shootTimer > os.clock() then
-						cooldownOffset = shootTimer - os.clock()
-					end
-					
-					handle.CFrame = CFrame.lookAlong(cf.Position, aimSpring:Update(dt)) * CFrame.new(0, 0, math.max(cooldownOffset, 0))
-					handle.AssemblyLinearVelocity = Vector3.zero
-				end)
-				
-				Viewmodel:Clean(renderConn)
+				end))
 			else
 				if old then
-					pcall(function()
-						for _, v in pairs(old:GetDescendants()) do
-							if v:IsA("BasePart") or v:IsA("Texture") or v:IsA("Decal") then
-								v.LocalTransparencyModifier = 0
-							end
-						end
-					end)
+					for _, v in old:QueryDescendants('BasePart, Texture, Decal') do
+						v.LocalTransparencyModifier = 0
+					end
 					old = nil
 				end
 	
@@ -744,37 +660,27 @@ run(function()
 		end,
 		Tooltip = 'Custom viewmodel for guns'
 	})
-	
 	Sway = Viewmodel:CreateToggle({
 		Name = 'Sway Effect',
 		Default = true
 	})
-	
 	ForceField = Viewmodel:CreateToggle({
 		Name = 'ForceField Effect',
 		Function = function(callback)
-			if ColorSl and ColorSl.Object then
-				ColorSl.Object.Visible = callback
-			end
-			if callback and Viewmodel and Viewmodel.Enabled then
+			ColorSl.Object.Visible = callback
+			if callback and Viewmodel.Enabled then
 				Viewmodel:Toggle()
-				task.wait(0.05)
 				Viewmodel:Toggle()
 			end
 		end
 	})
-	
 	ColorSl = Viewmodel:CreateColorSlider({
 		Name = 'Color',
 		Function = function(hue, sat, val)
 			if vtool then
-				pcall(function()
-					for _, v in pairs(vtool:GetDescendants()) do
-						if v:IsA("BasePart") then
-							v.Color = Color3.fromHSV(hue, sat, val)
-						end
-					end
-				end)
+				for _, v in vtool:QueryDescendants('BasePart') do
+					v.Color = Color3.fromHSV(hue, sat, val)
+				end
 			end
 		end,
 		Visible = false
