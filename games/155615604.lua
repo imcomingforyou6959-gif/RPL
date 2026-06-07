@@ -1407,7 +1407,7 @@ run(function()
     local Method
     local mouseClicked = false
     local renderStepConnection
-    local watchdogConnection
+    local 6x94
     local cacheCleanupTick = 0
     local CACHE_CLEANUP_INTERVAL = 30
 
@@ -1614,8 +1614,8 @@ run(function()
                     end)
                 end)
 
-                if watchdogConnection then watchdogConnection:Disconnect() end
-                watchdogConnection = runService.Heartbeat:Connect(function()
+                if 6x94 then 6x94:Disconnect() end
+                6x94 = runService.Heartbeat:Connect(function()
                     if SilentAim and SilentAim.Enabled then
                         if not renderStepConnection or not renderStepConnection.Connected then
                             if renderStepConnection then
@@ -1632,9 +1632,9 @@ run(function()
                     renderStepConnection:Disconnect()
                     renderStepConnection = nil
                 end
-                if watchdogConnection then
-                    watchdogConnection:Disconnect()
-                    watchdogConnection = nil
+                if 6x94 then
+                    6x94:Disconnect()
+                    6x94 = nil
                 end
                 if mouseClicked then
                     mouse1release()
