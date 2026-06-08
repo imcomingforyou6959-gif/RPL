@@ -1915,13 +1915,23 @@ run(function()
     local Range
     local SpreadRadius
     local FireRate
+    local WeaponSelector
+    local selectedWeapons = {"M9", "Revolver", "M4A1", "Remington 870"}
+
+    local function isWeaponSelected(name)
+        if not WeaponSelector or not WeaponSelector.Value then return true end
+        if #WeaponSelector.Value == 0 then return true end
+        return table.find(WeaponSelector.Value, name) ~= nil
+    end
 
     local function itemAdded(v)
         if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
-            v:SetAttribute("Range", Range and Range.Value)
-            v:SetAttribute("AccurateRange", Range and Range.Value)
-            v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
-            v:SetAttribute("FireRate", FireRate and FireRate.Value)
+            if isWeaponSelected(v.Name) then
+                v:SetAttribute("Range", Range and Range.Value)
+                v:SetAttribute("AccurateRange", Range and Range.Value)
+                v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
+                v:SetAttribute("FireRate", FireRate and FireRate.Value)
+            end
         end
     end
 
@@ -1950,6 +1960,16 @@ run(function()
             end
         end
     })
+
+    WeaponSelector = GunMods:CreateMultiChoice({
+        Name = "Weapons",
+        List = {"M9", "Revolver", "M4A1", "Remington 870", "MP5", "Taser", "M700"},
+        Default = {"M9", "Revolver", "M4A1", "Remington 870"},
+        Function = function(selected)
+            selectedWeapons = selected
+        end
+    })
+
     Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
     SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
     FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
