@@ -1915,8 +1915,15 @@ run(function()
     local Range
     local SpreadRadius
     local FireRate
-    local AutoFireToggle
+    local Automatic
     local modifiedTools = {}
+
+    local WeaponsAF = {
+        ["M700"] = true,
+        ["M9"] = true,
+        ["Revolver"] = true,
+        ["Remington 870"] = true,
+    }
 
     local function applyMods(v)
         if not v or not v:IsA("Tool") then return end
@@ -1927,7 +1934,7 @@ run(function()
         v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
         v:SetAttribute("FireRate", FireRate and FireRate.Value)
         
-        if AutoFireToggle and AutoFireToggle.Enabled then
+        if Automatic and Automatic.Enabled and WeaponsAF[v.Name] then
             v:SetAttribute("AutoFire", true)
         else
             v:SetAttribute("AutoFire", false)
@@ -1949,18 +1956,10 @@ run(function()
         applyMods(v)
         modifiedTools[v] = true
 
-        local conn = v:GetAttributeChangedSignal("Range"):Connect(function()
-            applyMods(v)
-        end)
-        local conn2 = v:GetAttributeChangedSignal("FireRate"):Connect(function()
-            applyMods(v)
-        end)
-        local conn3 = v:GetAttributeChangedSignal("SpreadRadius"):Connect(function()
-            applyMods(v)
-        end)
-        local conn4 = v:GetAttributeChangedSignal("AutoFire"):Connect(function()
-            applyMods(v)
-        end)
+        local conn = v:GetAttributeChangedSignal("Range"):Connect(function() applyMods(v) end)
+        local conn2 = v:GetAttributeChangedSignal("FireRate"):Connect(function() applyMods(v) end)
+        local conn3 = v:GetAttributeChangedSignal("SpreadRadius"):Connect(function() applyMods(v) end)
+        local conn4 = v:GetAttributeChangedSignal("AutoFire"):Connect(function() applyMods(v) end)
 
         v.Destroying:Connect(function()
             modifiedTools[v] = nil
@@ -2010,11 +2009,11 @@ run(function()
         Suffix=function(val) return val==1 and 'second' or 'seconds' end,
         Function = function() reapplyAll() end
     })
-    AutoFireToggle = GunMods:CreateToggle({
-        Name = "AutoFire",
+    Automatic = GunMods:CreateToggle({
+        Name = "Automatic",
         Default = true,
         Function = function() reapplyAll() end,
-        Tooltip = "Sets the AutoFire attribute on guns"
+        Tooltip = "Automatic guns shit idk"
     })
 end)
                                                                                                                                                                     
