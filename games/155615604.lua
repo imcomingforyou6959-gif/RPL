@@ -1915,14 +1915,52 @@ run(function()
     local Range
     local SpreadRadius
     local FireRate
+    local AutoFireToggle
+    local modifiedTools = {}
+
+    local function applyMods(v)
+        if not v or not v:IsA("Tool") then return end
+        if not v:GetAttribute("Local_ReloadSession") then return end
+
+        v:SetAttribute("Range", Range and Range.Value)
+        v:SetAttribute("AccurateRange", Range and Range.Value)
+        v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
+        v:SetAttribute("FireRate", FireRate and FireRate.Value)
+        if AutoFiret and AutoFiret.Enabled then
+            v:SetAttribute("AutoFire", true)
+        end
+
+        modifiedTools[v] = true
+
+        local conn = v:GetAttributeChangedSignal("Range"):Connect(function()
+            v:SetAttribute("Range", Range and Range.Value)
+        end)
+        local conn2 = v:GetAttributeChangedSignal("FireRate"):Connect(function()
+            v:SetAttribute("FireRate", FireRate and FireRate.Value)
+        end)
+        local conn3 = v:GetAttributeChangedSignal("SpreadRadius"):Connect(function()
+            v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
+        end)
+        local conn4 = v:GetAttributeChangedSignal("AutoFire"):Connect(function()
+            if AutoFiret and AutoFiret.Enabled then
+                v:SetAttribute("AutoFire", true)
+            end
+        end)
+
+        -- Cleanup on destroy
+        v.Destroying:Connect(function()
+            modifiedTools[v] = nil
+            pcall(function() conn:Disconnect() end)
+            pcall(function() conn2:Disconnect() end)
+            pcall(function() conn3:Disconnect() end)
+            pcall(function() conn4:Disconnect() end)
+        end)
+    end
 
     local function itemAdded(v)
-        if v and v:IsA("Tool") and v:GetAttribute("Local_ReloadSession") then
-            v:SetAttribute("Range", Range and Range.Value)
-            v:SetAttribute("AccurateRange", Range and Range.Value)
-            v:SetAttribute("SpreadRadius", SpreadRadius and SpreadRadius.Value)
-            v:SetAttribute("FireRate", FireRate and FireRate.Value)
-        end
+        if not v or not v:IsA("Tool") then return end
+        if modifiedTools[v] then return end
+        applyMods(v)
     end
 
     local function characterAdded(char)
@@ -1953,6 +1991,11 @@ run(function()
     Range = GunMods:CreateSlider({ Name = "Range", Min=1, Max=9999, Default=150, Suffix=function(val) return val==1 and 'stud' or 'studs' end })
     SpreadRadius = GunMods:CreateSlider({ Name = "Spread Radius", Min=0, Max=1, Default=0.03, Decimal=100, Suffix='studs' })
     FireRate = GunMods:CreateSlider({ Name = "Fire Rate", Min=0, Max=1, Decimal=100, Default=0.1, Suffix=function(val) return val==1 and 'second' or 'seconds' end })
+    AutoFiret = GunMods:CreateToggle({
+        Name = "automatic",
+        Default = true,
+        Tooltip = "Sets all guns automatic"
+    })
 end)
                                                                                                                                                                     
 run(function()
