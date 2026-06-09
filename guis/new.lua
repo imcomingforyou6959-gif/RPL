@@ -6872,7 +6872,6 @@ VapeLabelSorter.Parent = VapeLabelHolder
 --[[
 	Target Info
 ]]
-
 local targetinfo
 local targetinfoobj
 local targetinfobcolor
@@ -6888,7 +6887,7 @@ targetinfoobj = mainapi:CreateOverlay({
             task.spawn(function()
                 repeat
                     targetinfo:UpdateInfo()
-                    task.wait() -- Unlimited FPS
+                    task.wait()
                 until not targetinfoobj.Button or not targetinfoobj.Button.Enabled
             end)
         end
@@ -6953,18 +6952,6 @@ targetinfoname:GetPropertyChangedSignal('FontFace'):Connect(function()
 end)
 targetinfoname.Parent = targetinfobkg
 
--- Distance display
-local targetinfoDistance = Instance.new('TextLabel')
-targetinfoDistance.Size = UDim2.fromOffset(100, 14)
-targetinfoDistance.Position = UDim2.fromOffset(54, 42)
-targetinfoDistance.BackgroundTransparency = 1
-targetinfoDistance.Text = ''
-targetinfoDistance.TextXAlignment = Enum.TextXAlignment.Left
-targetinfoDistance.TextColor3 = color.Dark(uipallet.Text, 0.3)
-targetinfoDistance.TextSize = 10
-targetinfoDistance.FontFace = uipallet.Font
-targetinfoDistance.Parent = targetinfobkg
-
 local targetinfohealthbkg = Instance.new('Frame')
 targetinfohealthbkg.Name = 'HealthBKG'
 targetinfohealthbkg.Size = UDim2.fromOffset(200, 9)
@@ -6979,19 +6966,6 @@ targetinfohealth.Size = UDim2.fromScale(0.8, 1)
 targetinfohealth.Position = UDim2.new()
 targetinfohealth.BackgroundColor3 = Color3.fromHSV(1 / 2.5, 0.89, 0.75)
 targetinfohealth.Parent = targetinfohealthbkg
-
--- Health text overlay
-local targetinfoHealthText = Instance.new('TextLabel')
-targetinfoHealthText.Size = UDim2.fromOffset(200, 9)
-targetinfoHealthText.Position = UDim2.fromOffset(20, 56)
-targetinfoHealthText.BackgroundTransparency = 1
-targetinfoHealthText.Text = ''
-targetinfoHealthText.TextXAlignment = Enum.TextXAlignment.Center
-targetinfoHealthText.TextColor3 = Color3.new(1, 1, 1)
-targetinfoHealthText.TextSize = 9
-targetinfoHealthText.FontFace = uipallet.Font
-targetinfoHealthText.TextStrokeTransparency = 0.5
-targetinfoHealthText.Parent = targetinfobkg
 
 targetinfohealth:GetPropertyChangedSignal('Size'):Connect(function()
     targetinfohealth.Visible = targetinfohealth.Size.X.Scale > 0.01
@@ -7019,7 +6993,6 @@ targetinfob.Enabled = false
 targetinfob.Color = Color3.fromHSV(0.44, 1, 1)
 targetinfob.Parent = targetinfobkg
 
--- Settings
 targetinfoobj:CreateFont({
     Name = 'Font',
     Blacklist = 'Arial',
@@ -7061,15 +7034,6 @@ targetinfobackgroundtransparency = targetinfoobj:CreateSlider({
         targetinfobkg.BackgroundTransparency = val
     end,
     Darker = true
-})
-
--- Distance toggle
-targetinfoobj:CreateToggle({
-    Name = 'Show Distance',
-    Default = true,
-    Function = function(callback)
-        targetinfoDistance.Visible = callback
-    end
 })
 
 local targetinfocolor
@@ -7122,123 +7086,70 @@ targetinfobcolor = targetinfoobj:CreateColorSlider({
 
 local lasthealth = 0
 local lastmaxhealth = 0
-local lastdistance = 0
-
-local function getCamera()
-    return workspace.CurrentCamera or game.Workspace.CurrentCamera or camera
-end
 
 targetinfo = {
     Targets = {},
     Object = targetinfobkg,
     UpdateInfo = function(self)
-        local now = tick()
-        for target, expireTime in pairs(self.Targets) do
-            if expireTime < now then
-                self.Targets[target] = nil
+        local entitylib = mainapi.Libraries
+        if not entitylib then return end
+
+        for i, v in self.Targets do
+            if v < tick() then
+                self.Targets[i] = nil
             end
         end
 
         local v, highest = nil, tick()
-        for target, check in pairs(self.Targets) do
+        for i, check in self.Targets do
             if check > highest then
-                v = target
+                v = i
                 highest = check
             end
         end
 
-        local isVisible = targetinfobkg.Visible
-        targetinfobkg.Visible = v ~= nil
-        
+        targetinfobkg.Visible = v ~= nil or mainapi.gui.ScaledGui.ClickGui.Visible
         if v then
-            targetinfoname.Text = v.Player and (targetinfodisplay.Enabled and v.Player.DisplayName or v.Player.Name) or v.Character and v.Character.Name or "Unknown"
-            
-            if v.Player and v.Player.UserId then
-                targetinfoshot.Image = 'rbxthumb://type=AvatarHeadShot&id='..v.Player.UserId..'&w=420&h=420'
+            targetinfoname.Text = v.Player and (targetinfodisplay.Enabled and v.Player.DisplayName or v.Player.Name) or v.Character and v.Character.Name or targetinfoname.Text
+            targetinfoshot.Image = 'rbxthumb://type=AvatarHeadShot&id='..(v.Player and v.Player.UserId or 1)..'&w=420&h=420'
+
+            if not v.Character then
+                v.Health = v.Health or 0
+                v.MaxHealth = v.MaxHealth or 100
             end
 
-            local health = 0
-            local maxHealth = 100
-            
-            if v.Character then
-                local humanoid = v.Character:FindFirstChild("Humanoid")
-                if humanoid then
-                    health = humanoid.Health
-                    maxHealth = humanoid.MaxHealth
-                end
-            else
-                health = v.Health or 0
-                maxHealth = v.MaxHealth or 100
-            end
-            
-            local distanceText = ""
-            local camera = getCamera()
-            if camera and camera.CFrame then
-                local myPos = camera.CFrame.Position
-                local targetPos = nil
+            if v.Health ~= lasthealth or v.MaxHealth ~= lastmaxhealth then
+                local percent = math.max(v.Health / v.MaxHealth, 0)
                 
-                if v.Character and v.Character.PrimaryPart then
-                    targetPos = v.Character.PrimaryPart.Position
-                elseif v.Character then
-                    local hrp = v.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        targetPos = hrp.Position
-                    end
-                end
-                
-                if targetPos then
-                    local distance = (targetPos - myPos).Magnitude
-                    if math.abs(distance - lastdistance) > 1 then
-                        distanceText = string.format('Distance: %.0f', distance)
-                        lastdistance = distance
-                    else
-                        distanceText = string.format('Distance: %.0f', lastdistance)
-                    end
-                end
-            end
-            targetinfoDistance.Text = distanceText
-
-            if health ~= lasthealth or maxHealth ~= lastmaxhealth then
-                local percent = math.clamp(health / maxHealth, 0, 1)
                 local healthColor
                 if percent > 0.6 then
-                    healthColor = Color3.fromRGB(50, 200, 50)
+                    healthColor = Color3.fromHSV(1 / 2.5, 0.89, 0.75)
                 elseif percent > 0.3 then
-                    healthColor = Color3.fromRGB(255, 170, 0)
+                    healthColor = Color3.fromHSV(0.12, 0.89, 0.75)
                 else
-                    healthColor = Color3.fromRGB(200, 50, 50)
+                    healthColor = Color3.fromHSV(0, 0.89, 0.75)
                 end
                 
-                tween:Tween(targetinfohealth, TweenInfo.new(0.2), {
-                    Size = UDim2.fromScale(percent, 1),
+                tween:Tween(targetinfohealth, TweenInfo.new(0.3), {
+                    Size = UDim2.fromScale(math.min(percent, 1), 1),
                     BackgroundColor3 = healthColor
                 })
-                
-                targetinfoHealthText.Text = math.floor(health)..'/'..math.floor(maxHealth)
-                
-                tween:Tween(targetinfohealthextra, TweenInfo.new(0.2), {
+                tween:Tween(targetinfohealthextra, TweenInfo.new(0.3), {
                     Size = UDim2.fromScale(math.clamp(percent - 1, 0, 0.8), 1)
                 })
-                
-                if lasthealth > health and self.LastTarget == v then
+                if lasthealth > v.Health and self.LastTarget == v then
                     tween:Cancel(targetinfoshotflash)
                     targetinfoshotflash.BackgroundTransparency = 0.3
                     tween:Tween(targetinfoshotflash, TweenInfo.new(0.5), {
                         BackgroundTransparency = 1
                     })
                 end
-                
-                lasthealth = health
-                lastmaxhealth = maxHealth
+                lasthealth = v.Health
+                lastmaxhealth = v.MaxHealth
             end
 
-            if not v.Character then
-                table.clear(v)
-            end
+            if not v.Character then table.clear(v) end
             self.LastTarget = v
-        else
-            targetinfoDistance.Text = ''
-            targetinfoHealthText.Text = ''
         end
         return v
     end
