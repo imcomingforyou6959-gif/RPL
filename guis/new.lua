@@ -6876,22 +6876,23 @@ VapeLabelSorter.Parent = VapeLabelHolder
 local targetinfo
 local targetinfoobj
 local targetinfobcolor
+
 targetinfoobj = mainapi:CreateOverlay({
-	Name = 'Target Info',
-	Icon = getcustomasset('newvape/assets/new/targetinfoicon.png'),
-	Size = UDim2.fromOffset(14, 14),
-	Position = UDim2.fromOffset(12, 14),
-	CategorySize = 240,
-	Function = function(callback)
-		if callback then
-			task.spawn(function()
-				repeat
-					targetinfo:UpdateInfo()
-					task.wait()
-				until not targetinfoobj.Button or not targetinfoobj.Button.Enabled
-			end)
-		end
-	end
+    Name = 'Target Info',
+    Icon = getcustomasset('newvape/assets/new/targetinfoicon.png'),
+    Size = UDim2.fromOffset(14, 14),
+    Position = UDim2.fromOffset(12, 14),
+    CategorySize = 240,
+    Function = function(callback)
+        if callback then
+            task.spawn(function()
+                repeat
+                    targetinfo:UpdateInfo()
+                    task.wait()
+                until not targetinfoobj.Button or not targetinfoobj.Button.Enabled
+            end)
+        end
+    end
 })
 
 local targetinfobkg = Instance.new('Frame')
@@ -6899,24 +6900,29 @@ targetinfobkg.Size = UDim2.fromOffset(240, 89)
 targetinfobkg.BackgroundColor3 = color.Dark(uipallet.Main, 0.1)
 targetinfobkg.BackgroundTransparency = 0.5
 targetinfobkg.Parent = targetinfoobj.Children
+
 local targetinfoblurobj = addBlur(targetinfobkg)
 targetinfoblurobj.Visible = false
 addCorner(targetinfobkg)
+
 local targetinfoshot = Instance.new('ImageLabel')
 targetinfoshot.Size = UDim2.fromOffset(26, 27)
 targetinfoshot.Position = UDim2.fromOffset(19, 17)
 targetinfoshot.BackgroundColor3 = uipallet.Main
 targetinfoshot.Image = 'rbxthumb://type=AvatarHeadShot&id=1&w=420&h=420'
 targetinfoshot.Parent = targetinfobkg
+
 local targetinfoshotflash = Instance.new('Frame')
 targetinfoshotflash.Size = UDim2.fromScale(1, 1)
 targetinfoshotflash.BackgroundTransparency = 1
 targetinfoshotflash.BackgroundColor3 = Color3.new(1, 0, 0)
 targetinfoshotflash.Parent = targetinfoshot
 addCorner(targetinfoshotflash)
+
 local targetinfoshotblur = addBlur(targetinfoshot)
 targetinfoshotblur.Visible = false
 addCorner(targetinfoshot)
+
 local targetinfoname = Instance.new('TextLabel')
 targetinfoname.Size = UDim2.fromOffset(145, 20)
 targetinfoname.Position = UDim2.fromOffset(54, 20)
@@ -6928,22 +6934,36 @@ targetinfoname.TextScaled = true
 targetinfoname.TextColor3 = color.Light(uipallet.Text, 0.4)
 targetinfoname.TextStrokeTransparency = 1
 targetinfoname.FontFace = uipallet.Font
+
 local targetinfoshadow = targetinfoname:Clone()
 targetinfoshadow.Position = UDim2.fromOffset(55, 21)
 targetinfoshadow.TextColor3 = Color3.new()
 targetinfoshadow.TextTransparency = 0.65
 targetinfoshadow.Visible = false
 targetinfoshadow.Parent = targetinfobkg
+
 targetinfoname:GetPropertyChangedSignal('Size'):Connect(function()
-	targetinfoshadow.Size = targetinfoname.Size
+    targetinfoshadow.Size = targetinfoname.Size
 end)
 targetinfoname:GetPropertyChangedSignal('Text'):Connect(function()
-	targetinfoshadow.Text = targetinfoname.Text
+    targetinfoshadow.Text = targetinfoname.Text
 end)
 targetinfoname:GetPropertyChangedSignal('FontFace'):Connect(function()
-	targetinfoshadow.FontFace = targetinfoname.FontFace
+    targetinfoshadow.FontFace = targetinfoname.FontFace
 end)
 targetinfoname.Parent = targetinfobkg
+
+local targetinfoDistance = Instance.new('TextLabel')
+targetinfoDistance.Size = UDim2.fromOffset(100, 14)
+targetinfoDistance.Position = UDim2.fromOffset(54, 42)
+targetinfoDistance.BackgroundTransparency = 1
+targetinfoDistance.Text = ''
+targetinfoDistance.TextXAlignment = Enum.TextXAlignment.Left
+targetinfoDistance.TextColor3 = color.Dark(uipallet.Text, 0.3)
+targetinfoDistance.TextSize = 10
+targetinfoDistance.FontFace = uipallet.Font
+targetinfoDistance.Parent = targetinfobkg
+
 local targetinfohealthbkg = Instance.new('Frame')
 targetinfohealthbkg.Name = 'HealthBKG'
 targetinfohealthbkg.Size = UDim2.fromOffset(200, 9)
@@ -6952,14 +6972,29 @@ targetinfohealthbkg.BackgroundColor3 = uipallet.Main
 targetinfohealthbkg.BorderSizePixel = 0
 targetinfohealthbkg.Parent = targetinfobkg
 addCorner(targetinfohealthbkg, UDim.new(1, 0))
+
 local targetinfohealth = targetinfohealthbkg:Clone()
 targetinfohealth.Size = UDim2.fromScale(0.8, 1)
 targetinfohealth.Position = UDim2.new()
 targetinfohealth.BackgroundColor3 = Color3.fromHSV(1 / 2.5, 0.89, 0.75)
 targetinfohealth.Parent = targetinfohealthbkg
+
+local targetinfoHealthText = Instance.new('TextLabel')
+targetinfoHealthText.Size = UDim2.fromOffset(200, 9)
+targetinfoHealthText.Position = UDim2.fromOffset(20, 56)
+targetinfoHealthText.BackgroundTransparency = 1
+targetinfoHealthText.Text = ''
+targetinfoHealthText.TextXAlignment = Enum.TextXAlignment.Center
+targetinfoHealthText.TextColor3 = Color3.new(1, 1, 1)
+targetinfoHealthText.TextSize = 9
+targetinfoHealthText.FontFace = uipallet.Font
+targetinfoHealthText.TextStrokeTransparency = 0.5
+targetinfoHealthText.Parent = targetinfobkg
+
 targetinfohealth:GetPropertyChangedSignal('Size'):Connect(function()
-	targetinfohealth.Visible = targetinfohealth.Size.X.Scale > 0.01
+    targetinfohealth.Visible = targetinfohealth.Size.X.Scale > 0.01
 end)
+
 local targetinfohealthextra = targetinfohealth:Clone()
 targetinfohealthextra.Size = UDim2.new()
 targetinfohealthextra.Position = UDim2.fromScale(1, 0)
@@ -6967,159 +7002,206 @@ targetinfohealthextra.AnchorPoint = Vector2.new(1, 0)
 targetinfohealthextra.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
 targetinfohealthextra.Visible = false
 targetinfohealthextra.Parent = targetinfohealthbkg
+
 targetinfohealthextra:GetPropertyChangedSignal('Size'):Connect(function()
-	targetinfohealthextra.Visible = targetinfohealthextra.Size.X.Scale > 0.01
+    targetinfohealthextra.Visible = targetinfohealthextra.Size.X.Scale > 0.01
 end)
+
 local targetinfohealthblur = addBlur(targetinfohealthbkg)
 targetinfohealthblur.SliceCenter = Rect.new(52, 31, 261, 510)
 targetinfohealthblur.ImageColor3 = Color3.new()
 targetinfohealthblur.Visible = false
+
 local targetinfob = Instance.new('UIStroke')
 targetinfob.Enabled = false
 targetinfob.Color = Color3.fromHSV(0.44, 1, 1)
 targetinfob.Parent = targetinfobkg
 
 targetinfoobj:CreateFont({
-	Name = 'Font',
-	Blacklist = 'Arial',
-	Function = function(val)
-		targetinfoname.FontFace = val
-	end
+    Name = 'Font',
+    Blacklist = 'Arial',
+    Function = function(val)
+        targetinfoname.FontFace = val
+    end
 })
+
 local targetinfobackgroundtransparency = {
-	Value = 0.5,
-	Object = {Visible = {}}
+    Value = 0.5,
+    Object = {Visible = {}}
 }
+
 local targetinfodisplay = targetinfoobj:CreateToggle({
-	Name = 'Use Displayname',
-	Default = true
+    Name = 'Use Displayname',
+    Default = true
 })
+
 targetinfoobj:CreateToggle({
-	Name = 'Render Background',
-	Function = function(callback)
-		targetinfobkg.BackgroundTransparency = callback and targetinfobackgroundtransparency.Value or 1
-		targetinfoshadow.Visible = not callback
-		targetinfoblurobj.Visible = callback
-		targetinfohealthblur.Visible = not callback
-		targetinfoshotblur.Visible = not callback
-		targetinfobackgroundtransparency.Object.Visible = callback
-	end,
-	Default = true
+    Name = 'Render Background',
+    Function = function(callback)
+        targetinfobkg.BackgroundTransparency = callback and targetinfobackgroundtransparency.Value or 1
+        targetinfoshadow.Visible = not callback
+        targetinfoblurobj.Visible = callback
+        targetinfohealthblur.Visible = not callback
+        targetinfoshotblur.Visible = not callback
+        targetinfobackgroundtransparency.Object.Visible = callback
+    end,
+    Default = true
 })
+
 targetinfobackgroundtransparency = targetinfoobj:CreateSlider({
-	Name = 'Transparency',
-	Min = 0,
-	Max = 1,
-	Default = 0.5,
-	Decimal = 10,
-	Function = function(val)
-		targetinfobkg.BackgroundTransparency = val
-	end,
-	Darker = true
+    Name = 'Transparency',
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Decimal = 10,
+    Function = function(val)
+        targetinfobkg.BackgroundTransparency = val
+    end,
+    Darker = true
 })
+
+targetinfoobj:CreateToggle({
+    Name = 'Show Distance',
+    Default = true,
+    Function = function(callback)
+        targetinfoDistance.Visible = callback
+    end
+})
+
 local targetinfocolor
 local targetinfocolortoggle = targetinfoobj:CreateToggle({
-	Name = 'Custom Color',
-	Function = function(callback)
-		targetinfocolor.Object.Visible = callback
-		if callback then
-			targetinfobkg.BackgroundColor3 = Color3.fromHSV(targetinfocolor.Hue, targetinfocolor.Sat, targetinfocolor.Value)
-			targetinfoshot.BackgroundColor3 = Color3.fromHSV(targetinfocolor.Hue, targetinfocolor.Sat, math.max(targetinfocolor.Value - 0.1, 0.075))
-			targetinfohealthbkg.BackgroundColor3 = targetinfoshot.BackgroundColor3
-		else
-			targetinfobkg.BackgroundColor3 = color.Dark(uipallet.Main, 0.1)
-			targetinfoshot.BackgroundColor3 = uipallet.Main
-			targetinfohealthbkg.BackgroundColor3 = uipallet.Main
-		end
-	end
+    Name = 'Custom Color',
+    Function = function(callback)
+        targetinfocolor.Object.Visible = callback
+        if callback then
+            targetinfobkg.BackgroundColor3 = Color3.fromHSV(targetinfocolor.Hue, targetinfocolor.Sat, targetinfocolor.Value)
+            targetinfoshot.BackgroundColor3 = Color3.fromHSV(targetinfocolor.Hue, targetinfocolor.Sat, math.max(targetinfocolor.Value - 0.1, 0.075))
+            targetinfohealthbkg.BackgroundColor3 = targetinfoshot.BackgroundColor3
+        else
+            targetinfobkg.BackgroundColor3 = color.Dark(uipallet.Main, 0.1)
+            targetinfoshot.BackgroundColor3 = uipallet.Main
+            targetinfohealthbkg.BackgroundColor3 = uipallet.Main
+        end
+    end
 })
+
 targetinfocolor = targetinfoobj:CreateColorSlider({
-	Name = 'Color',
-	Function = function(hue, sat, val)
-		if targetinfocolortoggle.Enabled then
-			targetinfobkg.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
-			targetinfoshot.BackgroundColor3 = Color3.fromHSV(hue, sat, math.max(val - 0.1, 0))
-			targetinfohealthbkg.BackgroundColor3 = targetinfoshot.BackgroundColor3
-		end
-	end,
-	Darker = true,
-	Visible = false
+    Name = 'Color',
+    Function = function(hue, sat, val)
+        if targetinfocolortoggle.Enabled then
+            targetinfobkg.BackgroundColor3 = Color3.fromHSV(hue, sat, val)
+            targetinfoshot.BackgroundColor3 = Color3.fromHSV(hue, sat, math.max(val - 0.1, 0))
+            targetinfohealthbkg.BackgroundColor3 = targetinfoshot.BackgroundColor3
+        end
+    end,
+    Darker = true,
+    Visible = false
 })
+
 targetinfoobj:CreateToggle({
-	Name = 'Border',
-	Function = function(callback)
-		targetinfob.Enabled = callback
-		targetinfobcolor.Object.Visible = callback
-	end
+    Name = 'Border',
+    Function = function(callback)
+        targetinfob.Enabled = callback
+        targetinfobcolor.Object.Visible = callback
+    end
 })
+
 targetinfobcolor = targetinfoobj:CreateColorSlider({
-	Name = 'Border Color',
-	Function = function(hue, sat, val, opacity)
-		targetinfob.Color = Color3.fromHSV(hue, sat, val)
-		targetinfob.Transparency = 1 - opacity
-	end,
-	Darker = true,
-	Visible = false
+    Name = 'Border Color',
+    Function = function(hue, sat, val, opacity)
+        targetinfob.Color = Color3.fromHSV(hue, sat, val)
+        targetinfob.Transparency = 1 - opacity
+    end,
+    Darker = true,
+    Visible = false
 })
 
 local lasthealth = 0
 local lastmaxhealth = 0
+local lastdistance = 0
+
 targetinfo = {
-	Targets = {},
-	Object = targetinfobkg,
-	UpdateInfo = function(self)
-		local entitylib = mainapi.Libraries
-		if not entitylib then return end
+    Targets = {},
+    Object = targetinfobkg,
+    UpdateInfo = function(self)
+        local entitylib = mainapi.Libraries
+        if not entitylib then return end
 
-		for i, v in self.Targets do
-			if v < tick() then
-				self.Targets[i] = nil
-			end
-		end
+        for i, v in self.Targets do
+            if v < tick() then
+                self.Targets[i] = nil
+            end
+        end
 
-		local v, highest = nil, tick()
-		for i, check in self.Targets do
-			if check > highest then
-				v = i
-				highest = check
-			end
-		end
+        local v, highest = nil, tick()
+        for i, check in self.Targets do
+            if check > highest then
+                v = i
+                highest = check
+            end
+        end
 
-		targetinfobkg.Visible = v ~= nil or mainapi.gui.ScaledGui.ClickGui.Visible
-		if v then
-			targetinfoname.Text = v.Player and (targetinfodisplay.Enabled and v.Player.DisplayName or v.Player.Name) or v.Character and v.Character.Name or targetinfoname.Text
-			targetinfoshot.Image = 'rbxthumb://type=AvatarHeadShot&id='..(v.Player and v.Player.UserId or 1)..'&w=420&h=420'
+        targetinfobkg.Visible = v ~= nil or mainapi.gui.ScaledGui.ClickGui.Visible
+        if v then
+            targetinfoname.Text = v.Player and (targetinfodisplay.Enabled and v.Player.DisplayName or v.Player.Name) or v.Character and v.Character.Name or targetinfoname.Text
+            targetinfoshot.Image = 'rbxthumb://type=AvatarHeadShot&id='..(v.Player and v.Player.UserId or 1)..'&w=420&h=420'
 
-			if not v.Character then
-				v.Health = v.Health or 0
-				v.MaxHealth = v.MaxHealth or 100
-			end
+            if not v.Character then
+                v.Health = v.Health or 0
+                v.MaxHealth = v.MaxHealth or 100
+            end
 
-			if v.Health ~= lasthealth or v.MaxHealth ~= lastmaxhealth then
-				local percent = math.max(v.Health / v.MaxHealth, 0)
-				tween:Tween(targetinfohealth, TweenInfo.new(0.3), {
-					Size = UDim2.fromScale(math.min(percent, 1), 1), BackgroundColor3 = Color3.fromHSV(math.clamp(percent / 2.5, 0, 1), 0.89, 0.75)
-				})
-				tween:Tween(targetinfohealthextra, TweenInfo.new(0.3), {
-					Size = UDim2.fromScale(math.clamp(percent - 1, 0, 0.8), 1)
-				})
-				if lasthealth > v.Health and self.LastTarget == v then
-					tween:Cancel(targetinfoshotflash)
-					targetinfoshotflash.BackgroundTransparency = 0.3
-					tween:Tween(targetinfoshotflash, TweenInfo.new(0.5), {
-						BackgroundTransparency = 1
-					})
-				end
-				lasthealth = v.Health
-				lastmaxhealth = v.MaxHealth
-			end
+            local myPos = gameCamera.CFrame.Position
+            local targetPos = v.Character and v.Character.PrimaryPart and v.Character.PrimaryPart.Position or myPos
+            local distance = (targetPos - myPos).Magnitude
+            if math.abs(distance - lastdistance) > 1 then
+                targetinfoDistance.Text = string.format('Distance: %.0f', distance)
+                lastdistance = distance
+            end
 
-			if not v.Character then table.clear(v) end
-			self.LastTarget = v
-		end
-		return v
-	end
+            if v.Health ~= lasthealth or v.MaxHealth ~= lastmaxhealth then
+                local percent = math.max(v.Health / v.MaxHealth, 0)
+                local healthColor
+                if percent > 0.6 then
+                    healthColor = Color3.fromRGB(50, 200, 50)
+                elseif percent > 0.3 then
+                    healthColor = Color3.fromRGB(255, 170, 0)
+                else
+                    healthColor = Color3.fromRGB(200, 50, 50)
+                end
+                
+                tween:Tween(targetinfohealth, TweenInfo.new(0.2), {
+                    Size = UDim2.fromScale(math.min(percent, 1), 1),
+                    BackgroundColor3 = healthColor
+                })
+                
+                targetinfoHealthText.Text = math.floor(v.Health)..'/'..math.floor(v.MaxHealth)
+                
+                tween:Tween(targetinfohealthextra, TweenInfo.new(0.2), {
+                    Size = UDim2.fromScale(math.clamp(percent - 1, 0, 0.8), 1)
+                })
+                
+                if lasthealth > v.Health and self.LastTarget == v then
+                    tween:Cancel(targetinfoshotflash)
+                    targetinfoshotflash.BackgroundTransparency = 0.3
+                    tween:Tween(targetinfoshotflash, TweenInfo.new(0.5), {
+                        BackgroundTransparency = 1
+                    })
+                end
+                lasthealth = v.Health
+                lastmaxhealth = v.MaxHealth
+            end
+
+            if not v.Character then table.clear(v) end
+            self.LastTarget = v
+        else
+            targetinfoDistance.Text = ''
+            targetinfoHealthText.Text = ''
+        end
+        return v
+    end
 }
+
 mainapi.Libraries.targetinfo = targetinfo
 
 function mainapi:UpdateTextGUI(afterload)
