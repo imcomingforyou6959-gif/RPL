@@ -1675,43 +1675,69 @@ run(function()
         end,
         Tooltip = 'Only target players on the selected team'
     })
-	SilentAim:CreateToggle({
-	    Name = 'Range Circle',
-	    Function = function(callback)
-	        if callback then
-	            CircleObject = Drawing.new('Circle')
-	            CircleObject.Filled = CircleFilled and CircleFilled.Enabled or false
-	            CircleObject.Color = Color3.fromHSV((CircleColor and CircleColor.Hue or 0), (CircleColor and CircleColor.Sat or 1), (CircleColor and CircleColor.Value or 1))
-	            CircleObject.Position = inputService:GetMouseLocation()
-	            CircleObject.Radius = Range and Range.Value or 150
-	            CircleObject.NumSides = 100
-	            CircleObject.Thickness = 1
-	            CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
-	            CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
-	        else
-	            if CircleObject then
-	                CircleObject:Remove()
-	                CircleObject = nil
-	            end
-	        end
-	        if CircleColor then CircleColor.Object.Visible = callback end
-	        if CircleTransparency then CircleTransparency.Object.Visible = callback end
-	        if CircleFilled then CircleFilled.Object.Visible = callback end
-    	end
-	})
+    
+    SilentAim:CreateToggle({
+        Name = 'Range Circle',
+        Function = function(callback)
+            if callback then
+                CircleObject = Drawing.new('Circle')
+                CircleObject.Filled = CircleFilled and CircleFilled.Enabled or false
+                CircleObject.Color = Color3.fromHSV((CircleColor and CircleColor.Hue or 0), (CircleColor and CircleColor.Sat or 1), (CircleColor and CircleColor.Value or 1))
+                CircleObject.Position = inputService:GetMouseLocation()
+                CircleObject.Radius = Range and Range.Value or 150
+                CircleObject.NumSides = 100
+                CircleObject.Thickness = 1
+                CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0.5)
+                CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
+            else
+                if CircleObject then
+                    CircleObject:Remove()
+                    CircleObject = nil
+                end
+            end
+            if CircleColor then CircleColor.Object.Visible = callback end
+            if CircleTransparency then CircleTransparency.Object.Visible = callback end
+            if CircleFilled then CircleFilled.Object.Visible = callback end
+        end
+    })
+    
     CircleColor = SilentAim:CreateColorSlider({
-        Name = 'Circle Color', Function = function(hue,sat,val) if CircleObject then CircleObject.Color = Color3.fromHSV(hue,sat,val) end end,
-        Darker = true, Visible = false
+        Name = 'Circle Color', 
+        Function = function(hue, sat, val) 
+            if CircleObject then 
+                CircleObject.Color = Color3.fromHSV(hue, sat, val) 
+            end 
+        end,
+        Darker = true, 
+        Visible = false
     })
+    
     CircleTransparency = SilentAim:CreateSlider({
-        Name = 'Transparency', Min = 0, Max = 1, Decimal = 10, Default = 0.5,
-        Function = function(val) if CircleObject then CircleObject.Transparency = 1 - val end end,
-        Darker = true, Visible = false
+        Name = 'Transparency', 
+        Min = 0, 
+        Max = 1, 
+        Decimal = 10, 
+        Default = 0.5,
+        Function = function(val) 
+            if CircleObject then 
+                CircleObject.Transparency = 1 - val 
+            end 
+        end,
+        Darker = true, 
+        Visible = false
     })
+    
     CircleFilled = SilentAim:CreateToggle({
-        Name = 'Circle Filled', Function = function(callback) if CircleObject then CircleObject.Filled = callback end end,
-        Darker = true, Visible = false
+        Name = 'Circle Filled', 
+        Function = function(callback) 
+            if CircleObject then 
+                CircleObject.Filled = callback 
+            end 
+        end,
+        Darker = true, 
+        Visible = false
     })
+    
     Face = SilentAim:CreateToggle({ Name = 'Face target' })
     ShowTarget = SilentAim:CreateToggle({ Name = "Show Target Info" })
 end)
