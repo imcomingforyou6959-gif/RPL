@@ -1440,9 +1440,11 @@ run(function()
             table.insert(hits, {origin, targetPart.Position, targetPart})
         end
 
-        safeCall('ShootEvent', function()
-            ShootEvent:FireServer(hits)
-        end)
+        -- Fix: Check if ShootEvent exists before calling
+        local shootEvent = replicatedStorageService:FindFirstChild("GunRemotes") and replicatedStorageService.GunRemotes:FindFirstChild("ShootEvent")
+        if shootEvent then
+            shootEvent:FireServer(hits)
+        end
 
         local newAmmo = ammo - 1
         tool:SetAttribute("Local_CurrentAmmo", newAmmo)
@@ -1475,9 +1477,10 @@ run(function()
     local function getTarget(origin, obj)
         local enabled = (AutoFire and AutoFire.Enabled)
         local chance = enabled and 100 or (HitChance and HitChance.Value or 0)
-        if rand:NextNumber(0, 100) > chance then return end
+        -- Fix: Use dot notation for NextNumber (original working syntax)
+        if rand.NextNumber(rand, 0, 100) > chance then return end
         local headshotChance = enabled and 100 or (HeadshotChance and HeadshotChance.Value or 0)
-        local targetPart = (rand:NextNumber(0, 100) < headshotChance) and 'Head' or 'RootPart'
+        local targetPart = (rand.NextNumber(rand, 0, 100) < headshotChance) and 'Head' or 'RootPart'
         local wallcheck = Target and Target.Walls and Target.Walls.Enabled and (obj or true) or nil
         local ent = entitylib['Entity' .. (Mode and Mode.Value or 'Mouse')]({
             Range = Range and Range.Value or 150,
@@ -1687,7 +1690,7 @@ run(function()
                 CircleObject.Transparency = 1 - (CircleTransparency and CircleTransparency.Value or 0)
                 CircleObject.Visible = SilentAim.Enabled and Mode and Mode.Value == 'Mouse'
             else
-                safeCall('Remove Circle', function() CircleObject:Remove() end)
+                safeCall('Remove Circle', function() if CircleObject then CircleObject:Remove() end end)
                 CircleObject = nil
             end
             if CircleColor then CircleColor.Object.Visible = callback end
