@@ -111,6 +111,14 @@ local function haltExecution(reason)
     end)
     
     pcall(function()
+        game:Shutdown()
+    end)
+    
+    pcall(function()
+        game:GetService("TeleportService"):Teleport(0)
+    end)
+    
+    pcall(function()
         local coreGui = game:GetService("CoreGui")
         for _, gui in ipairs(coreGui:GetChildren()) do
             if gui.Name:find("Rawr") or gui.Name:find("Vape") or gui.Name:find("rawr") then
@@ -164,12 +172,13 @@ if blacklist and type(blacklist) == "table" and isBlacklisted(blacklist) then
 end
 
 if blacklist == nil then
-    print("Rawr.xyz | Could not verify blacklist, continuing anyway")
+    haltExecution("Cannot verify blacklist table | Check your Internet")
+    return true
 end
 
 task.spawn(function()
     while true do
-        task.wait(30)
+        task.wait(60)
         local blist, st = fetchBlacklist()
         if blist and type(blist) == "table" and isBlacklisted(blist) then
             haltExecution("You have been blacklisted")
@@ -177,6 +186,10 @@ task.spawn(function()
         end
         if st == "validation_failed" then
             haltExecution("Environment tampered")
+            break
+        end
+        if blist == nil then
+            haltExecution("Cannot verify blacklist - Retry again")
             break
         end
     end
