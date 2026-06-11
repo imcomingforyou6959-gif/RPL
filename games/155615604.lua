@@ -206,7 +206,7 @@ until (replicatedStorageService and replicatedStorageService:FindFirstChild("Rem
 
 task.wait(0.5)
 
-print("✅ Rawr.xyz | Loaded successfully")
+print("Checked Cilent")
 
 local cloneref = cloneref or function(obj) return obj end
 
