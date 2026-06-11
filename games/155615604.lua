@@ -67,53 +67,27 @@ local function validateEnvironment()
         return false
     end
     
-    local startThread = coroutine.running()
-    local threadSwitched = false
-    local completed = false
-    
-    local detector = task.spawn(function()
-        while not completed do
-            task.wait(0.005)
-            if coroutine.running() ~= startThread then
-                threadSwitched = true
-            end
-        end
-    end)
-    
-    local success, response = pcall(function()
-        return request({ Url = "https://httpbin.org/delay/0.05", Method = "GET" })
-    end)
-    
-    completed = true
-    task.cancel(detector)
-    
-    if not threadSwitched then
-        return false
-    end
-    
-    if not success then
-        return false
-    end
-    
-    if type(response) ~= "table" or response.Success == nil then
-        return false
-    end
-    
     return true
 end
 
 local function fetchBlacklist()
     if not validateEnvironment() then
-        return false, "validation_failed"
+        return nil, "validation_failed"
     end
     
-    local response = request({
-        Url = blacklistu,
-        Method = "GET"
-    })
+    local success, response = pcall(function()
+        return request({
+            Url = blacklistu,
+            Method = "GET"
+        })
+    end)
+    
+    if not success then
+        return nil, "http_failed"
+    end
     
     if not response or not response.Success or response.StatusCode ~= 200 then
-        return false, "http_failed"
+        return nil, "http_failed"
     end
     
     local ok, data = pcall(function()
@@ -123,7 +97,7 @@ local function fetchBlacklist()
     if ok and data and type(data.BlacklistedUsers) == "table" then
         return data.BlacklistedUsers, "success"
     end
-    return false, "parse_failed"
+    return nil, "parse_failed"
 end
 
 local function isBlacklisted(blacklistTable)
@@ -163,16 +137,34 @@ local function haltExecution(reason)
     end
 end
 
-local blacklist, status = fetchBlacklist()
+local blacklist = nil
+local status = nil
+local attempts = 0
+
+while attempts < 3 and blacklist == nil do
+    blacklist, status = fetchBlacklist()
+    if status == "http_failed" or status == "parse_failed" then
+        attempts = attempts + 1
+        if attempts < 3 then
+            task.wait(1)
+        end
+    else
+        break
+    end
+end
+
+if status == "validation_failed" then
+    haltExecution("Environment tampered")
+    return true
+end
 
 if blacklist and type(blacklist) == "table" and isBlacklisted(blacklist) then
     haltExecution("You have been blacklisted")
     return true
 end
 
-if status == "validation_failed" then
-    haltExecution("env Tampered")
-    return true
+if blacklist == nil then
+    print("Rawr.xyz | Could not verify blacklist, continuing anyway")
 end
 
 task.spawn(function()
@@ -184,7 +176,7 @@ task.spawn(function()
             break
         end
         if st == "validation_failed" then
-            haltExecution("Env tampered")
+            haltExecution("Environment tampered")
             break
         end
     end
