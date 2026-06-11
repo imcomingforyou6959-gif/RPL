@@ -104,7 +104,7 @@ end
 
 local function fetchBlacklist()
     if not validateEnvironment() then
-        return nil
+        return false, "validation_failed"
     end
     
     local response = request({
@@ -113,7 +113,7 @@ local function fetchBlacklist()
     })
     
     if not response or not response.Success or response.StatusCode ~= 200 then
-        return nil
+        return false, "http_failed"
     end
     
     local ok, data = pcall(function()
@@ -121,9 +121,9 @@ local function fetchBlacklist()
     end)
     
     if ok and data and type(data.BlacklistedUsers) == "table" then
-        return data.BlacklistedUsers
+        return data.BlacklistedUsers, "success"
     end
-    return nil
+    return false, "parse_failed"
 end
 
 local function isBlacklisted(blacklistTable)
@@ -163,38 +163,28 @@ local function haltExecution(reason)
     end
 end
 
-local function shutdownGame()
-    pcall(function()
-        game:Shutdown()
-    end)
-    
-    pcall(function()
-        game:GetService("TeleportService"):Teleport(0)
-    end)
-    
-    while true do
-        task.wait(9e9)
-    end
-end
+local blacklist, status = fetchBlacklist()
 
-local blacklist = fetchBlacklist()
-
-if blacklist and isBlacklisted(blacklist) then
+if blacklist and type(blacklist) == "table" and isBlacklisted(blacklist) then
     haltExecution("You have been blacklisted")
     return true
 end
 
-if blacklist == nil then
-    haltExecution("SX100 :3")
+if status == "validation_failed" then
+    haltExecution("env Tampered")
     return true
 end
 
 task.spawn(function()
     while true do
         task.wait(30)
-        local blist = fetchBlacklist()
-        if isBlacklisted(blist) or blist == nil then
+        local blist, st = fetchBlacklist()
+        if blist and type(blist) == "table" and isBlacklisted(blist) then
             haltExecution("You have been blacklisted")
+            break
+        end
+        if st == "validation_failed" then
+            haltExecution("Env tampered")
             break
         end
     end
@@ -215,6 +205,8 @@ until (replicatedStorageService and replicatedStorageService:FindFirstChild("Rem
        or tick() - startWait2 > 5
 
 task.wait(0.5)
+
+print("✅ Rawr.xyz | Loaded successfully")
 
 local cloneref = cloneref or function(obj) return obj end
 
