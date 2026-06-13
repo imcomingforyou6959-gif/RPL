@@ -1,3 +1,11 @@
+--[[
+    Prison Duels Script
+    Modules: Hit Sounds, Crosshair, Auto Sprint, No Spread, Silent Aim
+]]
+
+-- ============================================
+-- GLOBALS & SETUP
+-- ============================================
 
 local playersService = game:GetService("Players")
 local replicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,6 +16,31 @@ local workspaceService = game:GetService("Workspace")
 local lplr = playersService.LocalPlayer
 local vape = shared.vape
 
+-- Find available categories
+local category = nil
+if vape.Categories then
+    if vape.Categories.Utility then
+        category = vape.Categories.Utility
+    elseif vape.Categories.Misc then
+        category = vape.Categories.Misc
+    elseif vape.Categories.Other then
+        category = vape.Categories.Other
+    else
+        for _, cat in pairs(vape.Categories) do
+            category = cat
+            break
+        end
+    end
+end
+
+local function createModule(name, callback)
+    if category then
+        return category:CreateModule({Name = name, Function = callback})
+    else
+        return vape:CreateModule({Name = name, Function = callback})
+    end
+end
+
 local config = lplr:FindFirstChild("config")
 if not config then
     config = lplr:WaitForChild("config", 10)
@@ -17,7 +50,11 @@ local mainEvent = replicatedStorage:FindFirstChild("remotes") and
                   replicatedStorage.remotes:FindFirstChild("events") and
                   replicatedStorage.remotes.events:FindFirstChild("main_event")
 
-local function notif(...) return vape:CreateNotification(...) end
+local function notif(...) 
+    if vape and vape.CreateNotification then
+        return vape:CreateNotification(...)
+    end
+end
 
 local soundIds = {
     "1255040462",  -- Rust
@@ -35,20 +72,19 @@ local soundIds = {
     "5766898159",  -- Bonk
     "4018616850",  -- Minecraft
     "7553397015",  -- TomScream
-    "3124331820",  -- Bameware
-}
+    "3124331820",
 
 local soundNames = {}
 for _, id in ipairs(soundIds) do
     table.insert(soundNames, id)
 end
 
-run(function()
-    local HitSounds
+do
     local headSoundId = "1255040462"
     local limbSoundId = "1255040462"
     local torsoSoundId = "1255040462"
     local hitSoundsEnabled = false
+    local module = nil
     
     local function applyHitSounds()
         if not config then return end
@@ -65,59 +101,57 @@ run(function()
         config.torso_hit_sound = ""
     end
     
-    HitSounds = vape.Categories.Utility:CreateModule({
-        Name = "Hit Sounds",
-        Function = function(callback)
-            hitSoundsEnabled = callback
-            if callback then applyHitSounds() else resetHitSounds() end
-        end,
-        Tooltip = "Custom sounds when you hit enemies"
-    })
+    module = createModule("Hit Sounds", function(callback)
+        hitSoundsEnabled = callback
+        if callback then applyHitSounds() else resetHitSounds() end
+    end)
     
-    HitSounds:CreateToggle({
-        Name = "Enable",
-        Default = false,
-        Function = function(c)
-            hitSoundsEnabled = c
-            if c then applyHitSounds() else resetHitSounds() end
-        end
-    })
-    
-    HitSounds:CreateDropdown({
-        Name = "Head Sound",
-        List = soundNames,
-        Default = "1255040462",
-        Function = function(val)
-            headSoundId = val
-            if hitSoundsEnabled then applyHitSounds() end
-        end
-    })
-    
-    HitSounds:CreateDropdown({
-        Name = "Limb Sound",
-        List = soundNames,
-        Default = "1255040462",
-        Function = function(val)
-            limbSoundId = val
-            if hitSoundsEnabled then applyHitSounds() end
-        end
-    })
-    
-    HitSounds:CreateDropdown({
-        Name = "Torso Sound",
-        List = soundNames,
-        Default = "1255040462",
-        Function = function(val)
-            torsoSoundId = val
-            if hitSoundsEnabled then applyHitSounds() end
-        end
-    })
-end)
+    if module then
+        module:CreateToggle({
+            Name = "Enable",
+            Default = false,
+            Function = function(c)
+                hitSoundsEnabled = c
+                if c then applyHitSounds() else resetHitSounds() end
+            end
+        })
+        
+        module:CreateDropdown({
+            Name = "Head Sound",
+            List = soundNames,
+            Default = "1255040462",
+            Function = function(val)
+                headSoundId = val
+                if hitSoundsEnabled then applyHitSounds() end
+            end
+        })
+        
+        module:CreateDropdown({
+            Name = "Limb Sound",
+            List = soundNames,
+            Default = "1255040462",
+            Function = function(val)
+                limbSoundId = val
+                if hitSoundsEnabled then applyHitSounds() end
+            end
+        })
+        
+        module:CreateDropdown({
+            Name = "Torso Sound",
+            List = soundNames,
+            Default = "1255040462",
+            Function = function(val)
+                torsoSoundId = val
+                if hitSoundsEnabled then applyHitSounds() end
+            end
+        })
+    end
+end
 
-run(function()
-    local CrosshairChanger
+do
     local crosshairEnabled = false
     local cursorId = "426730675"
+    local module = nil
     
     local function applyCrosshair()
         if not config then return end
@@ -130,39 +164,37 @@ run(function()
         config.cursor_id = ""
     end
     
-    CrosshairChanger = vape.Categories.Utility:CreateModule({
-        Name = "Crosshair",
-        Function = function(callback)
-            crosshairEnabled = callback
-            if callback then applyCrosshair() else resetCrosshair() end
-        end,
-        Tooltip = "Change your crosshair"
-    })
+    module = createModule("Crosshair", function(callback)
+        crosshairEnabled = callback
+        if callback then applyCrosshair() else resetCrosshair() end
+    end)
     
-    CrosshairChanger:CreateToggle({
-        Name = "Enable",
-        Default = false,
-        Function = function(c)
-            crosshairEnabled = c
-            if c then applyCrosshair() else resetCrosshair() end
-        end
-    })
-    
-    CrosshairChanger:CreateTextBox({
-        Name = "Crosshair ID",
-        Placeholder = "Enter asset ID",
-        Default = "426730675",
-        Function = function(val)
-            cursorId = val
-            if crosshairEnabled then applyCrosshair() end
-        end
-    })
-end)
+    if module then
+        module:CreateToggle({
+            Name = "Enable",
+            Default = false,
+            Function = function(c)
+                crosshairEnabled = c
+                if c then applyCrosshair() else resetCrosshair() end
+            end
+        })
+        
+        module:CreateTextBox({
+            Name = "Crosshair ID",
+            Placeholder = "Enter asset ID",
+            Default = "426730675",
+            Function = function(val)
+                cursorId = val
+                if crosshairEnabled then applyCrosshair() end
+            end
+        })
+    end
+end
 
-run(function()
-    local AutoSprint
+do
     local autoSprintEnabled = false
     local sprintToggled = false
+    local module = nil
     
     local function setSprint(value)
         if not config then return end
@@ -176,40 +208,36 @@ run(function()
         if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
             sprintToggled = not sprintToggled
             setSprint(sprintToggled)
-            notif("Auto Sprint", sprintToggled and "Sprint ON" or "Sprint OFF", 1, "info")
+            if notif then notif("Auto Sprint", sprintToggled and "Sprint ON" or "Sprint OFF", 1, "info") end
         end
     end)
     
-    AutoSprint = vape.Categories.Utility:CreateModule({
-        Name = "Auto Sprint",
-        Function = function(callback)
-            autoSprintEnabled = callback
-            if not callback then
-                sprintToggled = false
-                setSprint(false)
-            end
-        end,
-        Tooltip = "Press Shift once to toggle sprint"
-    })
-    
-    AutoSprint:CreateToggle({
-        Name = "Enable",
-        Default = false,
-        Function = function(c)
-            autoSprintEnabled = c
-            if not c then
-                sprintToggled = false
-                setSprint(false)
-            end
+    module = createModule("Auto Sprint", function(callback)
+        autoSprintEnabled = callback
+        if not callback then
+            sprintToggled = false
+            setSprint(false)
         end
-    })
-end)
+    end)
+    
+    if module then
+        module:CreateToggle({
+            Name = "Enable",
+            Default = false,
+            Function = function(c)
+                autoSprintEnabled = c
+                if not c then
+                    sprintToggled = false
+                    setSprint(false)
+                end
+            end
+        })
+    end
+end
 
--- gun mods
-
-run(function()
-    local NoSpread
+do
     local noSpreadEnabled = false
+    local module = nil
     
     local function modifySpread()
         local playersFolder = workspaceService:FindFirstChild("players")
@@ -245,36 +273,31 @@ run(function()
     
     task.spawn(watchForWeapons)
     
-    NoSpread = vape.Categories.Combat:CreateModule({
-        Name = "No Spread",
-        Function = function(callback)
-            noSpreadEnabled = callback
-            if callback then
-                modifySpread()
-            end
-        end,
-        Tooltip = "Removes bullet spread"
-    })
+    module = createModule("No Spread", function(callback)
+        noSpreadEnabled = callback
+        if callback then modifySpread() end
+    end)
     
-    NoSpread:CreateToggle({
-        Name = "Enable",
-        Default = false,
-        Function = function(c)
-            noSpreadEnabled = c
-            if c then modifySpread() end
-        end
-    })
-end)
+    if module then
+        module:CreateToggle({
+            Name = "Enable",
+            Default = false,
+            Function = function(c)
+                noSpreadEnabled = c
+                if c then modifySpread() end
+            end
+        })
+    end
+end
 
--- silent
-
-run(function()
-    local SilentAim
+do
     local enabled = false
     local aimPart = "Head"
     local fovRadius = 200
     local hitChance = 100
     local range = 800
+    local module = nil
+    local oldFire = nil
     
     local function getClosestEnemy()
         local myChar = lplr.Character
@@ -315,17 +338,26 @@ run(function()
     end
     
     if mainEvent then
-        local oldFire = mainEvent.FireServer
+        oldFire = mainEvent.FireServer
         mainEvent.FireServer = function(self, data, token)
             if enabled and data and type(data) == "table" and math.random(100) <= hitChance then
                 local target = getClosestEnemy()
                 if target then
                     local myHead = lplr.Character and lplr.Character:FindFirstChild("Head")
                     if myHead then
-                        for i, hit in pairs(data) do
-                            if type(hit) == "table" then
-                                hit[2] = target.Position
-                                hit[3] = target
+                        if type(data) == "table" then
+                            for i, hit in pairs(data) do
+                                if type(hit) == "table" then
+                                    hit[2] = target.Position
+                                    hit[3] = target
+                                end
+                            end
+                        elseif data[1] and type(data[1]) == "table" then
+                            for i, hit in pairs(data) do
+                                if type(hit) == "table" then
+                                    hit[2] = target.Position
+                                    hit[3] = target
+                                end
                             end
                         end
                     end
@@ -337,80 +369,79 @@ run(function()
         warn("Silent Aim: Could not find main_event remote")
     end
     
-    SilentAim = vape.Categories.Combat:CreateModule({
-        Name = "Silent Aim",
-        Function = function(callback)
-            enabled = callback
-        end,
-        Tooltip = "Silently redirect bullets to enemies"
-    })
+    module = createModule("Silent Aim", function(callback)
+        enabled = callback
+    end)
     
-    SilentAim:CreateToggle({
-        Name = "Enable",
-        Default = false,
-        Function = function(c)
-            enabled = c
-        end
-    })
-    
-    SilentAim:CreateDropdown({
-        Name = "Aim Part",
-        List = {"Head", "Torso", "HumanoidRootPart"},
-        Default = "Head",
-        Function = function(v)
-            aimPart = v
-        end
-    })
-    
-    SilentAim:CreateSlider({
-        Name = "FOV",
-        Min = 10,
-        Max = 500,
-        Default = 200,
-        Suffix = "px",
-        Function = function(v)
-            fovRadius = v
-        end
-    })
-    
-    SilentAim:CreateSlider({
-        Name = "Range",
-        Min = 50,
-        Max = 1000,
-        Default = 800,
-        Suffix = "studs",
-        Function = function(v)
-            range = v
-        end
-    })
-    
-    SilentAim:CreateSlider({
-        Name = "Hit Chance",
-        Min = 0,
-        Max = 100,
-        Default = 100,
-        Suffix = "%",
-        Function = function(v)
-            hitChance = v
-        end
-    })
-end)
-
--- CLEANUP
-
-vape:Clean(function()
-    if config then
-        config.head_hit_sound = ""
-        config.limb_hit_sound = ""
-        config.torso_hit_sound = ""
-        config.cursor_id = ""
-        config.toggle_sprint = false
+    if module then
+        module:CreateToggle({
+            Name = "Enable",
+            Default = false,
+            Function = function(c)
+                enabled = c
+            end
+        })
+        
+        module:CreateDropdown({
+            Name = "Aim Part",
+            List = {"Head", "Torso", "HumanoidRootPart"},
+            Default = "Head",
+            Function = function(v)
+                aimPart = v
+            end
+        })
+        
+        module:CreateSlider({
+            Name = "FOV",
+            Min = 10,
+            Max = 500,
+            Default = 200,
+            Suffix = "px",
+            Function = function(v)
+                fovRadius = v
+            end
+        })
+        
+        module:CreateSlider({
+            Name = "Range",
+            Min = 50,
+            Max = 1000,
+            Default = 800,
+            Suffix = "studs",
+            Function = function(v)
+                range = v
+            end
+        })
+        
+        module:CreateSlider({
+            Name = "Hit Chance",
+            Min = 0,
+            Max = 100,
+            Default = 100,
+            Suffix = "%",
+            Function = function(v)
+                hitChance = v
+            end
+        })
     end
-    
-    if mainEvent and mainEvent.FireServer then
-    end
-    
-    notif("Prison Duels", "test", 2, "info")
-end)
+end
 
-notif("Prison Duels", "rawr locked in", 3, "success")
+if vape and vape.Clean then
+    vape:Clean(function()
+        if config then
+            config.head_hit_sound = ""
+            config.limb_hit_sound = ""
+            config.torso_hit_sound = ""
+            config.cursor_id = ""
+            config.toggle_sprint = false
+        end
+        
+        if mainEvent and oldFire then
+            mainEvent.FireServer = oldFire
+        end
+        
+        if notif then notif("Prison Duels", "All modules cleaned up", 2, "info") end
+    end)
+end
+
+if notif then notif("Prison Duels", "Loaded successfully!", 3, "success") end
