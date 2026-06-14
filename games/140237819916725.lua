@@ -1,6 +1,4 @@
--- ============================================
--- GLOBALS
--- ============================================
+
 
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
@@ -21,10 +19,6 @@ local gameCamera = workspace.CurrentCamera or workspace:FindFirstChildWhichIsA('
 local lplr = playersService.LocalPlayer
 
 local vape = shared.vape
-
-for _, v in {
-    'SilentAim'
-} do pcall(function() vape:Remove(v) end) end
 
 run(function()
     local silentEnabled = false
@@ -77,15 +71,15 @@ run(function()
         setreadonly(met, true)
     end
     
-    local SilentAimModule = vape.Categories.Combat:CreateModule({
-        Name = "Silent Aim",
+    local SilentAim = vape.Categories.Combat:CreateModule({
+        Name = "SilentAim",
         Function = function(callback)
             silentEnabled = callback
         end,
         Tooltip = "Redirect bullets to nearest enemy"
     })
     
-    SilentAimModule:CreateToggle({
+    SilentAim:CreateToggle({
         Name = "Enable",
         Default = false,
         Function = function(c)
@@ -93,7 +87,7 @@ run(function()
         end
     })
     
-    SilentAimModule:CreateSlider({
+    SilentAim:CreateSlider({
         Name = "FOV",
         Min = 10,
         Max = 500,
@@ -104,7 +98,7 @@ run(function()
         end
     })
     
-    SilentAimModule:CreateDropdown({
+    SilentAim:CreateDropdown({
         Name = "Aim Part",
         List = {"Head", "Torso", "HumanoidRootPart"},
         Default = "Head",
@@ -117,7 +111,7 @@ run(function()
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.C then
             silentEnabled = not silentEnabled
-            vape:CreateNotification("Silent Aim", silentEnabled and "ON" or "OFF", 1, "info")
+            vape:CreateNotification("SilentAim", silentEnabled and "ON" or "OFF", 1, "info")
         end
     end)
 end)
