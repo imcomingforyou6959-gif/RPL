@@ -3352,13 +3352,17 @@ run(function()
                         if data.ShootBurstCooldown then 
                             data.ShootBurstCooldown = _G.gunModsShootCooldown or 0.001 
                         end
+                        if data.ReloadTime then
+                            data.ReloadTime = _G.gunModsReloadTime or 0.001
+                            modifiedCount = modifiedCount + 1
+                        end
                     end
                 end
 
                 vape:CreateNotification("Gun Mods v2", "Modified " .. modifiedCount .. " guns", 3, "success")
             end
         end,
-        Tooltip = "Fast fire rate with adjustable cooldown"
+        Tooltip = "Fast fire rate, instant reload, adjustable cooldown"
     })
 
     module:CreateSlider({
@@ -3396,6 +3400,19 @@ run(function()
             _G.gunModsShootRecoil = v
         end,
         Tooltip = "Gun recoil amount"
+    })
+
+    module:CreateSlider({
+        Name = "Reload Time",
+        Min = 0.001,
+        Max = 3,
+        Default = 0.001,
+        Decimal = 1000,
+        Function = function(v)
+            _G.gunModsReloadTime = v
+        end,
+        Suffix = "s",
+        Tooltip = "Reload duration (0.001 = instant)"
     })
 end)
 
@@ -3468,7 +3485,342 @@ run(function()
         Suffix = "s",
         Tooltip = "Delay between melee swings"
     })
-end)                                                                                                                                                                                                                                                                                                          
+end)
+                                                                                                                                                                                                                                                                                                                                                    
+run(function()
+    local animTrack = nil
+    local speed = 1
+    local startPercent = 0
+    local endPercent = 100
+
+    local function playAnimation(id)
+        local humanoid = lp.Character and lp.Character:FindFirstChildWhichIsA("Humanoid")
+        if not humanoid then return end
+        local animator = humanoid:FindFirstChildOfClass("Animator")
+        if not animator then
+            animator = Instance.new("Animator", humanoid)
+        end
+        if animTrack then animTrack:Stop(); animTrack:Destroy() end
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://" .. id
+        local track = animator:LoadAnimation(anim)
+        track.Priority = Enum.AnimationPriority.Action
+        track:Play()
+        track:AdjustSpeed(speed)
+        track:AdjustWeight(1)
+        animTrack = track
+    end
+
+    local function enable()
+        local preset = Options.AnimPreset.Value or "Normal"
+        if preset == "Long Legs" then playAnimation("4049646104")
+        elseif preset == "Spin" then playAnimation("2825744398")
+        elseif preset == "Floppy" then playAnimation("3335483079")
+        elseif preset == "Zesty" then playAnimation("3360689775")
+        elseif Options.CustomAnimID.Value ~= "" then
+            playAnimation(Options.CustomAnimID.Value)
+        end
+    end
+
+    local function disable()
+        if animTrack then animTrack:Stop(); animTrack:Destroy(); animTrack = nil end
+    end
+
+    vape.Categories.Visuals:CreateModule({
+        Name = "Animation Player",
+        Function = function(cb) if cb then enable() else disable() end end,
+        Tooltip = "Play custom animations on your character"
+    }):CreateDropdown({
+        Name = "Preset", Values = {"Normal", "Long Legs", "Spin", "Floppy", "Zesty"}, Default = "Normal",
+        Function = function(v) if v ~= "Normal" then enable() else disable() end end
+    }):CreateTextBox({
+        Name = "Custom Animation ID", Placeholder = "id...",
+        Function = function(v) Options.CustomAnimID.Value = v end
+    })
+end)
+                                                                                                                                                                                                                                                                                                                                                                
+run(function()
+    local gui = nil
+
+    local function enable()
+        gui = Instance.new("ScreenGui", lp.PlayerGui)
+        gui.Name = "CustomImageCrosshair"
+        gui.IgnoreGuiInset = true
+        local img = Instance.new("ImageLabel", gui)
+        img.BackgroundTransparency = 1
+        img.AnchorPoint = Vector2.new(0.5, 0.5)
+        img.Position = UDim2.new(0.5, 0, 0.5, 0)
+        img.Size = UDim2.new(0, 24, 0, 24)
+        img.Image = "rbxassetid://97119437608195"
+    end
+
+    local function disable()
+        if gui then gui:Destroy(); gui = nil end
+    end
+
+    vape.Categories.Render:CreateModule({
+        Name = "Image Crosshair",
+        Function = function(cb) if cb then enable() else disable() end end,
+        Tooltip = "Custom image at screen center"
+    })
+end)                                                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                                    
+run(function()
+    local doubleJumpCooldown = 0
+    local jumpConnection
+
+    local uis = cloneref(game:GetService("UserInputService"))
+    local players = cloneref(game:GetService("Players"))
+    local lp = players.LocalPlayer
+
+    local function getMC()
+        local char = lp.Character
+        if not char then return nil end
+        local mc = char:FindFirstChild("MechanicsController")
+        if mc and type(mc) == "table" and mc.DoubleJump and mc.IsAlive then
+            return mc
+        end
+        for _, v in ipairs({lp.PlayerScripts, game:GetService("ReplicatedStorage")}) do
+            if v then
+                local found = v:FindFirstChild("MechanicsController")
+                if found and type(found) == "table" and found.DoubleJump and found.IsAlive then
+                    return found
+                end
+            end
+        end
+        return nil
+    end
+
+    local function tryDoubleJump()
+        if tick() < doubleJumpCooldown then return end
+
+        local char = lp.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+
+        local state = hum:GetState()
+        local airborne = (state == Enum.HumanoidStateType.Freefall
+                       or state == Enum.HumanoidStateType.Jumping
+                       or state == Enum.HumanoidStateType.Physics)
+
+        if not airborne then return end
+
+        doubleJumpCooldown = tick() + 0.5
+
+        local mc = getMC()
+        if mc then
+            pcall(function()
+                if mc:IsAlive() and not mc:IsFrozen() then
+                    mc._double_jumps_used = {}
+                    mc:DoubleJump()
+                end
+            end)
+        else
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            hum.JumpPower = 50 * (Options.DoubleJumpHeight and Options.DoubleJumpHeight.Value or 1)
+        end
+    end
+
+    local function enable()
+        if jumpConnection then return end
+        jumpConnection = uis.JumpRequest:Connect(function()
+            if not (Toggles.InfiniteDoubleJump and Toggles.InfiniteDoubleJump.Value) then return end
+            tryDoubleJump()
+        end)
+    end
+
+    local function disable()
+        if jumpConnection then
+            jumpConnection:Disconnect()
+            jumpConnection = nil
+        end
+    end
+
+    local DoubleJump = vape.Categories.Blatant:CreateModule({
+        Name = "Double Jump",
+        Function = function(callback)
+            if callback then
+                enable()
+            else
+                disable()
+            end
+        end,
+        Tooltip = "Press Space in mid-air to double jump"
+    })
+
+    local InfiniteToggle = DoubleJump:CreateToggle({
+        Name = "Infinite Jump",
+        Default = false,
+        Function = function(val) end
+    })
+    Toggles = Toggles or {}
+    Toggles.InfiniteDoubleJump = InfiniteToggle
+
+    local HeightOption = DoubleJump:CreateSlider({
+        Name = "Double Jump Height",
+        Default = 1,
+        Min = 0.5,
+        Max = 3,
+        Precision = 1,
+        Function = function(val) end
+    })
+    Options = Options or {}
+    Options.DoubleJumpHeight = HeightOption
+
+    DoubleJump.EnabledChanged:Connect(function(enabled)
+        if not enabled then
+            disable()
+        end
+    end)
+end)
+                                                                                                                                                                                                                                                                                                                                                                
+run(function()
+    local conn, mc
+    local slideWasActive = false
+    local boostAmount = 20
+
+    task.spawn(function()
+        task.wait(2)
+        pcall(function()
+            mc = require(lplr.PlayerScripts.Controllers.MechanicsController)
+        end)
+    end)
+
+    local function enable()
+        conn = runService.Heartbeat:Connect(function()
+            local char = lplr.Character
+            if not char then return end
+            local hum = char:FindFirstChildWhichIsA("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hum or not hrp then return end
+
+            local isSliding = (hum:GetState() == Enum.HumanoidStateType.Physics)
+                or (char:GetAttribute("Sliding") == true)
+                or (mc and mc.IsSliding)
+            
+            if isSliding and not slideWasActive then
+                slideWasActive = true
+                task.delay(0.1, function()
+                    pcall(function()
+                        if mc and mc.IsSliding and mc._sliding_velocity then
+                            local vel = mc._sliding_velocity.Velocity
+                            if vel.Magnitude > 0.1 then
+                                mc._sliding_velocity.Velocity = vel.Unit * math.min(vel.Magnitude + boostAmount, 120)
+                                return
+                            end
+                        end
+                        if hrp then
+                            local v = hrp.AssemblyLinearVelocity
+                            local flatV = Vector3.new(v.X,0,v.Z)
+                            if flatV.Magnitude > 0.1 then
+                                hrp.AssemblyLinearVelocity = v + flatV.Unit * boostAmount
+                            else
+                                hrp.AssemblyLinearVelocity += (hrp.CFrame.LookVector * Vector3.new(1,0,1)).Unit * boostAmount
+                            end
+                        end
+                    end)
+                end)
+            elseif not isSliding then
+                slideWasActive = false
+            end
+        end)
+    end
+
+    local function disable()
+        if conn then conn:Disconnect(); conn = nil end
+        slideWasActive = false
+    end
+
+    local SB = vape.Categories.Blatant:CreateModule({
+        Name = "Slide Boost",
+        Function = function(callback)
+            if callback then enable() else disable() end
+        end,
+        Tooltip = "Boosts speed when sliding"
+    })
+    SB:CreateSlider({
+        Name = "Boost Amount", Min = 5, Max = 60, Default = 20, Suffix = "studs/s",
+        Function = function(v) boostAmount = v end
+    })
+end)                                                                                                                                                                                                                                                                                                                                                                
+
+run(function()
+    local SlingTargets = {}
+    local SlingBypass_Void = CFrame.new(0, 100000, 0)
+    local connChildAdded, connChildRemoved, connHeartbeat
+    getgenv().RealPlayerPositions = {}
+
+    local function enable()
+        connChildAdded = workspace.ChildAdded:Connect(function(o)
+            if not o:IsA("BasePart") then return end
+            if o.Name == "CoreProjectile" then
+                SlingTargets[o] = true
+            elseif o.Name == "Part" then
+                task.defer(function()
+                    if o and o.Parent and o.AssemblyLinearVelocity.Magnitude > 50 then
+                        SlingTargets[o] = true
+                    end
+                end)
+            end
+        end)
+        connChildRemoved = workspace.ChildRemoved:Connect(function(o)
+            SlingTargets[o] = nil
+        end)
+        connHeartbeat = runService.Heartbeat:Connect(function()
+            if not libraryRunning then return end
+            local char = lplr.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+
+            pcall(function()
+                local allPlayers = game:GetService("Players"):GetPlayers()
+                for _, p in ipairs(allPlayers) do
+                    if p ~= lplr and p.Character then
+                        local pHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                        if pHrp then
+                            getgenv().RealPlayerPositions[p] = pHrp.CFrame
+                            pHrp.CFrame = SlingBypass_Void
+                            pHrp.AssemblyLinearVelocity = Vector3.zero
+                            pHrp.AssemblyAngularVelocity = Vector3.zero
+                        end
+                    end
+                end
+
+                for _, obj in pairs(workspace:GetChildren()) do
+                    if obj.Name == "CoreProjectile" and obj:IsA("BasePart") then
+                        obj.CFrame = SlingBypass_Void
+                        obj.AssemblyLinearVelocity = Vector3.zero
+                    end
+                end
+                for obj in pairs(SlingTargets) do
+                    if obj and obj.Parent then
+                        obj.CFrame = SlingBypass_Void
+                        obj.AssemblyLinearVelocity = Vector3.zero
+                    else
+                        SlingTargets[obj] = nil
+                    end
+                end
+            end)
+        end)
+    end
+
+    local function disable()
+        if connChildAdded then connChildAdded:Disconnect() end
+        if connChildRemoved then connChildRemoved:Disconnect() end
+        if connHeartbeat then connHeartbeat:Disconnect() end
+        SlingTargets = {}
+        table.clear(getgenv().RealPlayerPositions)
+    end
+
+    vape.Categories.Blatant:CreateModule({
+        Name = "Sling Bypass",
+        Function = function(callback)
+            if callback then enable() else disable() end
+        end,
+        Tooltip = "Voids projectiles"
+    })
+end)                                                                                                                                                                                                                                                                                                                                                                
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
 run(function()
     if hookmetamethod and getnamecallmethod then
