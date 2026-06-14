@@ -1,3 +1,10 @@
+
+
+local run = function(func, issue)
+    if issue then return end
+    pcall(func)
+end
+
 local playersService = cloneref(game:GetService('Players'))
 local replicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
 local runService = cloneref(game:GetService('RunService'))
@@ -25,6 +32,15 @@ local tween = vape.Libraries.tween
 local targetinfo = vape.Libraries.targetinfo
 local getfontsize = vape.Libraries.getfontsize
 local getcustomasset = vape.Libraries.getcustomasset
+
+for _, v in {
+    'SilentAim', 'Reach', 'AntiFall', 'AntiRagdoll', 'Blink',
+    'Disabler', 'SafeWalk', 'MurderMystery', 'TriggerBot',
+    'ChatSpammer', 'Arrest Highlight', 'HitNotifications',
+    'Bullet Tracers', 'Head Pitch Spinbot (Client)', 'AutoArrest',
+    'Anti Riot', 'Anti Taze', 'C4 ESP',
+    'AutoReset', 'AutoHeal'
+} do vape:Remove(v) end
 
 local blacklistu = "https://raw.githubusercontent.com/imcomingforyou6959-gif/whitelists/refs/heads/main/PlayerBlacklist.json" .. "?t=" .. tick()
 
