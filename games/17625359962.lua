@@ -1283,7 +1283,7 @@ run(function()
         end
     end
 
-    local soundNames = {"Default"}
+    local soundNames = {}
     local soundMap = {}
 
     for _, s in ipairs(assetSounds) do
@@ -1295,81 +1295,61 @@ run(function()
         soundMap[s.name] = s.id
     end
 
-    local categoryMap = {
-        Body       = "rbxassetid://0",
-        Head       = "rbxassetid://0",
-        Kill       = "rbxassetid://0",
-        Eliminated = "rbxassetid://0",
-    }
+    local hitsoundEnabled = false
+    local currentSoundId = soundMap["Bell"]
+    local hitConnection = nil
 
-    local childAddedConn
-    local enabled = false
-
-    local function processSound(inst)
-        if not inst:IsA("Sound") then return end
-        local name = inst.Name
-        local id = nil
-        if name:find("HitBody") or name:find("Body") then
-            id = categoryMap.Body
-        elseif name:find("HitHead") or name:find("Head") then
-            id = categoryMap.Head
-        elseif name:find("Kill") then
-            id = categoryMap.Kill
-        elseif name:find("Eliminated") then
-            id = categoryMap.Eliminated
-        end
-        if id and id ~= "rbxassetid://0" then
-            pcall(function()
-                inst.SoundId = id
+    local function applySoundReplacement()
+        if hitConnection then hitConnection:Disconnect() end
+        if not hitsoundEnabled then return end
+        local viewModel = nil
+        pcall(function()
+            viewModel = lplr.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem:WaitForChild("ClientViewModel", 5)
+        end)
+        if viewModel then
+            hitConnection = viewModel.ChildAdded:Connect(function(v)
+                if v:IsA("Sound") then
+                    local newSoundId = currentSoundId
+                    if newSoundId and v.SoundId ~= newSoundId then
+                        v.SoundId = newSoundId
+                        v.Pitch = 1
+                        v.Volume = 1
+                    end
+                end
             end)
         end
     end
 
-    local function enable()
-        if childAddedConn then return end
-        childAddedConn = workspace.DescendantAdded:Connect(processSound)
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            pcall(processSound, obj)
-        end
-    end
-
-    local function disable()
-        if childAddedConn then
-            childAddedConn:Disconnect()
-            childAddedConn = nil
-        end
-    end
-
-    local AudioSwap = vape.Categories.Utility:CreateModule({
-        Name = "Audio Swapper",
-        Function = function(cb)
-            if cb then enable() else disable() end
-        end,
-        Tooltip = "Replace"
-    })
-
-    local function addCategoryDropdown(categoryName, defaultId)
-        AudioSwap:CreateDropdown({
-            Name = categoryName .. " Sound",
-            List = soundNames,
-            Default = "Default",
-            Function = function(val)
-                categoryMap[categoryName] = (val == "Default") and "rbxassetid://0" or soundMap[val]
-                if enabled then
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        pcall(processSound, obj)
-                    end
-                end
+    local HitsoundModule = vape.Categories.Utility:CreateModule({
+        Name = "Hitsound",
+        Function = function(callback)
+            hitsoundEnabled = callback
+            applySoundReplacement()
+            if not callback and hitConnection then
+                hitConnection:Disconnect()
+                hitConnection = nil
             end
-        })
-    end
-
-    addCategoryDropdown("Body",       "rbxassetid://0")
-    addCategoryDropdown("Head",       "rbxassetid://0")
-    addCategoryDropdown("Kill",       "rbxassetid://0")
-    addCategoryDropdown("Eliminated", "rbxassetid://0")
+        end
+    })
+    HitsoundModule:CreateToggle({
+        Name = "Hitsound",
+        Default = false,
+        Function = function(c)
+            hitsoundEnabled = c
+            applySoundReplacement()
+        end
+    })
+    HitsoundModule:CreateDropdown({
+        Name = "Select Sound",
+        List = soundNames,
+        Function = function(val)
+            currentSoundId = soundMap[val] or soundMap["Bell"]
+            applySoundReplacement()
+            notif('Hitsound', 'Selected: '..val, 2, 'success')
+        end
+    })
 end)
-
+                                                                                                                                                                    
 run(function()
     local Lighting = game:GetService("Lighting")
     local origBrightness, origClockTime, origFogEnd, origFogStart, origGlobalShadows, origOutdoorAmbient =
@@ -3231,7 +3211,7 @@ run(function()
     local function enable()
         if spoofEnabled then return end
         if not checksPass() then
-            warn("Spoofer prerequisites not met (no CustomLeaderstats/Level or Level attribute)")
+            notif("Name/Level Spoofer", "Failed: missing CustomLeaderstats/Level", 3, "alert")
             return
         end
         spoofEnabled = true
@@ -3289,7 +3269,7 @@ run(function()
         Tooltip = "Spoofs your name"
     })
 
-    Spoofer:CreateTextBox({
+    Spoofer:CreateConfigInput({
         Name = "Name",
         Default = config.client_name,
         Placeholder = "Your fake name",
@@ -3303,7 +3283,7 @@ run(function()
         end
     })
 
-    Spoofer:CreateTextBox({
+    Spoofer:CreateConfigInput({
         Name = "Level Spoof",
         Default = tostring(config.level_spoof),
         Placeholder = "Set level (max 9999)",
@@ -3311,17 +3291,17 @@ run(function()
             local num = tonumber(val)
             if num then
                 if num > 9999 then
-                    warn("Level cannot exceed 9999 – set to 9999")
+                    notif("Name/Level Spoofer", "Level cannot exceed 9999 – capped to 9999", 2, "alert")
                     config.level_spoof = 9999
                 else
                     config.level_spoof = num
                 end
             else
-                warn("Level must be a number")
+                notif("Name/Level Spoofer", "Level must be a number", 2, "alert")
             end
         end
     })
-end)                                                                                                                                                                                                                                                                                                       
+end)                                                                                                                                                                                                                                                                                                
                                                                                                                                                                                                                                                                                                                                                         
 run(function()
     local module = vape.Categories.Utility:CreateModule({
