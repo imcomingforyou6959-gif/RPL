@@ -411,7 +411,7 @@ run(function()
         for _, player in pairs(playersFolder:GetChildren()) do
             for _, tool in pairs(player:GetChildren()) do
                 if tool:IsA("Tool") and noSpreadEnabled then
-                    tool:SetAttribute("spread", 0)
+                    tool:SetAttribute("spread", 1000)
                 end
             end
         end
