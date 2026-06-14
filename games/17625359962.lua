@@ -3135,7 +3135,7 @@ run(function()
     local originalLevel, originalAttributeLevel
 
     local config = {
-        level_spoof = 67,
+        level_spoof = 1381,
         client_name = "rawr.xyz",
         enemy_name = "rawr.xyz | discord.gg/UFjWRWsSB"
     }
@@ -3175,7 +3175,7 @@ run(function()
             if localplayer:FindFirstChild("CustomLeaderstats") and localplayer.CustomLeaderstats:FindFirstChild("Level") then
                 localplayer.CustomLeaderstats.Level.Value = config.level_spoof
             end
-            localplayer:SetAttribute("Level", config.level_spoof)
+            localplayer:SetAttribute("Level", "N" .. tostring(config.level_spoof))
         end)
     end
 
@@ -3260,7 +3260,7 @@ run(function()
         Function = function(callback)
             if callback then enable() else disable() end
         end,
-        Tooltip = "yu"
+        Tooltip = "..."
     })
 
     Spoofer:CreateTextBox({
@@ -3279,23 +3279,24 @@ run(function()
 
     Spoofer:CreateTextBox({
         Name = "Level Spoof",
-        Default = tostring(config.level_spoof),
-        Placeholder = "Set level (max 9999)",
+        Default = "N" .. tostring(config.level_spoof),
+        Placeholder = "Enter level as Nxxxx (max N9999)",
         Function = function(val)
             if val == "" then return end
-            local num = tonumber(val)
-            if num then
-                if num > 9999 then
-                    notif("Name/Level Spoofer", "Level cannot exceed 9999 – capped to 9999", 2, "alert")
-                    config.level_spoof = 9999
-                else
-                    config.level_spoof = num
-                end
-                if spoofEnabled then
-                    applyLevelSpoof()
-                end
+            local numStr = string.match(val, "^[Nn](%d+)$")
+            if not numStr then
+                notif("Name/Level Spoofer", "Format must be N followed by number (e.g. N1234)", 2, "alert")
+                return
+            end
+            local num = tonumber(numStr)
+            if num > 9999 then
+                notif("Name/Level Spoofer", "Level cannot exceed 9999 – capped to 9999", 2, "alert")
+                config.level_spoof = 9999
             else
-                notif("Name/Level Spoofer", "Invalid number – please enter a valid integer", 2, "alert")
+                config.level_spoof = num
+            end
+            if spoofEnabled then
+                applyLevelSpoof()
             end
         end
     })
