@@ -3135,9 +3135,9 @@ run(function()
     local originalLevel, originalAttributeLevel
 
     local config = {
-        level_spoof = 6741,
+        level_spoof = 67,
         client_name = "rawr.xyz",
-        enemy_name = "discord.gg/UFjWRWsSB"
+        enemy_name = "rawr.xyz | discord.gg/UFjWRWsSB"
     }
 
     local alloc = function(str) return cloneref(game:GetService(str)) end
@@ -3260,7 +3260,7 @@ run(function()
         Function = function(callback)
             if callback then enable() else disable() end
         end,
-        Tooltip = "u"
+        Tooltip = "yu"
     })
 
     Spoofer:CreateTextBox({
@@ -3282,6 +3282,7 @@ run(function()
         Default = tostring(config.level_spoof),
         Placeholder = "Set level (max 9999)",
         Function = function(val)
+            if val == "" then return end
             local num = tonumber(val)
             if num then
                 if num > 9999 then
@@ -3294,7 +3295,7 @@ run(function()
                     applyLevelSpoof()
                 end
             else
-                notif("Name/Level Spoofer", "Level must be a number", 2, "alert")
+                notif("Name/Level Spoofer", "Invalid number – please enter a valid integer", 2, "alert")
             end
         end
     })
